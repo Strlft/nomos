@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Nomos · Advisor</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#08090c;--s1:#0e1013;--s2:#141618;--s3:#1a1d21;
+  --b0:rgba(255,255,255,.06);--b1:rgba(255,255,255,.11);--b2:rgba(255,255,255,.18);
+  --warm:#c4956a;--warm2:#a07350;--wBg:rgba(196,149,106,.07);
+  --g:#4ade80;   --gBg:rgba(74,222,128,.07);
+  --r:#f87171;   --rBg:rgba(248,113,113,.07);
+  --bl:#60a5fa;  --blBg:rgba(96,165,250,.07);
+  --vi:#a78bfa;  --viBg:rgba(167,139,250,.07);
+  --gy:#6b7280;  --gyBg:rgba(107,114,128,.07);
+  --t1:#e4e4e7;--t2:#8b8d94;--t3:#44464d;
+  --ff:'Inter',system-ui,sans-serif;
+  --fm:'JetBrains Mono',monospace;
+  --rad:12px;
+  --trans:.18s ease;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--t1);font-family:var(--ff);font-size:13px;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--b1);border-radius:2px}
+
+/* ── Top bar ── */
+.top{
+  height:54px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 28px;border-bottom:1px solid var(--b0);flex-shrink:0;
+}
+.top-l{display:flex;align-items:center;gap:10px}
+.logo-mark{
+  width:28px;height:28px;border-radius:7px;flex-shrink:0;
+  background:linear-gradient(140deg,#a78bfa,#60a5fa);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--fm);font-weight:600;font-size:13px;color:#fff;
+  box-shadow:0 0 0 1px rgba(167,139,250,.2);
+}
+.logo-name{font-weight:600;font-size:14px;letter-spacing:-.2px}
+.role-pill{
+  padding:2px 9px;border-radius:20px;
+  background:var(--viBg);color:var(--vi);
+  border:1px solid rgba(167,139,250,.2);
+  font-size:10px;font-weight:500;font-family:var(--fm);
+  margin-left:4px;
+}
+.top-sep{width:1px;height:16px;background:var(--b1);margin:0 4px}
+.top-user{font-size:11px;color:var(--t2)}
+.top-r{display:flex;align-items:center;gap:18px;font-size:11px;color:var(--t3)}
+.status-dot{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:3px 9px;border-radius:20px;border:1px solid var(--b0);
+  font-size:10px;font-family:var(--fm);transition:all var(--trans);
+}
+.status-dot.live{color:var(--g);border-color:rgba(74,222,128,.2);background:var(--gBg)}
+.status-dot.offline{color:var(--r);border-color:rgba(248,113,113,.2);background:var(--rBg)}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.top-clock{font-family:var(--fm);font-size:10px;color:var(--t3)}
+.sign-out{
+  font-size:10px;color:var(--t3);cursor:pointer;
+  padding:4px 10px;border-radius:6px;border:1px solid transparent;
+  transition:all var(--trans);
+}
+.sign-out:hover{color:var(--t1);border-color:var(--b1);background:var(--b0)}
+
+/* ── Layout ── */
+.wrap{flex:1;display:flex;overflow:hidden}
+.side{
+  width:224px;padding:20px 0;flex-shrink:0;
+  display:flex;flex-direction:column;border-right:1px solid var(--b0);
+}
+.side-l{
+  font-size:10px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--t3);padding:0 20px;margin-bottom:4px;margin-top:16px;
+}
+.side-l:first-child{margin-top:0}
+.si{
+  padding:7px 20px;font-size:12px;color:var(--t2);cursor:pointer;
+  transition:all .12s;display:flex;justify-content:space-between;align-items:center;
+}
+.si:hover{color:var(--t1);background:var(--b0)}
+.si.on{color:var(--vi);background:rgba(167,139,250,.04)}
+.si-badge{
+  font-family:var(--fm);font-size:9px;padding:2px 6px;
+  border-radius:4px;background:var(--b0);color:var(--t3);
+  transition:all var(--trans);
+}
+.si-badge.al{color:var(--r);background:var(--rBg);border:1px solid rgba(248,113,113,.15)}
+.si-badge.ok{color:var(--g);background:var(--gBg);border:1px solid rgba(74,222,128,.15)}
+.si-badge.vi{color:var(--vi);background:var(--viBg);border:1px solid rgba(167,139,250,.15)}
+.side-ft{
+  margin-top:auto;padding:16px 20px;border-top:1px solid var(--b0);
+  font-size:10px;color:var(--t3);line-height:2;
+}
+.ct{flex:1;overflow-y:auto;padding:32px 40px}
+
+/* ── Typography ── */
+.hd{font-size:20px;font-weight:600;margin-bottom:6px;letter-spacing:-.4px}
+.sub{font-size:11px;color:var(--t3);margin-bottom:28px}
+.sh{font-size:13px;font-weight:600;color:var(--t2);margin-bottom:12px;margin-top:28px;display:flex;align-items:center;gap:8px}
+
+/* ── Tag / badge ── */
+.tag{font-size:9px;font-family:var(--fm);padding:3px 8px;border-radius:4px;font-weight:400}
+.tag-r{background:var(--rBg);color:var(--r)}.tag-g{background:var(--gBg);color:var(--g)}
+.tag-w{background:var(--wBg);color:var(--warm)}.tag-v{background:var(--viBg);color:var(--vi)}
+.tag-b{background:var(--blBg);color:var(--bl)}
+
+/* ── Status pill ── */
+.p{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:3px 10px;border-radius:6px;font-size:10px;font-weight:500;
+  transition:background var(--trans),border-color var(--trans);
+}
+.p-g  {background:var(--gBg); color:var(--g);    border:1px solid rgba(74,222,128,.22)}
+.p-r  {background:var(--rBg); color:var(--r);    border:1px solid rgba(248,113,113,.22)}
+.p-w  {background:var(--wBg); color:var(--warm); border:1px solid rgba(196,149,106,.22)}
+.p-b  {background:var(--blBg);color:var(--bl);   border:1px solid rgba(96,165,250,.22)}
+.p-v  {background:var(--viBg);color:var(--vi);   border:1px solid rgba(167,139,250,.22)}
+.p-gy {background:var(--gyBg);color:var(--gy);   border:1px solid rgba(107,114,128,.22)}
+
+/* ── Card ── */
+.card{
+  background:var(--s1);border:1px solid var(--b0);border-radius:var(--rad);
+  padding:20px 24px;margin-bottom:12px;
+  transition:border-color var(--trans);
+}
+.card:hover{border-color:var(--b1)}
+
+/* ── KPI row ── */
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:28px}
+.kpi{
+  background:var(--s1);border:1px solid var(--b0);border-radius:var(--rad);
+  padding:18px 20px;transition:border-color var(--trans),box-shadow var(--trans);
+}
+.kpi:hover{border-color:var(--b1);box-shadow:0 4px 20px rgba(0,0,0,.3)}
+.kpi-l{font-size:10px;color:var(--t3);margin-bottom:10px;font-weight:500;letter-spacing:.02em}
+.kpi-v{font-size:34px;font-weight:600;line-height:1;letter-spacing:-.5px}
+.kpi-s{font-size:10px;color:var(--t2);margin-top:8px}
+
+/* ── Tables ── */
+.tb{width:100%;border-collapse:collapse;margin-bottom:20px}
+.tb th{
+  font-size:10px;font-weight:500;letter-spacing:.05em;color:var(--t3);
+  text-align:left;padding:10px 12px;border-bottom:1px solid var(--b0);
+  text-transform:uppercase;
+}
+.tb td{padding:10px 12px;border-bottom:1px solid var(--b0);font-size:12px;color:var(--t2)}
+.tb tbody tr{transition:background var(--trans)}
+.tb tbody tr:nth-child(even){background:rgba(255,255,255,.018)}
+.tb tbody tr:hover{background:rgba(255,255,255,.032)!important}
+.tb .m{font-family:var(--fm);font-size:11px}
+.tb .id{color:var(--warm);cursor:pointer;font-family:var(--fm);font-size:11px}
+
+/* ── Buttons ── */
+.btn{
+  font-size:10px;padding:6px 14px;border-radius:6px;cursor:pointer;
+  border:1px solid var(--b0);background:transparent;color:var(--t2);
+  font-family:var(--ff);transition:all var(--trans);
+}
+.btn:hover{background:var(--b0);color:var(--t1)}
+.btn:disabled{opacity:.35;cursor:not-allowed;pointer-events:none}
+.btn.act{color:var(--vi);border-color:rgba(167,139,250,.28);background:var(--viBg)}
+.btn.act:hover{background:rgba(167,139,250,.14)}
+.btn.approve{
+  color:var(--warm);border-color:rgba(196,149,106,.32);
+  background:var(--wBg);font-weight:500;
+}
+.btn.approve:hover{background:rgba(196,149,106,.14)}
+.btn.danger{color:var(--r);border-color:rgba(248,113,113,.25)}
+.btn.danger:hover{background:var(--rBg)}
+
+/* ── Alert items ── */
+.al{
+  border-radius:var(--rad);padding:14px 18px;margin-bottom:8px;
+  display:flex;gap:12px;border:1px solid var(--b0);background:var(--s1);align-items:flex-start;
+  transition:border-color var(--trans);
+}
+.al.cr{border-left:2px solid var(--r)}.al.wr{border-left:2px solid var(--warm)}.al.inf{border-left:2px solid var(--bl)}
+.al-t{font-size:12px;font-weight:600;margin-bottom:2px}.al-d{font-size:11px;color:var(--t2);line-height:1.5}
+.al-r{font-family:var(--fm);font-size:9px;color:var(--t3);margin-top:4px}
+.al-a{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
+
+/* ── Clause builder ── */
+.clause{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--b0)}
+.clause:last-child{border-bottom:none}
+.clause-l{display:flex;align-items:center;gap:12px}
+.clause-ref{font-family:var(--fm);font-size:10px;color:var(--t3);width:70px}
+.clause-name{font-size:12px;font-weight:500}.clause-desc{font-size:10px;color:var(--t3);margin-top:2px}
+.toggle{
+  width:36px;height:20px;border-radius:10px;background:var(--s3);
+  cursor:pointer;position:relative;transition:background var(--trans);flex-shrink:0;
+}
+.toggle.on{background:var(--vi)}
+.toggle::after{
+  content:'';position:absolute;width:16px;height:16px;border-radius:50%;
+  background:#fff;top:2px;left:2px;transition:left .2s;
+}
+.toggle.on::after{left:18px}
+.toggle.mandatory{background:var(--g);cursor:default;opacity:.6}
+.toggle.mandatory::after{left:18px}
+
+/* ── Netting ── */
+.netting-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.netting-card{background:var(--s2);border-radius:var(--rad);padding:16px 18px}
+.netting-card h4{font-size:12px;font-weight:600;margin-bottom:8px}
+.netting-card p{font-size:11px;color:var(--t2);line-height:1.7}
+
+/* ── Audit log ── */
+.log-item{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--b0);font-size:11px}
+.log-time{font-family:var(--fm);font-size:10px;color:var(--t3);width:140px;flex-shrink:0}
+.log-ev{color:var(--t2);line-height:1.5;word-break:break-all}
+
+/* ── Animations ── */
+.pulse{animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Footer bar ── */
+.ft{
+  height:28px;display:flex;align-items:center;justify-content:center;
+  border-top:1px solid var(--b0);font-size:9px;color:var(--t3);
+  letter-spacing:.04em;flex-shrink:0;
+}
+
+/* ── Modal ── */
+.modal-bg{
+  position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:200;
+  display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(8px);
+}
+.modal{
+  background:var(--s1);border:1px solid var(--b1);border-radius:18px;
+  width:600px;max-height:88vh;overflow-y:auto;padding:34px 38px;
+}
+.modal-h{font-size:18px;font-weight:600;margin-bottom:4px;letter-spacing:-.3px}
+.modal-sub{font-size:11px;color:var(--t3);margin-bottom:24px}
+
+/* Step indicator */
+.step-ind{display:flex;gap:6px;margin-bottom:28px}
+.step-dot{height:3px;flex:1;border-radius:2px;background:var(--b1);transition:background .3s}
+.step-dot.done{background:var(--vi)}
+.step-dot.cur{background:rgba(167,139,250,.55)}
+
+/* Form elements */
+.fr{margin-bottom:16px}
+.fl{
+  font-size:10px;color:var(--t3);letter-spacing:.05em;text-transform:uppercase;
+  margin-bottom:5px;font-weight:500;display:flex;align-items:center;gap:4px;
+}
+.req{color:var(--r);font-size:10px}
+.fi{
+  width:100%;background:var(--s2);border:1px solid var(--b1);border-radius:8px;
+  padding:9px 12px;color:var(--t1);font-family:var(--ff);font-size:12px;
+  outline:none;transition:border-color var(--trans),box-shadow var(--trans);
+}
+.fi:focus{border-color:rgba(167,139,250,.55);box-shadow:0 0 0 3px rgba(167,139,250,.08)}
+.fi.err{border-color:rgba(248,113,113,.55)!important;box-shadow:0 0 0 3px rgba(248,113,113,.07)!important}
+select.fi option{background:var(--s2)}
+.fi[type=number]{-moz-appearance:textfield}
+.fi::-webkit-outer-spin-button,.fi::-webkit-inner-spin-button{-webkit-appearance:none}
+.ferr{font-size:10px;color:var(--r);margin-top:4px}
+
+.fr2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fr3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+
+/* Toggle row */
+.ftog{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:11px 0;border-bottom:1px solid var(--b0);
+}
+.ftog:last-child{border-bottom:none}
+.ftog-l .fn{font-size:12px;font-weight:500}
+.ftog-l .fd{font-size:10px;color:var(--t3);margin-top:2px}
+
+/* Modal footer */
+.mfooter{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-top:24px;padding-top:20px;border-top:1px solid var(--b0);
+}
+.merr{
+  background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.2);
+  border-radius:6px;padding:9px 12px;font-size:11px;color:var(--r);margin-bottom:14px;
+}
+
+/* Result */
+.hash-box{
+  background:var(--s2);border:1px solid var(--b1);border-radius:8px;
+  padding:11px 14px;font-family:var(--fm);font-size:10px;color:var(--vi);
+  word-break:break-all;margin:10px 0;
+}
+.success-ring{
+  width:52px;height:52px;border-radius:50%;background:var(--gBg);
+  border:1px solid rgba(74,222,128,.28);display:flex;align-items:center;
+  justify-content:center;font-size:22px;margin:0 auto 14px;
+}
+.section-sep{
+  font-size:11px;color:var(--t3);font-weight:500;
+  border-top:1px solid var(--b0);padding-top:16px;margin:16px 0 12px;
+}
+</style></head><body>
+
+<div class="top">
+  <div class="top-l">
+    <div class="logo-mark">N</div>
+    <div class="logo-name">Nomos</div>
+    <span class="role-pill">Advisor</span>
+    <div class="top-sep"></div>
+    <span class="top-user">Linklaters LLP · J. Smith</span>
+  </div>
+  <div class="top-r">
+    <span id="api-status" class="status-dot"><span class="dot pulse"></span>Connecting…</span>
+    <span class="top-clock" id="ck"></span>
+    <span class="sign-out" onclick="logout()">Sign out</span>
+  </div>
+</div>
+
+<div class="wrap">
+<div class="side">
+  <div class="side-l">Overview</div>
+  <div class="si on" onclick="N('d',this)">Dashboard</div>
+  <div class="si" onclick="N('act',this)">Pending Actions <span class="si-badge al" id="sb-actions">—</span></div>
+  <div class="side-l">Contracts</div>
+  <div class="si" onclick="openNC()" style="color:var(--vi);font-weight:500">+ New Contract</div>
+  <div class="si" onclick="N('mon',this)">Monitoring §3/§4/§5 <span class="si-badge vi" id="sb-cts">—</span></div>
+  <div class="si" onclick="N('cb',this)">Clause Builder</div>
+  <div class="si" onclick="N('net',this)">Netting Opinions</div>
+  <div class="side-l">Operations</div>
+  <div class="si" onclick="N('orc',this)">Oracle</div>
+  <div class="si" onclick="N('aud',this)">Audit Trail</div>
+  <div class="si" onclick="N('not',this)">Notices §12</div>
+  <div class="side-ft">Firm: <span style="color:var(--vi)">Linklaters LLP</span><br>Clients: Alpha Corp S.A.<br><span id="sb-ft">Contracts: —</span></div>
+</div>
+<div class="ct" id="C"></div>
+</div>
+
+<div id="nc-bg" class="modal-bg" style="display:none" onclick="if(event.target===this)closeNC()">
+<div class="modal" onclick="event.stopPropagation()">
+<div id="nc-inner"></div>
+</div></div>
+
+<div class="ft">§1(b) ISDA 2002 · Confirmation &gt; Schedule &gt; MA &gt; Code · Legal text always prevails · Live API ↻ 5s</div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────────────────────────
+const API = 'http://localhost:8000/api'
+
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+;(function(){const r=localStorage.getItem('nomos_role');if(r&&r!=='advisor')window.location.href='login.html'})()
+function logout(){localStorage.removeItem('nomos_role');window.location.href='login.html'}
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let S = { contracts:[], oracle:{}, details:{}, loading:true, error:null, lastUpdate:null }
+let view = 'd'
+
+// ── CLOCK ─────────────────────────────────────────────────────────────────────
+function tk(){const n=new Date();document.getElementById('ck').textContent=n.toUTCString().slice(5,16)+' '+n.toUTCString().slice(17,22)+' UTC'}
+setInterval(tk,1e3);tk()
+
+// ── API HELPERS ───────────────────────────────────────────────────────────────
+async function apiFetch(path, opts={}) {
+  const r = await fetch(API+path, opts)
+  if (!r.ok) throw new Error(`HTTP ${r.status}`)
+  return r.json()
+}
+async function apiPost(path, body) {
+  return apiFetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:body?JSON.stringify(body):undefined})
+}
+
+// ── DATA REFRESH (polled every 5s) ────────────────────────────────────────────
+async function refresh() {
+  try {
+    const [cs, orc] = await Promise.all([
+      apiFetch('/contracts?role=advisor'),
+      apiFetch('/oracle/latest')
+    ])
+    S.contracts = cs
+    S.oracle = orc
+    await Promise.all(cs.map(x =>
+      apiFetch(`/contracts/${x.id}?role=advisor`).then(d => S.details[x.id] = d).catch(()=>{})
+    ))
+    S.loading = false
+    S.error = null
+    S.lastUpdate = new Date()
+    updateSidebar()
+  } catch(e) {
+    S.error = 'API unreachable — is the server running on :8000?'
+  }
+  R()
+}
+setInterval(refresh, 5000)
+refresh()
+
+// ── SIDEBAR ───────────────────────────────────────────────────────────────────
+function updateSidebar() {
+  const acts = buildActions()
+  const el = document.getElementById('sb-actions')
+  if(el) { el.textContent=acts.length||'0'; el.className='si-badge '+(acts.filter(a=>a.sev==='critical').length?'al':'vi') }
+  const ec = document.getElementById('sb-cts'); if(ec) ec.textContent=S.contracts.length||'0'
+  const ft = document.getElementById('sb-ft'); if(ft) ft.textContent=`Contracts: ${S.contracts.length} active`
+  const st = document.getElementById('api-status')
+  if(st) {
+    st.className = 'status-dot '+(S.error?'offline':'live')
+    st.innerHTML = S.error
+      ? `<span class="dot"></span>Offline`
+      : `<span class="dot pulse"></span>Live API`
+  }
+}
+
+// ── NAVIGATION ────────────────────────────────────────────────────────────────
+function N(v, el) { view=v; document.querySelectorAll('.si').forEach(e=>e.classList.remove('on')); if(el) el.classList.add('on'); R() }
+function R() { const fn=({d:rD,act:rAct,mon:rMon,cb:rCb,net:rNet,orc:rOrc,aud:rAud,not:rNot})[view]; const res=fn(document.getElementById('C')); if(res instanceof Promise) res.catch(console.error) }
+
+// ── DISPLAY HELPERS ───────────────────────────────────────────────────────────
+const eur = (v,d=2) => v!=null ? '€'+Number(v).toLocaleString('en-GB',{minimumFractionDigits:d,maximumFractionDigits:d}) : '—'
+const pct = v => v!=null ? (Number(v)*100).toFixed(3)+'%' : '—'
+const updBadge = () => S.lastUpdate ? `<span style="font-size:9px;color:var(--t3);margin-left:10px;font-weight:400">↻ ${S.lastUpdate.toLocaleTimeString()}</span>` : ''
+const errBanner = () => S.error ? `<div style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.22);border-radius:8px;padding:10px 16px;margin-bottom:20px;font-size:11px;color:var(--r)">⚠ ${S.error}</div>` : ''
+const spinner = () => `<div style="padding:60px;text-align:center;color:var(--t3);font-size:11px;letter-spacing:.04em">Loading from API…</div>`
+
+// Status badge helpers
+function statusCls(st) {
+  if (st==='ACTIVE')            return 'p-g'
+  if (st==='PENDING_SIGNATURE') return 'p-w'
+  if (st==='SUSPENDED')         return 'p-r'
+  if (st==='TERMINATED')        return 'p-gy'
+  if (st==='EARLY_TERM_NOTIFIED') return 'p-r'
+  return 'p-b'
+}
+function statusLbl(st) {
+  if (st==='PENDING_SIGNATURE')   return '◐ Pending Sig'
+  if (st==='EARLY_TERM_NOTIFIED') return '⚡ ETD Notified'
+  if (st==='TERMINATED')          return '✕ Terminated'
+  return st
+}
+
+// ── ACTIONS ───────────────────────────────────────────────────────────────────
+function buildActions() {
+  const acts = []
+  S.contracts.forEach(x => {
+    if (x.status === 'PENDING_SIGNATURE') {
+      acts.push({type:'sign_pending',sev:'warn',contract:x.id,desc:`Awaiting client signature — ${x.id}. Share Confirmation PDF with ${x.party_b} for execution.`,ref:'§1(b) ISDA 2002'})
+      return
+    }
+    const det = S.details[x.id]
+    if (det) {
+      det.periods.filter(p=>p.fixed_amount!==null && !p.payment_confirmed).forEach(p => {
+        acts.push({
+          type:'approve_pi', sev:'normal', contract:x.id, period:p.number,
+          amt:p.net_amount, date:p.payment_date, payer:p.net_payer,
+          desc:`Approve Payment Instruction P${p.number} — ${eur(p.net_amount)} · Pay Date: ${p.payment_date}`,
+          ref:'§2(a)(i) ISDA 2002'
+        })
+      })
+      const nextCalc = det.periods.find(p=>p.fixed_amount===null)
+      if (nextCalc) {
+        acts.push({
+          type:'execute_period', sev:'info', contract:x.id, period:nextCalc.number,
+          desc:`Run calculation P${nextCalc.number} · ${x.id} · Reset Date: ${nextCalc.start}`,
+          ref:'§2(a)(i) · Oracle fetch'
+        })
+      }
+      ;(det.eods||[]).forEach(e => {
+        acts.push({
+          type:'eod_review', sev:'critical', contract:x.id,
+          desc:`${e.type||'EoD'} — ${e.party||x.id} · Grace: ${e.grace_end||'—'}`,
+          ref:'§5(a)(i) → §6(a)'
+        })
+      })
+    }
+    const rep = x.compliance?.representations
+    if (rep?.breached > 0) acts.push({type:'compliance',sev:'critical',contract:x.id,desc:`Representation breached — ${rep.breached} §3 section(s). Potential §5(a)(iv).`,ref:'§3 · §5(a)(iv)'})
+    if (rep?.pending_review > 0) acts.push({type:'docs',sev:'warn',contract:x.id,desc:`${rep.pending_review} §4(a) obligation(s) overdue — documents not delivered by counterparty.`,ref:'§4(a)(ii) → §5(a)(ii)'})
+    if (x.netting_status==='AMBER') acts.push({type:'netting_review',sev:'info',contract:x.id,desc:`Netting enforceability AMBER for ${x.id}. Review opinion before next cycle.`,ref:'§1(c)'})
+  })
+  return acts
+}
+
+// ── ACTION: Approve PI ────────────────────────────────────────────────────────
+async function approvePi(contractId, period) {
+  const btnId = `pi-${contractId}-${period}`
+  const btn = document.getElementById(btnId)
+  if (btn) { btn.disabled=true; btn.textContent='Approving…' }
+  try {
+    await apiPost(`/contracts/${contractId}/approve-pi/${period}?approver=J.Smith%20(Linklaters)`)
+    delete S.details[contractId]
+    await refresh()
+    const el = document.getElementById(`pi-row-${contractId}-${period}`)
+    if (el) { el.style.background='rgba(74,222,128,.04)'; setTimeout(()=>el.style.background='',1500) }
+  } catch(e) {
+    if (btn) { btn.disabled=false; btn.textContent='✓ Approve PI' }
+    alert('Error approving PI: '+e.message)
+  }
+}
+
+// ── ACTION: Execute next period ───────────────────────────────────────────────
+async function executePeriod(contractId, period) {
+  const btn = document.getElementById(`exec-${contractId}-${period}`)
+  if (btn) { btn.disabled=true; btn.textContent='Calculating…' }
+  try {
+    await apiPost(`/contracts/${contractId}/execute?period=${period}`)
+    delete S.details[contractId]
+    await refresh()
+  } catch(e) {
+    if (btn) { btn.disabled=false; btn.textContent='⟳ Run' }
+    alert('Error executing period: '+e.message)
+  }
+}
+
+// ── ACTION: Generate §12 Notice ───────────────────────────────────────────────
+async function generateNotice(contractId, noticeType) {
+  const NOTICE_DETAILS = {
+    FAILURE_TO_PAY:    {party_defaulting:'Counterparty',currency:'EUR',amount:'TBD',due_date:'—',grace_period:'1 Local Business Day',grace_end:'—'},
+    BREACH_OF_AGREEMENT: {party_defaulting:'Counterparty',obligation:'Obligation TBD',due_date:'—',section:'§4(a)(ii)'},
+    ETD_DESIGNATION:   {eod_notice_date:new Date().toLocaleDateString('en-GB'),eod_type:'§5(a)(i) Failure to Pay',etd_date:new Date(Date.now()+20*86400000).toLocaleDateString('en-GB'),currency:'EUR'},
+    DELIVERY_REMINDER: {document:'Annual Financials / Compliance Certificate',due_date:'30 Apr 2026'},
+    TAX_CHANGE:        {description:'Change in tax status',effective_date:'1 Jan 2027'}
+  }
+  const btn = event?.target
+  if (btn) { btn.disabled=true; btn.textContent='Generating…' }
+  try {
+    const r = await apiPost(`/contracts/${contractId}/notice`, {notice_type:noticeType, details:NOTICE_DETAILS[noticeType]||{}})
+    if (btn) { btn.disabled=false; btn.textContent='Generate Notice' }
+    const el = document.getElementById('notice-result')
+    if (el) { el.innerHTML=`<div style="background:var(--viBg);border:1px solid rgba(167,139,250,.2);border-radius:8px;padding:12px 16px;font-size:11px;color:var(--vi)">✓ Notice generated · Type: ${r.type} · Hash: ${r.hash?.slice(0,16)}… · File: ${r.pdf}</div>`; el.style.display='block' }
+    await refresh()
+  } catch(e) {
+    if (btn) { btn.disabled=false; btn.textContent='Generate Notice' }
+    alert('Error: '+e.message)
+  }
+}
+
+// ── RENDER ACTIONS HTML ───────────────────────────────────────────────────────
+function actionsHtml(acts) {
+  if (!acts.length) return '<div class="card" style="text-align:center;color:var(--t3);padding:30px;font-size:11px">No pending actions.</div>'
+  return acts.map(a => `
+<div class="al ${a.sev==='critical'?'cr':a.sev==='warn'?'wr':'inf'}" id="pi-row-${a.contract}-${a.period||0}">
+  <div style="font-size:14px;margin-top:1px">${a.sev==='critical'?'🚨':a.sev==='warn'?'⚠':'ℹ'}</div>
+  <div style="flex:1">
+    <div class="al-t">${a.desc}</div>
+    <div class="al-r">${a.contract} · ${a.ref}</div>
+    <div class="al-a">
+      ${a.type==='approve_pi' ? `<button id="pi-${a.contract}-${a.period}" class="btn approve" onclick="approvePi('${a.contract}',${a.period})">✓ Approve PI</button>` : ''}
+      ${a.type==='execute_period' ? `<button id="exec-${a.contract}-${a.period}" class="btn" onclick="executePeriod('${a.contract}',${a.period})">⟳ Run Calculation P${a.period}</button>` : ''}
+      ${a.type==='eod_review' ? `<button class="btn danger">Declare EoD §5(a)(i)</button><button class="btn">Bona Fide Dispute (15d)</button>` : ''}
+      ${a.type==='docs' ? `<button class="btn approve" onclick="generateNotice('${a.contract}','DELIVERY_REMINDER');return false">Send §12 Reminder</button><button class="btn" onclick="N('mon',null)">Review §4</button>` : ''}
+      ${a.type==='compliance' ? `<button class="btn act" onclick="N('mon',null)">Review §3/§4</button>` : ''}
+      ${a.type==='netting_review' ? `<button class="btn" onclick="N('net',null)">View Netting Opinion</button>` : ''}
+    </div>
+  </div>
+</div>`).join('')
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────────────────────
+function rD(c) {
+  if (S.loading && !S.contracts.length) { c.innerHTML=spinner(); return }
+  const D = S.contracts, O = S.oracle
+  const acts = buildActions()
+  const eodCount = Object.values(S.details).reduce((s,d)=>s+(d.eods?.length||0), 0)
+  const critActs = acts.filter(a=>a.sev==='critical')
+  const totalNotional = D.reduce((s,x)=>s+x.notional,0)
+
+  c.innerHTML = `
+${errBanner()}
+<div class="hd">Advisor Dashboard${updBadge()}</div>
+<div class="sub">All clients · All contracts · ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</div>
+<div class="kpi-row">
+  <div class="kpi"><div class="kpi-l">Clients</div><div class="kpi-v">${new Set(D.map(x=>x.party_a)).size}</div><div class="kpi-s">${[...new Set(D.map(x=>x.party_a))].join(', ')||'—'}</div></div>
+  <div class="kpi"><div class="kpi-l">Active Contracts</div><div class="kpi-v">${D.length}</div><div class="kpi-s">${D.filter(x=>x.status!=='ACTIVE').length} alert</div></div>
+  <div class="kpi"><div class="kpi-l">Pending Actions</div><div class="kpi-v" style="color:var(--vi)">${acts.length}</div><div class="kpi-s">${critActs.length} critical</div></div>
+  <div class="kpi"><div class="kpi-l">Total Notional</div><div class="kpi-v" style="color:var(--warm)">€${totalNotional>0?(totalNotional/1e6).toFixed(0):0}M</div><div class="kpi-s">EUR</div></div>
+  <div class="kpi"><div class="kpi-l">EoDs Active</div><div class="kpi-v" style="color:${eodCount?'var(--r)':'var(--g)'}">${eodCount}</div><div class="kpi-s">${eodCount?'§2(a)(iii) suspended':'All clear'}</div></div>
+</div>
+
+<div class="sh">Pending Actions <span class="tag ${critActs.length?'tag-r':'tag-g'}">${critActs.length} critical</span></div>
+${actionsHtml(acts.slice(0,6))}
+
+<div class="sh" style="margin-top:28px">Contracts Overview</div>
+<table class="tb"><thead><tr><th>Contract</th><th>Client</th><th>Counterparty</th><th>Type</th><th>Notional</th><th>Gov. Law</th><th>Netting</th><th>Periods</th><th>EoDs</th><th>Status</th></tr></thead><tbody>
+${D.map(x => {
+  const det = S.details[x.id]
+  const eods = det?.eods?.length||0
+  const calc = x.periods_calculated||0
+  return `<tr>
+    <td class="id">${x.id}</td>
+    <td>${x.party_a}</td>
+    <td>${x.party_b}</td>
+    <td>${x.type}</td>
+    <td class="m">€${(x.notional/1e6).toFixed(0)}M</td>
+    <td class="m">${x.governing_law}</td>
+    <td><span class="p ${x.netting_status==='GREEN'?'p-g':'p-w'}">${x.netting_status||'—'}</span></td>
+    <td class="m">${calc}/${x.periods_total||'—'}</td>
+    <td>${eods?`<span class="p p-r">${eods}</span>`:'<span class="p p-g">0</span>'}</td>
+    <td><span class="p ${statusCls(x.status)}">${statusLbl(x.status)}</span></td>
+  </tr>`
+}).join('')}
+</tbody></table>`
+}
+
+// ── PENDING ACTIONS ───────────────────────────────────────────────────────────
+function rAct(c) {
+  if (S.loading && !S.contracts.length) { c.innerHTML=spinner(); return }
+  const acts = buildActions()
+  c.innerHTML = `<div class="hd">Pending Actions${updBadge()}</div>
+<div class="sub">${acts.length} item${acts.length!==1?'s':''} requiring advisor decision</div>
+${actionsHtml(acts)}`
+}
+
+// ── COMPLIANCE MONITORING ─────────────────────────────────────────────────────
+function rMon(c) {
+  if (S.loading && !S.contracts.length) { c.innerHTML=spinner(); return }
+  const x = S.contracts[0]
+  if (!x) { c.innerHTML='<div class="hd">Compliance Monitoring</div><div style="padding:40px;text-align:center;color:var(--t3)">No contracts loaded.</div>'; return }
+  const comp = x.compliance||{}
+  const reps = comp.representations?.details||[]
+  const eodCount = Object.values(S.details).reduce((s,d)=>s+(d.eods?.length||0),0)
+  const ctSelector = S.contracts.length > 1
+    ? `<div style="margin-bottom:20px;display:flex;gap:8px">${S.contracts.map(ct=>`<button class="btn ${ct.id===x.id?'act':''}" onclick="_monSel('${ct.id}')">${ct.id}</button>`).join('')}</div>` : ''
+
+  c.innerHTML = `<div class="hd">Compliance Monitoring${updBadge()}</div>
+<div class="sub">§3 Representations · §4 Agreements · §5 Events of Default — clause-by-clause · Contract: ${x.id}</div>
+${ctSelector}
+<div class="sh">§3 Representations <span class="tag tag-v">Repeated each Payment Date</span></div>
+<table class="tb"><thead><tr><th>Section</th><th>Representation</th><th>Auto</th><th>Status</th><th>Detail</th></tr></thead><tbody>
+${reps.map(r=>`<tr>
+  <td class="m">${r.section}</td>
+  <td>${r.name}</td>
+  <td>${r.auto?'<span class="p p-v">AUTO</span>':'<span class="p p-w">HUMAN</span>'}</td>
+  <td><span class="p ${r.status==='SATISFIED'?'p-g':r.status==='BREACHED'?'p-r':r.status==='PENDING_REVIEW'?'p-w':'p-b'}">${r.status}</span></td>
+  <td style="font-size:10px;color:var(--t3);max-width:260px;white-space:normal">${(r.detail||'').slice(0,100)}${(r.detail?.length||0)>100?'…':''}</td>
+</tr>`).join('')}
+</tbody></table>
+
+<div class="sh">§5 Events of Default <span class="tag ${eodCount?'tag-r':'tag-g'}">${eodCount} active</span></div>
+${Object.entries(S.details).flatMap(([id,det])=>(det.eods||[]).map(e=>`
+<div class="al cr"><div style="font-size:14px">🚨</div><div style="flex:1">
+  <div class="al-t">${e.type||'EoD'} — ${e.party||id}</div>
+  <div class="al-d">Contract: ${id} · Detected: ${e.date||'—'} · Grace end: ${e.grace_end||'—'} · Expired: ${e.expired?'YES':'NO'}</div>
+  <div class="al-a">
+    <button class="btn danger">Declare EoD §5(a)(i)</button>
+    <button class="btn">Bona Fide Dispute (15d)</button>
+    <button class="btn act" onclick="generateNotice('${id}','ETD_DESIGNATION')">Designate ETD §6(a)</button>
+  </div>
+</div></div>`)).join('')||'<div class="card" style="text-align:center;color:var(--t3);padding:30px;font-size:11px">No active Events of Default. §2(a)(iii) conditions precedent: SATISFIED.</div>'}`
+
+  window._monSel = async (id) => {
+    const tmp = S.contracts
+    S.contracts = [S.contracts.find(c=>c.id===id), ...S.contracts.filter(c=>c.id!==id)].filter(Boolean)
+    rMon(c)
+    S.contracts = tmp
+  }
+}
+
+// ── CLAUSE BUILDER ────────────────────────────────────────────────────────────
+function rCb(c) {
+  const clauses = [
+    {ref:'§2(c)',     name:'Payment Netting',             desc:'Automatic netting of same-date, same-currency payments',              auto:true,  mandatory:true,  on:true},
+    {ref:'Part 4(i)', name:'Multiple Transaction Netting', desc:'Net across multiple Transactions between same Offices',               auto:true,  mandatory:false, on:true},
+    {ref:'Part 1(e)', name:'Automatic Early Termination',  desc:'AET on Bankruptcy §5(a)(vii) — immediate termination without notice', auto:true,  mandatory:false, on:false},
+    {ref:'Part 1(c)', name:'Cross-Default',                desc:'§5(a)(vi) — default under external debt triggers EoD here',          auto:false, mandatory:false, on:false},
+    {ref:'CSA',       name:'Credit Support Annex',         desc:'Margin calls, threshold-based collateral posting',                    auto:false, mandatory:false, on:false},
+    {ref:'Break',     name:'Break Clause',                 desc:'Optional early termination right at specified break dates',           auto:false, mandatory:false, on:false},
+    {ref:'§3(g)',     name:'No Agency Representation',     desc:'Each party acts as principal, not agent',                            auto:false, mandatory:false, on:true}
+  ]
+  c.innerHTML = `<div class="hd">Clause Builder</div><div class="sub">Configure Schedule elections and optional clauses · Changes affect contract generation</div>
+<div class="card" style="padding:0;overflow:hidden">
+${clauses.map(cl=>`<div class="clause">
+  <div class="clause-l"><div class="clause-ref">${cl.ref}</div><div>
+    <div class="clause-name">${cl.name}
+      ${cl.auto?'<span class="tag tag-v" style="margin-left:6px">AUTO</span>':''}
+      ${cl.mandatory?'<span class="tag tag-g" style="margin-left:4px">MANDATORY</span>':''}
+    </div>
+    <div class="clause-desc">${cl.desc}</div>
+  </div></div>
+  <div class="toggle ${cl.on?'on':''} ${cl.mandatory?'mandatory':''}" onclick="${cl.mandatory?'':`this.classList.toggle('on')`}"></div>
+</div>`).join('')}
+</div>
+<div style="margin-top:16px;display:flex;gap:8px">
+  <button class="btn act">Save Elections</button>
+  <button class="btn">Generate PDF</button>
+  <button class="btn">Export Schedule</button>
+</div>`
+}
+
+// ── NETTING OPINIONS ──────────────────────────────────────────────────────────
+function rNet(c) {
+  const nettingRows = S.contracts.map(x => {
+    const det = S.details[x.id]
+    return {id:x.id, jA:det?.party_a?.jurisdiction||'—', jB:det?.party_b?.jurisdiction||'—', status:x.netting_status}
+  })
+  c.innerHTML = `<div class="hd">Netting Opinion Check</div><div class="sub">Pre-trade assessment of close-out netting enforceability — §1(c) / §6(e) ISDA 2002</div>
+${nettingRows.map(r=>`
+<div class="card" style="margin-bottom:12px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <div style="font-size:13px;font-weight:600">${r.id}</div>
+    <span class="p ${r.status==='GREEN'?'p-g':r.status==='AMBER'?'p-w':'p-r'}">${r.status==='GREEN'?'● Enforceable':r.status==='AMBER'?'◐ Qualified':'○ Unenforceable'}</span>
+  </div>
+  <div style="font-size:11px;color:var(--t2)">Jurisdictions: ${r.jA} ↔ ${r.jB} · Netting status: <strong>${r.status||'NOT_ASSESSED'}</strong></div>
+</div>`).join('')}
+<div class="netting-grid">
+  <div class="netting-card"><h4>GB (United Kingdom) <span class="p p-g" style="margin-left:6px">● GREEN</span></h4><p>Opinion: CLEAN · By: Linklaters · Updated: 2024<br>Legislation: General principles<br>§2(a)(iii): PERPETUAL_SUSPENSION<br>SRR: Yes (UK Banking Act 2009)<br>G-20: Yes · AET recommended: No</p></div>
+  <div class="netting-card"><h4>FR (France) <span class="p p-g" style="margin-left:6px">● GREEN</span></h4><p>Opinion: CLEAN · By: Gide Loyrette Nouel · Updated: 2024<br>Legislation: Code monétaire et financier<br>§2(a)(iii): LIMITED_SUSPENSION<br>SRR: Yes<br>G-20: Yes · AET recommended: No</p></div>
+</div>
+<div class="al wr"><div>⚠</div><div><div class="al-t">§2(a)(iii) Asymmetry — GB ↔ FR</div><div class="al-d">Party A (GB) = PERPETUAL_SUSPENSION · Party B (FR) = LIMITED_SUSPENSION. Behavior differs depending on which party defaults. Legal advice required.</div></div></div>
+<div class="al inf"><div>ℹ</div><div><div class="al-t">SRR applies to both jurisdictions</div><div class="al-d">Temporary stay on close-out rights (max 2 Business Days) may apply for bank counterparties under resolution.</div></div></div>`
+}
+
+// ── ORACLE ────────────────────────────────────────────────────────────────────
+function rOrc(c) {
+  const O = S.oracle
+  const rate = O.current_rate ? (Number(O.current_rate)*100).toFixed(3) : null
+  const st = O.status==='CONFIRMED'?'<span class="p p-g">● Confirmed</span>':O.status==='FALLBACK'?'<span class="p p-w">△ ISDA 2021 Fallback</span>':'<span class="p p-b">— Pending</span>'
+  c.innerHTML = `<div class="hd">Oracle${updBadge()}</div><div class="sub">EURIBOR 3M reference rate · ISDA 2021 5-step fallback waterfall</div>
+<div class="card"><div style="display:flex;align-items:center;gap:32px">
+  <div style="text-align:center;min-width:170px">
+    <div style="font-size:10px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;font-family:var(--fm)">EURIBOR 3M</div>
+    <div style="font-family:var(--fm);font-size:46px;font-weight:300;color:var(--warm);letter-spacing:-2px">${rate?rate+'%':'—'}</div>
+    <div style="margin-top:12px">${st}</div>
+  </div>
+  <div style="width:1px;background:var(--b0);align-self:stretch"></div>
+  <div style="font-size:11px;color:var(--t2);line-height:2.2">
+    <strong>Source:</strong> ${O.source||'—'}<br>
+    <strong>Fallback chain:</strong> ${(O.sources_attempted||[]).join(' → ')||'—'}<br>
+    <strong>Fetch count:</strong> ${O.fetch_count||0}<br>
+    <strong>Anomalies:</strong> ${O.anomalies_detected||0}<br>
+    <strong>Last confirmed:</strong> ${O.last_confirmed?(Number(O.last_confirmed)*100).toFixed(3)+'%':'None yet'}<br>
+    <strong>Challenge threshold:</strong> 5 bps · §5(b) SLC
+  </div>
+</div></div>
+<div style="margin-top:16px;display:flex;gap:8px">
+  <button class="btn act" onclick="_fetchOracle(this)">⟳ Fetch Live Rate</button>
+  <button class="btn" onclick="alert('Rate challenge initiated — Calculation Agent notified')">Challenge Rate</button>
+</div>`
+  window._fetchOracle = async (btn) => {
+    btn.disabled=true; btn.textContent='Fetching…'
+    try { S.oracle = await apiFetch('/oracle/latest'); R() } catch(e) { alert(e.message) }
+    btn.disabled=false; btn.textContent='⟳ Fetch Live Rate'
+  }
+}
+
+// ── AUDIT TRAIL ───────────────────────────────────────────────────────────────
+async function rAud(c) {
+  c.innerHTML = `<div class="hd">Audit Trail${updBadge()}</div><div class="sub">SHA-256 chained · Tamper-evident · All contracts</div><div id="audit-body" style="color:var(--t3);font-size:11px;padding:20px 0">Loading…</div>`
+  try {
+    const allAudits = await Promise.all(S.contracts.map(x => apiFetch(`/contracts/${x.id}/audit`)))
+    const flat = allAudits.flat().sort((a,b)=>b.seq-a.seq)
+    const body = document.getElementById('audit-body')
+    if (!body) return
+    body.innerHTML = `<div class="card" style="padding:16px 20px;max-height:520px;overflow-y:auto">
+${flat.map(l => `<div class="log-item">
+  <div class="log-time">${(l.timestamp||'').slice(0,19).replace('T',' ')}</div>
+  <div class="log-ev">
+    <span style="color:var(--vi);font-weight:600">${l.event_type}</span>
+    <span style="color:var(--t3)"> · ${l.actor}</span>
+    <span style="color:var(--t2)"> · ${JSON.stringify(l.data||{}).slice(0,100)}${JSON.stringify(l.data||{}).length>100?'…':''}</span>
+  </div>
+</div>`).join('')}
+</div>
+<div style="margin-top:12px;display:flex;gap:8px">
+  <button class="btn" onclick="_exportAudit(${JSON.stringify(flat).replace(/"/g,'&quot;')})">↓ Export JSON</button>
+  <span style="font-size:10px;color:var(--t3);padding:6px 0">${flat.length} entries · Head: ${flat[0]?.entry_hash?.slice(0,16)||'—'}…</span>
+</div>`
+    window._exportAudit = (data) => {
+      const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'})
+      const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='audit_trail.json'; a.click()
+    }
+  } catch(e) {
+    const body = document.getElementById('audit-body')
+    if (body) body.textContent = 'Error loading audit trail: '+e.message
+  }
+}
+
+// ── NOTICES §12 ───────────────────────────────────────────────────────────────
+function rNot(c) {
+  const contractOptions = S.contracts.map(x=>`<option value="${x.id}">${x.id} · ${x.party_b}</option>`).join('')
+  c.innerHTML = `<div class="hd">Notices — §12 ISDA 2002</div><div class="sub">Generate and track contractual notices</div>
+<div class="sh">Generate Notice</div>
+<div class="card">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+    <div>
+      <label style="font-size:10px;color:var(--t3);display:block;margin-bottom:5px;letter-spacing:.04em;text-transform:uppercase">Notice Type</label>
+      <select id="not-type" class="fi">
+        <option value="FAILURE_TO_PAY">§5(a)(i) Failure to Pay Notice</option>
+        <option value="BREACH_OF_AGREEMENT">§5(a)(ii) Breach of Agreement</option>
+        <option value="ETD_DESIGNATION">§6(a) ETD Designation</option>
+        <option value="DELIVERY_REMINDER">§4(a) Delivery Reminder</option>
+        <option value="TAX_CHANGE">§4(d) Tax Status Change</option>
+      </select>
+    </div>
+    <div>
+      <label style="font-size:10px;color:var(--t3);display:block;margin-bottom:5px;letter-spacing:.04em;text-transform:uppercase">Contract</label>
+      <select id="not-cid" class="fi">
+        ${contractOptions||'<option>No contracts loaded</option>'}
+      </select>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="btn approve" onclick="generateNotice(document.getElementById('not-cid').value,document.getElementById('not-type').value)">Generate Notice</button>
+    <button class="btn">Preview</button>
+  </div>
+</div>
+<div id="notice-result" style="display:none;margin-bottom:12px"></div>
+<div class="sh">Generated Notices</div>
+<div id="notice-history">
+  <div style="color:var(--t3);font-size:11px;padding:16px 0">No notices generated yet. Use the form above to generate a §12 notice.</div>
+</div>`
+}
+
+R()
+
+// ══════════════════════════════════════════════════════════════════════════════
+// NEW CONTRACT WIZARD
+// ══════════════════════════════════════════════════════════════════════════════
+const JURIS=[
+  {v:'GB',l:'England & Wales'},{v:'FR',l:'France'},{v:'DE',l:'Germany'},
+  {v:'IT',l:'Italy'},{v:'NL',l:'Netherlands'},{v:'CH',l:'Switzerland'},
+  {v:'US',l:'United States'},{v:'CA',l:'Canada'},{v:'JP',l:'Japan'},
+  {v:'AU',l:'Australia'},{v:'SG',l:'Singapore'},{v:'HK',l:'Hong Kong'}
+]
+const GLAW=[
+  {v:'English Law',l:'English Law (§13 ISDA 2002)'},
+  {v:'New York Law',l:'New York Law (§13 ISDA 2002)'}
+]
+let NC={step:1,data:{},loading:false,err:null,fieldErrors:{},result:null}
+
+function _genId(){return 'SLC-IRS-EUR-'+String(Math.floor(Math.random()*9000)+1000)}
+
+function openNC(){
+  const today=new Date().toISOString().slice(0,10)
+  const twoYears=new Date(Date.now()+2*365.25*86400000).toISOString().slice(0,10)
+  NC={step:1,loading:false,err:null,fieldErrors:{},result:null,data:{
+    contract_id:_genId(),
+    party_a_name:'', party_a_short:'', party_a_jurisdiction:'GB',
+    party_b_name:'', party_b_short:'', party_b_jurisdiction:'FR',
+    notional:'10000000', fixed_rate:'3.200', currency:'EUR',
+    floating_index:'EURIBOR 3M', effective_date:today, termination_date:twoYears,
+    governing_law:'English Law', mtpn:true, aet:false, csa:false,
+    csa_threshold_a:'500000', csa_threshold_b:'500000', csa_mta:'50000'
+  }}
+  renderNC()
+  document.getElementById('nc-bg').style.display='flex'
+}
+function closeNC(){document.getElementById('nc-bg').style.display='none'}
+
+function ncV(){
+  NC.err=null; NC.fieldErrors={}
+  if(NC.step===1){
+    if(!NC.data.contract_id) NC.fieldErrors.contract_id='Required'
+    if(!NC.data.party_a_name) NC.fieldErrors.party_a_name='Required'
+    if(!NC.data.party_b_name) NC.fieldErrors.party_b_name='Required'
+    if(NC.data.party_a_name && NC.data.party_b_name && NC.data.party_a_name.toLowerCase()===NC.data.party_b_name.toLowerCase())
+      NC.fieldErrors.party_b_name='Must be different from Party A'
+    if(Object.keys(NC.fieldErrors).length){NC.err='Please complete all required fields.';return false}
+    if(!NC.data.party_a_short) NC.data.party_a_short=NC.data.party_a_name.split(' ')[0]
+    if(!NC.data.party_b_short) NC.data.party_b_short=NC.data.party_b_name.split(' ')[0]
+  }
+  if(NC.step===2){
+    if(!NC.data.notional)          NC.fieldErrors.notional='Required'
+    if(!NC.data.fixed_rate)        NC.fieldErrors.fixed_rate='Required'
+    if(!NC.data.effective_date)    NC.fieldErrors.effective_date='Required'
+    if(!NC.data.termination_date)  NC.fieldErrors.termination_date='Required'
+    if(NC.data.effective_date && NC.data.termination_date && new Date(NC.data.termination_date)<=new Date(NC.data.effective_date))
+      NC.fieldErrors.termination_date='Must be after effective date'
+    if(NC.data.fixed_rate && (Number(NC.data.fixed_rate)<=0||Number(NC.data.fixed_rate)>30))
+      NC.fieldErrors.fixed_rate='Enter as % (e.g. 3.200 for 3.2%)'
+    if(Object.keys(NC.fieldErrors).length){NC.err='Please fix the highlighted fields.';return false}
+  }
+  return true
+}
+function ncNext(){if(!ncV()){renderNC();return}NC.step++;renderNC()}
+function ncBack(){NC.err=null;NC.fieldErrors={};NC.step--;renderNC()}
+
+async function ncSubmit(){
+  if(!ncV()){renderNC();return}
+  NC.loading=true;NC.err=null;NC.fieldErrors={};renderNC()
+  try{
+    const d=NC.data
+    const r=await apiPost('/contracts',{
+      contract_id:d.contract_id,
+      party_a_name:d.party_a_name, party_a_short:d.party_a_short, party_a_jurisdiction:d.party_a_jurisdiction,
+      party_b_name:d.party_b_name, party_b_short:d.party_b_short, party_b_jurisdiction:d.party_b_jurisdiction,
+      notional:Number(d.notional), fixed_rate:Number(d.fixed_rate)/100,
+      effective_date:d.effective_date, termination_date:d.termination_date,
+      initiated_by:'ADVISOR',
+      governing_law:d.governing_law, mtpn:d.mtpn, aet:d.aet,
+      csa:d.csa, csa_threshold_a:d.csa?Number(d.csa_threshold_a):undefined,
+      csa_threshold_b:d.csa?Number(d.csa_threshold_b):undefined,
+      csa_mta:d.csa?Number(d.csa_mta):undefined
+    })
+    NC.loading=false; NC.result=r; NC.step=4; renderNC()
+    await refresh()
+  }catch(e){NC.loading=false;NC.err='API error: '+e.message;renderNC()}
+}
+
+function renderNC(){
+  const el=document.getElementById('nc-inner')
+  if(!el) return
+  const fe = NC.fieldErrors||{}
+  const jSel=(key)=>JURIS.map(j=>`<option value="${j.v}"${NC.data[key]===j.v?' selected':''}>${j.l}</option>`).join('')
+  const glSel=GLAW.map(g=>`<option value="${g.v}"${NC.data.governing_law===g.v?' selected':''}>${g.l}</option>`).join('')
+  const ind=[1,2,3,4].map(i=>`<div class="step-dot ${i<NC.step?'done':i===NC.step?'cur':''}"></div>`).join('')
+  const labels=['Parties','Economic Terms','Schedule Elections','Complete']
+  const genErr=NC.err?`<div class="merr">⚠ ${NC.err}</div>`:''
+  const fld=(key,content)=>`<div class="fr">${content}${fe[key]?`<div class="ferr">⚠ ${fe[key]}</div>`:''}</div>`
+  let body
+
+  if(NC.loading){
+    body=`<div style="padding:52px;text-align:center;color:var(--t3)">
+<div style="font-size:32px;margin-bottom:18px;display:inline-block;animation:spin 1s linear infinite">⟳</div>
+<div style="font-size:13px;color:var(--t2);margin-bottom:10px">Creating contract…</div>
+<div style="font-size:10px;line-height:2.2;font-family:var(--fm)">Fetching EURIBOR 3M from ECB SDW<br>Generating quarterly schedule<br>Running netting opinion check<br>Producing Confirmation PDF (SHA-256)</div>
+</div>`
+  } else if(NC.step===1){
+    body=`
+${fld('contract_id',`<div class="fl">Contract Reference <span class="req">*</span></div><input class="fi${fe.contract_id?' err':''}" value="${NC.data.contract_id}" oninput="NC.data.contract_id=this.value" placeholder="SLC-IRS-EUR-001"/>`)}
+<div class="section-sep">Party A · Your Client (Fixed Rate Payer)</div>
+<div class="fr2">
+${fld('party_a_name',`<div class="fl">Legal Name <span class="req">*</span></div><input class="fi${fe.party_a_name?' err':''}" value="${NC.data.party_a_name}" oninput="NC.data.party_a_name=this.value;if(!NC.data.party_a_short_edited)NC.data.party_a_short=this.value.split(' ')[0]" placeholder="Alpha Corp S.A."/>`)}
+<div class="fr"><div class="fl">Short Name</div><input class="fi" value="${NC.data.party_a_short}" oninput="NC.data.party_a_short=this.value;NC.data.party_a_short_edited=true" placeholder="Alpha"/></div>
+</div>
+<div class="fr"><div class="fl">Jurisdiction of Incorporation</div><select class="fi" onchange="NC.data.party_a_jurisdiction=this.value">${jSel('party_a_jurisdiction')}</select></div>
+<div class="section-sep">Party B · Counterparty (Floating Rate Payer)</div>
+<div class="fr2">
+${fld('party_b_name',`<div class="fl">Legal Name <span class="req">*</span></div><input class="fi${fe.party_b_name?' err':''}" value="${NC.data.party_b_name}" oninput="NC.data.party_b_name=this.value;if(!NC.data.party_b_short_edited)NC.data.party_b_short=this.value.split(' ')[0]" placeholder="Beta Fund Ltd"/>`)}
+<div class="fr"><div class="fl">Short Name</div><input class="fi" value="${NC.data.party_b_short}" oninput="NC.data.party_b_short=this.value;NC.data.party_b_short_edited=true" placeholder="Beta"/></div>
+</div>
+<div class="fr"><div class="fl">Jurisdiction of Incorporation</div><select class="fi" onchange="NC.data.party_b_jurisdiction=this.value">${jSel('party_b_jurisdiction')}</select></div>
+${genErr}
+<div class="mfooter"><div/><div style="display:flex;gap:8px"><button class="btn" onclick="closeNC()">Cancel</button><button class="btn act" onclick="ncNext()">Next →</button></div></div>`
+  } else if(NC.step===2){
+    const notM=(Number(NC.data.notional)/1e6).toFixed(1)
+    const qFixed=NC.data.notional&&NC.data.fixed_rate?(Number(NC.data.notional)*Number(NC.data.fixed_rate)/100/4).toFixed(0):null
+    const preview=qFixed?`<div style="background:var(--s2);border-radius:8px;padding:12px 14px;font-size:10px;color:var(--t3);margin-top:8px;border:1px solid var(--b0)"><strong style="color:var(--t2)">Indicative economics</strong><br>Notional: ${NC.data.currency} ${Number(NC.data.notional).toLocaleString()} · Fixed leg: ~${NC.data.currency} ${Number(qFixed).toLocaleString()}/quarter<br>Day count: Fixed 30/360 · Float ACT/360 · Frequency: Quarterly · §2(c) netting</div>`:''
+    body=`
+<div class="fr2">
+${fld('notional',`<div class="fl">Notional Amount <span class="req">*</span></div><input class="fi${fe.notional?' err':''}" type="number" value="${NC.data.notional}" oninput="NC.data.notional=this.value;renderNC()" placeholder="10000000"/>`)}
+<div class="fr"><div class="fl">Currency</div><select class="fi" onchange="NC.data.currency=this.value"><option value="EUR" selected>EUR</option></select></div>
+</div>
+<div class="fr2">
+${fld('fixed_rate',`<div class="fl">Fixed Rate (% p.a.) <span class="req">*</span></div><input class="fi${fe.fixed_rate?' err':''}" type="number" step="0.001" value="${NC.data.fixed_rate}" oninput="NC.data.fixed_rate=this.value;renderNC()" placeholder="3.200"/>`)}
+<div class="fr"><div class="fl">Floating Index</div><select class="fi" onchange="NC.data.floating_index=this.value"><option value="EURIBOR 3M" selected>EURIBOR 3M</option></select></div>
+</div>
+<div class="fr2">
+${fld('effective_date',`<div class="fl">Effective Date <span class="req">*</span></div><input class="fi${fe.effective_date?' err':''}" type="date" value="${NC.data.effective_date}" oninput="NC.data.effective_date=this.value"/>`)}
+${fld('termination_date',`<div class="fl">Termination Date <span class="req">*</span></div><input class="fi${fe.termination_date?' err':''}" type="date" value="${NC.data.termination_date}" oninput="NC.data.termination_date=this.value"/>`)}
+</div>
+${preview}
+${genErr}
+<div class="mfooter"><button class="btn" onclick="ncBack()">← Back</button><div style="display:flex;gap:8px"><button class="btn" onclick="closeNC()">Cancel</button><button class="btn act" onclick="ncNext()">Next →</button></div></div>`
+  } else if(NC.step===3){
+    const csaFields=NC.data.csa?`<div style="background:var(--s2);border-radius:8px;padding:14px;margin-top:12px;border:1px solid var(--b0)"><div style="font-size:10px;color:var(--t3);margin-bottom:12px;font-weight:500;letter-spacing:.05em;text-transform:uppercase">CSA Parameters</div><div class="fr3">
+<div class="fr"><div class="fl">Threshold A (EUR)</div><input class="fi" type="number" value="${NC.data.csa_threshold_a}" oninput="NC.data.csa_threshold_a=this.value"/></div>
+<div class="fr"><div class="fl">Threshold B (EUR)</div><input class="fi" type="number" value="${NC.data.csa_threshold_b}" oninput="NC.data.csa_threshold_b=this.value"/></div>
+<div class="fr"><div class="fl">Min. Transfer (EUR)</div><input class="fi" type="number" value="${NC.data.csa_mta}" oninput="NC.data.csa_mta=this.value"/></div>
+</div></div>`:''
+    body=`
+<div class="fr"><div class="fl">Governing Law</div><select class="fi" onchange="NC.data.governing_law=this.value">${glSel}</select></div>
+<div style="background:var(--s2);border-radius:8px;padding:0 14px;margin:14px 0;border:1px solid var(--b0)">
+<div class="ftog"><div class="ftog-l"><div class="fn">§2(c) Payment Netting</div><div class="fd">Automatic — same date, same currency · MANDATORY</div></div><div class="toggle on mandatory"></div></div>
+<div class="ftog"><div class="ftog-l"><div class="fn">Multiple Transaction Payment Netting</div><div class="fd">Part 4(i) — net across all Transactions between the parties</div></div>
+<div id="tog-mtpn" class="toggle${NC.data.mtpn?' on':''}" onclick="NC.data.mtpn=!NC.data.mtpn;this.classList.toggle('on')"></div></div>
+<div class="ftog"><div class="ftog-l"><div class="fn">Automatic Early Termination</div><div class="fd">§6(a) AET — immediate termination on §5(a)(vii) Bankruptcy</div></div>
+<div id="tog-aet" class="toggle${NC.data.aet?' on':''}" onclick="NC.data.aet=!NC.data.aet;this.classList.toggle('on')"></div></div>
+<div class="ftog"><div class="ftog-l"><div class="fn">Credit Support Annex (CSA)</div><div class="fd">VM CSA — threshold-based margin and collateral posting</div></div>
+<div id="tog-csa" class="toggle${NC.data.csa?' on':''}" onclick="NC.data.csa=!NC.data.csa;renderNC()"></div></div>
+</div>
+${csaFields}
+${genErr}
+<div class="mfooter"><button class="btn" onclick="ncBack()">← Back</button><div style="display:flex;gap:8px"><button class="btn" onclick="closeNC()">Cancel</button><button class="btn approve" onclick="ncSubmit()">Generate Contract</button></div></div>`
+  } else if(NC.step===4){
+    const r=NC.result||{}
+    body=`
+<div style="text-align:center;padding:16px 0 24px">
+<div class="success-ring">✓</div>
+<div style="font-size:17px;font-weight:600;margin-bottom:4px">Contract Generated</div>
+<div style="font-size:11px;color:var(--t3)">Awaiting client signature to activate</div>
+</div>
+<table style="width:100%;border-collapse:collapse">
+<tr><td style="padding:8px 0;font-size:10px;color:var(--t3);width:140px;letter-spacing:.03em">Contract ID</td><td style="font-family:var(--fm);font-size:11px;color:var(--warm)">${r.contract_id||'—'}</td></tr>
+<tr><td style="padding:8px 0;font-size:10px;color:var(--t3)">Periods</td><td style="font-size:11px">${r.periods||'—'} quarterly payment periods</td></tr>
+<tr><td style="padding:8px 0;font-size:10px;color:var(--t3)">Status</td><td><span class="p p-w">◐ Pending Signature</span></td></tr>
+<tr><td style="padding:8px 0;font-size:10px;color:var(--t3)">Netting</td><td><span class="p ${r.netting_status==='GREEN'?'p-g':r.netting_status==='AMBER'?'p-w':'p-b'}">${r.netting_status||'NOT_ASSESSED'}</span></td></tr>
+</table>
+<div style="font-size:10px;color:var(--t3);margin-top:16px;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Confirmation SHA-256 fingerprint</div>
+<div class="hash-box">${r.confirmation_hash||'—'}</div>
+<div style="font-size:10px;color:var(--t3);margin-top:10px;line-height:2">§1(b) ISDA 2002 · Confirmation prevails over Schedule and MA<br>Contract will activate once client executes the Confirmation</div>
+<div class="mfooter"><div/><button class="btn act" onclick="closeNC()">Close</button></div>`
+  }
+
+  el.innerHTML=`
+<div class="modal-h">New IRS Transaction</div>
+<div class="modal-sub">${NC.step<=3?'Step '+NC.step+' of 3 — '+labels[NC.step-1]:'Transaction complete'}</div>
+<div class="step-ind">${ind}</div>
+${NC.loading?body:(body||'')}`
+}
+</script></body></html>

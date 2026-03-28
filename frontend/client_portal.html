@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Nomos · Client</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#08090c;--s1:#0e1013;--s2:#141618;--s3:#1a1d21;
+  --b0:rgba(255,255,255,.06);--b1:rgba(255,255,255,.11);--b2:rgba(255,255,255,.18);
+  --warm:#c4956a;--warm2:#a07350;--wBg:rgba(196,149,106,.07);
+  --g:#4ade80;   --gBg:rgba(74,222,128,.07);
+  --r:#f87171;   --rBg:rgba(248,113,113,.07);
+  --bl:#60a5fa;  --blBg:rgba(96,165,250,.07);
+  --vi:#a78bfa;  --viBg:rgba(167,139,250,.07);
+  --gy:#6b7280;  --gyBg:rgba(107,114,128,.07);
+  --t1:#e4e4e7;--t2:#8b8d94;--t3:#44464d;
+  --ff:'Inter',system-ui,sans-serif;
+  --fm:'JetBrains Mono',monospace;
+  --rad:12px;
+  --trans:.18s ease;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--t1);font-family:var(--ff);font-size:13px;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--b1);border-radius:2px}
+
+/* ── Top bar ── */
+.top{
+  height:54px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 28px;border-bottom:1px solid var(--b0);flex-shrink:0;
+}
+.top-l{display:flex;align-items:center;gap:10px}
+.logo-mark{
+  width:28px;height:28px;border-radius:7px;flex-shrink:0;
+  background:linear-gradient(140deg,#c4956a,#a07350);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--fm);font-weight:600;font-size:13px;color:#fff;
+  box-shadow:0 0 0 1px rgba(196,149,106,.25);
+}
+.logo-name{font-weight:600;font-size:14px;letter-spacing:-.2px}
+.role-pill{
+  padding:2px 9px;border-radius:20px;
+  background:var(--wBg);color:var(--warm);
+  border:1px solid rgba(196,149,106,.22);
+  font-size:10px;font-weight:500;font-family:var(--fm);
+  margin-left:4px;
+}
+.top-sep{width:1px;height:16px;background:var(--b1);margin:0 4px}
+.top-user{font-size:11px;color:var(--t2)}
+.top-r{display:flex;align-items:center;gap:18px;font-size:11px;color:var(--t3)}
+.status-dot{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:3px 9px;border-radius:20px;border:1px solid var(--b0);
+  font-size:10px;font-family:var(--fm);transition:all var(--trans);
+}
+.status-dot.live{color:var(--g);border-color:rgba(74,222,128,.2);background:var(--gBg)}
+.status-dot.offline{color:var(--r);border-color:rgba(248,113,113,.2);background:var(--rBg)}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.top-clock{font-family:var(--fm);font-size:10px;color:var(--t3)}
+.sign-out{
+  font-size:10px;color:var(--t3);cursor:pointer;
+  padding:4px 10px;border-radius:6px;border:1px solid transparent;
+  transition:all var(--trans);
+}
+.sign-out:hover{color:var(--t1);border-color:var(--b1);background:var(--b0)}
+
+/* ── Layout ── */
+.wrap{flex:1;display:flex;overflow:hidden}
+.side{
+  width:210px;padding:20px 0;flex-shrink:0;
+  display:flex;flex-direction:column;border-right:1px solid var(--b0);
+}
+.side-g{margin-bottom:8px}
+.side-l{
+  font-size:10px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--t3);padding:0 24px;margin-bottom:4px;
+}
+.si{
+  padding:7px 24px;font-size:12px;color:var(--t2);cursor:pointer;
+  transition:all .12s;display:flex;justify-content:space-between;align-items:center;
+}
+.si:hover{color:var(--t1);background:var(--b0)}
+.si.on{color:var(--warm);background:rgba(196,149,106,.04)}
+.si-badge{
+  font-family:var(--fm);font-size:9px;padding:2px 6px;
+  border-radius:4px;background:var(--b0);color:var(--t3);
+  transition:all var(--trans);
+}
+.si-badge.al{color:var(--r);background:var(--rBg);border:1px solid rgba(248,113,113,.15)}
+.si-badge.ok{color:var(--g);background:var(--gBg);border:1px solid rgba(74,222,128,.15)}
+.side-ft{margin-top:auto;padding:16px 24px;border-top:1px solid var(--b0);font-size:10px;color:var(--t3);line-height:2}
+.side-ft span{color:var(--warm)}
+.ct{flex:1;overflow-y:auto;padding:32px 40px}
+
+/* ── Typography ── */
+.hd{font-size:20px;font-weight:600;margin-bottom:6px;letter-spacing:-.4px}
+.sub{font-size:11px;color:var(--t3);margin-bottom:28px}
+.sh{font-size:13px;font-weight:600;color:var(--t2);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.tag{font-size:9px;font-family:var(--fm);padding:3px 8px;border-radius:4px;font-weight:400}
+.tag-r{background:var(--rBg);color:var(--r)}
+.tag-g{background:var(--gBg);color:var(--g)}
+.tag-w{background:var(--wBg);color:var(--warm)}
+
+/* ── Status pill ── */
+.p{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:3px 10px;border-radius:6px;font-size:10px;font-weight:500;
+  transition:background var(--trans),border-color var(--trans);
+}
+.p-g  {background:var(--gBg); color:var(--g);    border:1px solid rgba(74,222,128,.22)}
+.p-r  {background:var(--rBg); color:var(--r);    border:1px solid rgba(248,113,113,.22)}
+.p-w  {background:var(--wBg); color:var(--warm); border:1px solid rgba(196,149,106,.22)}
+.p-b  {background:var(--blBg);color:var(--bl);   border:1px solid rgba(96,165,250,.22)}
+.p-v  {background:var(--viBg);color:var(--vi);   border:1px solid rgba(167,139,250,.22)}
+.p-gy {background:var(--gyBg);color:var(--gy);   border:1px solid rgba(107,114,128,.22)}
+
+/* ── Card ── */
+.card{
+  background:var(--s1);border:1px solid var(--b0);border-radius:var(--rad);
+  padding:20px 24px;margin-bottom:16px;
+  transition:border-color var(--trans);
+}
+
+/* ── KPI row ── */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:32px}
+.kpi{
+  background:var(--s1);border:1px solid var(--b0);border-radius:var(--rad);
+  padding:20px 22px;transition:border-color var(--trans),box-shadow var(--trans);
+}
+.kpi:hover{border-color:var(--b1);box-shadow:0 4px 20px rgba(0,0,0,.3)}
+.kpi-l{font-size:11px;color:var(--t3);margin-bottom:12px;font-weight:500;letter-spacing:.02em}
+.kpi-v{font-size:34px;font-weight:600;letter-spacing:-.5px;line-height:1}
+.kpi-s{font-size:11px;color:var(--t2);margin-top:10px}
+
+/* ── Tables ── */
+.tb{width:100%;border-collapse:collapse;margin-bottom:24px}
+.tb th{
+  font-size:10px;font-weight:500;letter-spacing:.05em;color:var(--t3);
+  text-align:left;padding:10px 12px;border-bottom:1px solid var(--b0);
+  text-transform:uppercase;
+}
+.tb td{padding:11px 12px;border-bottom:1px solid var(--b0);font-size:12px;color:var(--t2)}
+.tb tbody tr{transition:background var(--trans)}
+.tb tbody tr:nth-child(even){background:rgba(255,255,255,.018)}
+.tb tbody tr:hover{background:rgba(255,255,255,.032)!important}
+.tb .m{font-family:var(--fm);font-size:11px}
+.tb .id{color:var(--warm);cursor:pointer;font-family:var(--fm);font-size:11px}
+
+/* Schedule table (inside swap detail) */
+.st{width:100%;border-collapse:collapse}
+.st th{
+  font-family:var(--fm);font-size:9px;font-weight:400;letter-spacing:.08em;
+  color:var(--t3);text-align:right;padding:8px 10px;border-bottom:1px solid var(--b0);
+  text-transform:uppercase;
+}
+.st th:nth-child(-n+4){text-align:left}
+.st td{padding:10px;font-family:var(--fm);font-size:11px;color:var(--t2);text-align:right;border-bottom:1px solid rgba(255,255,255,.03)}
+.st td:nth-child(-n+4){text-align:left}
+.st tbody tr:nth-child(even){background:rgba(255,255,255,.015)}
+.st tbody tr:hover{background:rgba(255,255,255,.028)!important}
+
+/* ── Buttons ── */
+.btn{
+  font-size:10px;padding:6px 14px;border-radius:6px;cursor:pointer;
+  border:1px solid var(--b0);background:transparent;color:var(--t2);
+  font-family:var(--ff);transition:all var(--trans);
+}
+.btn:hover{background:var(--b0);color:var(--t1)}
+.btn:disabled{opacity:.35;cursor:not-allowed;pointer-events:none}
+.btn.pr{color:var(--warm);border-color:rgba(196,149,106,.25)}
+.btn.pr:hover{background:var(--wBg)}
+.btn.sign-btn{
+  color:#fff;background:rgba(196,149,106,.85);
+  border-color:var(--warm);font-weight:500;
+  padding:6px 16px;
+}
+.btn.sign-btn:hover{background:var(--warm);box-shadow:0 2px 12px rgba(196,149,106,.3)}
+.btn.sign-btn:disabled{background:rgba(196,149,106,.3)}
+
+/* ── Alert items ── */
+.al{
+  border-radius:var(--rad);padding:16px 20px;margin-bottom:10px;
+  display:flex;gap:12px;border:1px solid var(--b0);background:var(--s1);
+  transition:border-color var(--trans);
+}
+.al.cr{border-left:2px solid var(--r)}.al.wr{border-left:2px solid var(--warm)}.al.inf{border-left:2px solid var(--bl)}
+.al-i{font-size:15px;margin-top:1px}
+.al-t{font-size:12px;font-weight:600;margin-bottom:3px}
+.al-d{font-size:11px;color:var(--t2);line-height:1.6}
+.al-r{font-family:var(--fm);font-size:9px;color:var(--t3);margin-top:6px}
+.al-a{margin-top:10px;display:flex;gap:6px}
+
+/* ── Oracle ── */
+.orc{display:flex;align-items:center;gap:32px}
+.orc-v{font-family:var(--fm);font-size:46px;font-weight:300;color:var(--warm);letter-spacing:-2px}
+.orc-m{font-size:11px;color:var(--t2);line-height:2.2}
+
+/* ── Contract accordion ── */
+.cpg{margin-bottom:20px}
+.cph{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 20px;background:var(--s2);border:1px solid var(--b0);
+  border-radius:var(--rad) var(--rad) 0 0;cursor:pointer;
+  transition:background var(--trans);
+}
+.cph:hover{background:var(--s3)}
+.cpb{border:1px solid var(--b0);border-top:none;border-radius:0 0 var(--rad) var(--rad);overflow:hidden}
+.cpn{font-size:13px;font-weight:600}
+.cpm{font-family:var(--fm);font-size:10px;color:var(--t3);display:flex;gap:20px}
+
+/* ── Compliance cards ── */
+.cg{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
+.cc{background:var(--s1);border:1px solid var(--b0);border-radius:var(--rad);padding:16px 18px}
+.cc-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.cc-t{font-size:11px;font-weight:600}
+.cc-i{font-size:11px;color:var(--t2);line-height:2.2}
+
+/* ── Animations ── */
+.pulse{animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* ── Footer ── */
+.ft{
+  height:28px;display:flex;align-items:center;justify-content:center;
+  border-top:1px solid var(--b0);font-size:9px;color:var(--t3);
+  letter-spacing:.04em;flex-shrink:0;
+}
+</style></head><body>
+
+<div class="top">
+  <div class="top-l">
+    <div class="logo-mark">N</div>
+    <div class="logo-name">Nomos</div>
+    <span class="role-pill">Client</span>
+    <div class="top-sep"></div>
+    <span class="top-user">Alpha Corp S.A.</span>
+  </div>
+  <div class="top-r">
+    <span id="api-status" class="status-dot"><span class="dot pulse"></span>Connecting…</span>
+    <span class="top-clock" id="ck"></span>
+    <span class="sign-out" onclick="logout()">Sign out</span>
+  </div>
+</div>
+
+<div class="wrap">
+<div class="side">
+  <div class="side-g"><div class="side-l">Portfolio</div>
+    <div class="si on" onclick="N('d',this)">Dashboard</div>
+    <div class="si" onclick="N('s',this)">My Swaps <span class="si-badge" id="sb-swaps">—</span></div>
+    <div class="si" onclick="N('p',this)">Payments</div>
+    <div class="si" onclick="N('o',this)">Oracle <span class="si-badge ok" id="sb-oracle">●</span></div>
+    <div class="si" onclick="N('dc',this)">Documents <span class="si-badge al">!</span></div>
+    <div class="si" onclick="N('al',this)">Alerts <span class="si-badge al" id="sb-alerts">—</span></div>
+  </div>
+  <div class="side-ft">Legal Advisor<br><span>Linklaters LLP</span><br><br>Calc. Agent · Party A</div>
+</div>
+<div class="ct" id="C"></div>
+</div>
+<div class="ft">§1(b) ISDA 2002 · Legal text prevails · Payment Instructions only · Live API ↻ 5s</div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────────────────────────
+const API = 'http://localhost:8000/api'
+
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+;(function(){const r=localStorage.getItem('nomos_role');if(r&&r!=='client')window.location.href='login.html'})()
+function logout(){localStorage.removeItem('nomos_role');window.location.href='login.html'}
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let S = { contracts:[], oracle:{}, details:{}, loading:true, error:null, lastUpdate:null }
+let view = 'd', EX = null
+
+// ── CLOCK ─────────────────────────────────────────────────────────────────────
+function tk(){const n=new Date();document.getElementById('ck').textContent=n.toUTCString().slice(5,16)+' '+n.toUTCString().slice(17,22)+' UTC'}
+setInterval(tk,1e3);tk()
+
+// ── API HELPERS ───────────────────────────────────────────────────────────────
+async function apiFetch(path, opts={}) {
+  const r = await fetch(API+path, opts)
+  if (!r.ok) throw new Error(`HTTP ${r.status}`)
+  return r.json()
+}
+async function apiPost(path, body) {
+  return apiFetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:body?JSON.stringify(body):undefined})
+}
+
+// Auto-seed removed — contracts are created via the Advisor portal New Contract wizard.
+async function seed() { /* no-op */ }
+
+// ── DATA REFRESH ──────────────────────────────────────────────────────────────
+async function refresh() {
+  try {
+    const [cs, orc] = await Promise.all([
+      apiFetch('/contracts?role=client'),
+      apiFetch('/oracle/latest')
+    ])
+    S.contracts = cs
+    S.oracle = orc
+    S.loading = false
+    S.error = null
+    S.lastUpdate = new Date()
+    if (EX && cs.find(c=>c.id===EX)) {
+      S.details[EX] = await apiFetch(`/contracts/${EX}?role=client`)
+    }
+    updateSidebar()
+  } catch(e) {
+    S.error = 'API unreachable — is the server running on :8000?'
+  }
+  R()
+}
+setInterval(refresh, 5000)
+seed().then(refresh)
+
+// ── SIDEBAR ───────────────────────────────────────────────────────────────────
+function updateSidebar() {
+  const el = document.getElementById('sb-swaps')
+  if (el) el.textContent = S.contracts.length || '0'
+  const al = buildAlerts()
+  const elAl = document.getElementById('sb-alerts')
+  if (elAl) elAl.textContent = al.length || '0'
+  const oEl = document.getElementById('sb-oracle')
+  if (oEl) { oEl.textContent = S.oracle.status==='CONFIRMED'?'●':'△'; oEl.className='si-badge '+(S.oracle.status==='CONFIRMED'?'ok':'al') }
+  const st = document.getElementById('api-status')
+  if (st) {
+    st.className = 'status-dot '+(S.error?'offline':'live')
+    st.innerHTML = S.error
+      ? `<span class="dot"></span>Offline`
+      : `<span class="dot pulse"></span>Live API`
+  }
+}
+
+// ── NAVIGATION ────────────────────────────────────────────────────────────────
+function N(v, el) { view=v; EX=null; document.querySelectorAll('.si').forEach(e=>e.classList.remove('on')); if(el) el.classList.add('on'); R() }
+function R() { const fn = ({d:rD,s:rS,p:rP,o:rO,dc:rDc,al:rAl})[view]; const res=fn(document.getElementById('C')); if(res instanceof Promise) res.catch(console.error) }
+
+// ── DISPLAY HELPERS ───────────────────────────────────────────────────────────
+const eur = (v,d=0) => v!=null ? '€'+Number(v).toLocaleString('en-GB',{minimumFractionDigits:d,maximumFractionDigits:d}) : '—'
+const pct = v => v!=null ? (Number(v)*100).toFixed(3)+'%' : '—'
+
+function pSt(p) {
+  if (p.payment_confirmed) return 'confirmed'
+  if (p.fixed_amount !== null) return 'pending'
+  const today = new Date().toISOString().slice(0,10)
+  if (p.payment_date < today) return 'overdue'
+  return 'future'
+}
+function pBadge(st) {
+  const map = {
+    confirmed: ['p-g',  '✓ Confirmed'],
+    pending:   ['p-w',  'Pending PI'],
+    overdue:   ['p-r',  'Overdue'],
+    future:    ['p-b',  'Scheduled'],
+  }
+  const [cls, lbl] = map[st] || ['p-b', st]
+  return `<span class="p ${cls}">${lbl}</span>`
+}
+function oracleTag() {
+  if (S.oracle.status==='CONFIRMED') return '<span class="tag tag-g">● Confirmed</span>'
+  if (S.oracle.status==='FALLBACK')  return '<span class="tag tag-w">△ Fallback</span>'
+  return '<span class="tag tag-r">○ Stale</span>'
+}
+
+// Status helpers
+function statusCls(st) {
+  if (st==='ACTIVE')            return 'p-g'
+  if (st==='PENDING_SIGNATURE') return 'p-w'
+  if (st==='SUSPENDED')         return 'p-r'
+  if (st==='TERMINATED')        return 'p-gy'
+  return 'p-b'
+}
+function statusLbl(st) {
+  if (st==='PENDING_SIGNATURE') return '◐ Pending Sig'
+  if (st==='TERMINATED')        return '✕ Terminated'
+  return st
+}
+
+const updBadge  = () => S.lastUpdate ? `<span style="font-size:9px;color:var(--t3);margin-left:10px;font-weight:400">↻ ${S.lastUpdate.toLocaleTimeString()}</span>` : ''
+const errBanner = () => S.error ? `<div style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.22);border-radius:8px;padding:10px 16px;margin-bottom:20px;font-size:11px;color:var(--r)">⚠ ${S.error}</div>` : ''
+const spinner   = () => `<div style="padding:60px;text-align:center;color:var(--t3);font-size:11px;letter-spacing:.04em">Loading from API…</div>`
+
+// ── SIGN CONTRACT ─────────────────────────────────────────────────────────────
+async function signContract(contractId) {
+  const btn = document.getElementById('sign-btn-'+contractId)
+  if (btn) { btn.disabled=true; btn.textContent='Signing…' }
+  try {
+    await apiPost('/contracts/'+contractId+'/sign?signed_by='+encodeURIComponent('Client — '+contractId))
+    delete S.details[contractId]
+    await refresh()
+  } catch(e) {
+    if (btn) { btn.disabled=false; btn.textContent='✍ Sign & Activate' }
+    alert('Error signing contract: '+e.message)
+  }
+}
+
+// ── BUILD ALERTS ──────────────────────────────────────────────────────────────
+function buildAlerts() {
+  const al = []
+  S.contracts.forEach(x => {
+    if (x.status === 'PENDING_SIGNATURE') {
+      al.push({t:'wr',i:'✍',ti:`Awaiting your signature · ${x.id}`,d:`New contract from your advisor is ready for execution. Review the Confirmation and sign to activate.`,r:'§1(b) ISDA 2002 · Confirmation execution',sign:x.id})
+      return
+    }
+    if (x.status !== 'ACTIVE') al.push({t:'cr',i:'🚨',ti:`Status alert · ${x.id}`,d:`Contract status: ${x.status}. Payment obligations may be suspended under §2(a)(iii).`,r:'§5(a)'})
+    const rep = x.compliance?.representations
+    if (rep?.breached > 0) al.push({t:'cr',i:'🚨',ti:`Representation breached · ${x.id}`,d:`${rep.breached} §3 representation(s) breached. Potential §5(a)(iv) Misrepresentation.`,r:'§3 · §5(a)(iv)'})
+    if (rep?.pending_review > 0) al.push({t:'wr',i:'⚠',ti:`Documents overdue · ${x.id}`,d:`Specified Information may be stale — ${rep.pending_review} §4(a) obligation(s) need attention.`,r:'§3(d) · §4(a)(ii)'})
+    if (x.netting_status === 'AMBER') al.push({t:'wr',i:'⚠',ti:`Netting review · ${x.id}`,d:'Close-out netting enforceability AMBER. Legal advisor review required before next cycle.',r:'§1(c)'})
+    if (x.netting_status === 'RED')   al.push({t:'cr',i:'🚨',ti:`Netting unenforceable · ${x.id}`,d:'Close-out netting may NOT be enforceable in counterparty jurisdiction. Immediate legal review required.',r:'§1(c) · §6(e)'})
+    const det = S.details[x.id]
+    if (det) {
+      const pendingPIs = det.periods.filter(p=>p.fixed_amount!==null&&!p.payment_confirmed)
+      if (pendingPIs.length) al.push({t:'inf',i:'ℹ',ti:`Payment Instruction pending · ${x.id}`,d:`${pendingPIs.length} PI(s) awaiting advisor approval. Period: ${pendingPIs.map(p=>'P'+p.number).join(', ')}.`,r:'§2(a)(i)'})
+    }
+  })
+  return al
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────────────────────
+function rD(c) {
+  if (S.loading && !S.contracts.length) { c.innerHTML = spinner(); return }
+  const D = S.contracts, O = S.oracle
+  const tot = D.reduce((s,x)=>s+x.notional, 0)
+  const np = D.find(x=>x.next_payment)?.next_payment
+  const alerts = buildAlerts()
+  const issues = D.filter(x=>(x.compliance?.representations?.breached||0)+(x.compliance?.representations?.pending_review||0)>0).length
+
+  c.innerHTML = `
+${errBanner()}
+<div class="hd">Dashboard${updBadge()}</div>
+<div class="sub">${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</div>
+<div class="kpi-row">
+  <div class="kpi">
+    <div class="kpi-l">Active Swaps</div>
+    <div class="kpi-v">${D.length}</div>
+    <div class="kpi-s">${D.filter(x=>x.status!=='ACTIVE').length ? `<span style="color:var(--r)">${D.filter(x=>x.status!=='ACTIVE').length} needs attention</span>` : 'All performing'}</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-l">Total Notional</div>
+    <div class="kpi-v" style="color:var(--warm)">€${(tot/1e6).toFixed(0)}M</div>
+    <div class="kpi-s">${D.length} contract${D.length!==1?'s':''}</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-l">Next Payment</div>
+    <div class="kpi-v" style="color:var(--warm)">${np ? eur(np.amount) : '—'}</div>
+    <div class="kpi-s">${np ? `You pay · ${np.date}` : 'No payment due yet'}</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-l">Compliance</div>
+    <div class="kpi-v" style="color:${issues?'var(--r)':'var(--g)'}">${issues ? issues : 'OK'}</div>
+    <div class="kpi-s">${issues ? `${issues} contract${issues!==1?'s':''} need review` : 'All representations met'}</div>
+  </div>
+</div>
+
+<div class="sh">Alerts <span class="tag ${alerts.length?'tag-r':'tag-g'}">${alerts.length}</span></div>
+${alerts.length
+  ? alerts.map(a=>`<div class="al ${a.t}">
+  <div class="al-i">${a.i}</div>
+  <div>
+    <div class="al-t">${a.ti}</div>
+    <div class="al-d">${a.d}</div>
+    <div class="al-r">${a.r}</div>
+    <div class="al-a">
+      ${a.sign
+        ? `<button id="sign-btn-${a.sign}-alert" class="btn sign-btn" onclick="signContract('${a.sign}')">✍ Sign &amp; Activate</button>`
+        : '<button class="btn pr">View</button>'}
+      <button class="btn">Contact advisor</button>
+    </div>
+  </div>
+</div>`).join('')
+  : '<div class="card" style="text-align:center;color:var(--t3);padding:30px;font-size:11px">No alerts.</div>'}
+
+<div class="sh" style="margin-top:28px">Oracle ${oracleTag()}</div>
+<div class="card"><div class="orc">
+  <div class="orc-v">${O.current_rate ? (Number(O.current_rate)*100).toFixed(3)+'%' : '—'}</div>
+  <div class="orc-m"><strong>EURIBOR 3M</strong><br>${O.source||'—'}<br>Fetch count: ${O.fetch_count||0} · Anomalies: ${O.anomalies_detected||0}</div>
+</div></div>
+
+<div class="sh" style="margin-top:28px">Positions</div>
+<table class="tb"><thead><tr><th>Contract</th><th>Counterparty</th><th>Notional</th><th>Fixed Rate</th><th>Next Net</th><th>Status</th><th>Netting</th></tr></thead><tbody>
+${D.map(x => {
+  const n = x.next_payment
+  return `<tr>
+    <td class="id" onclick="N('s',null);setTimeout(()=>{EX='${x.id}';rS(document.getElementById('C'))},30)">${x.id}</td>
+    <td>${x.party_b}</td>
+    <td class="m">€${(x.notional/1e6).toFixed(0)}M</td>
+    <td class="m">${pct(x.fixed_rate)}</td>
+    <td class="m" style="color:var(--warm)">${n ? eur(n.amount) : '—'}</td>
+    <td>${x.status==='PENDING_SIGNATURE'
+      ? `<button id="sign-btn-${x.id}" class="btn sign-btn" onclick="signContract('${x.id}')">✍ Sign &amp; Activate</button>`
+      : `<span class="p ${statusCls(x.status)}">${statusLbl(x.status)}</span>`}</td>
+    <td><span class="p ${x.netting_status==='GREEN'?'p-g':x.netting_status==='AMBER'?'p-w':'p-b'}">${x.netting_status||'—'}</span></td>
+  </tr>`
+}).join('')}
+</tbody></table>
+
+<div class="sh">Compliance</div>
+<div class="cg">${D.map(x => {
+  const rep = x.compliance?.representations
+  const ok = !rep?.breached && !rep?.pending_review
+  return `<div class="cc">
+    <div class="cc-h"><div class="cc-t">${x.id}</div><span class="p ${ok?'p-g':'p-r'}">${ok?'OK':'review'}</span></div>
+    <div class="cc-i">● §3(b): ${rep?.satisfied?'satisfied':'—'}<br>● Docs: ${rep?.pending_review||0} overdue<br>● Netting: ${x.netting_status||'—'}</div>
+  </div>`
+}).join('')}</div>`
+}
+
+// ── MY SWAPS ──────────────────────────────────────────────────────────────────
+function rS(c) {
+  if (S.loading && !S.contracts.length) { c.innerHTML = spinner(); return }
+  const D = S.contracts
+  const G = {}
+  D.forEach(x => { if(!G[x.party_b]) G[x.party_b]={cp:x.party_b,cs:[]}; G[x.party_b].cs.push(x) })
+
+  c.innerHTML = `<div class="hd">My Swaps</div><div class="sub">Grouped by counterparty</div>
+${Object.values(G).map(g => {
+  const tn = g.cs.reduce((s,x)=>s+x.notional, 0)
+  return `<div class="cpg">
+<div class="cph" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">
+  <div><div class="cpn">${g.cp}</div></div>
+  <div class="cpm"><span>${g.cs.length} swap${g.cs.length>1?'s':''}</span><span>€${(tn/1e6).toFixed(0)}M</span></div>
+</div>
+<div class="cpb">
+${g.cs.map(x => {
+  const det = S.details[x.id]
+  const expanded = EX===x.id
+  return `
+<div style="padding:12px 20px;border-bottom:1px solid var(--b0);cursor:pointer;transition:background var(--trans)" onmouseover="this.style.background='rgba(255,255,255,.02)'" onmouseout="this.style.background=''" onclick="_toggleSwap('${x.id}')">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <span class="id">${x.id}</span>
+      <span style="color:var(--t3);font-size:11px;margin-left:10px">${x.type} · €${(x.notional/1e6).toFixed(0)}M · ${pct(x.fixed_rate)}</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      ${x.status==='PENDING_SIGNATURE'
+        ? `<button id="sign-btn-${x.id}" class="btn sign-btn" onclick="event.stopPropagation();signContract('${x.id}')">✍ Sign &amp; Activate</button>`
+        : `<span class="p ${statusCls(x.status)}">${statusLbl(x.status)}</span>`}
+      <span style="color:var(--t3);font-size:10px">${expanded?'▲':'▼'}</span>
+    </div>
+  </div>
+</div>
+${expanded ? (det ? `
+<div style="padding:16px 20px;background:var(--s1)">
+  <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+    ${[`30/360 · Act/360`,'Quarterly',x.governing_law,`Netting: ${x.netting_status}`].map(t=>`<span style="font-family:var(--fm);font-size:9px;color:var(--t3);padding:4px 10px;border:1px solid var(--b0);border-radius:6px">${t}</span>`).join('')}
+  </div>
+  <table class="st"><thead><tr>
+    <th>#</th><th>Start</th><th>End</th><th>Pay Date</th>
+    <th>EURIBOR</th><th>Fixed</th><th>Floating</th><th>Net</th>
+    <th>Direction</th><th>Status</th><th>Fingerprint</th>
+  </tr></thead><tbody>
+  ${det.periods.map(p => {
+    const st = pSt(p)
+    const dir = p.net_payer==='PARTY_A'
+      ? '<span style="color:var(--r);font-weight:500">You pay</span>'
+      : p.net_payer==='PARTY_B'
+        ? '<span style="color:var(--g);font-weight:500">You receive</span>'
+        : '—'
+    return `<tr>
+      <td style="text-align:left;color:var(--t3)">${String(p.number).padStart(2,'0')}</td>
+      <td style="text-align:left">${p.start}</td>
+      <td style="text-align:left">${p.end}</td>
+      <td style="text-align:left">${p.payment_date}</td>
+      <td style="color:var(--warm)">${p.oracle_rate?(p.oracle_rate*100).toFixed(3)+'%':'—'}</td>
+      <td>${eur(p.fixed_amount)}</td>
+      <td>${eur(p.floating_amount)}</td>
+      <td style="color:var(--warm);font-weight:500">${eur(p.net_amount)}</td>
+      <td>${p.fixed_amount!==null?dir:'—'}</td>
+      <td>${pBadge(st)}</td>
+      <td style="color:var(--t3);font-size:9px">${p.fingerprint?p.fingerprint.slice(0,12)+'…':'—'}</td>
+    </tr>`
+  }).join('')}
+  </tbody></table>
+</div>` : `<div style="padding:20px;text-align:center;color:var(--t3);font-size:11px">Loading…</div>`) : ''}`
+}).join('')}
+</div></div>`
+}).join('')}`
+
+  window._toggleSwap = async (id) => {
+    if (EX === id) { EX = null; rS(c); return }
+    EX = id
+    if (!S.details[id]) {
+      rS(c)
+      try { S.details[id] = await apiFetch(`/contracts/${id}?role=client`) } catch(e) { console.warn(e) }
+    }
+    rS(c)
+  }
+}
+
+// ── PAYMENTS ──────────────────────────────────────────────────────────────────
+async function rP(c) {
+  if (S.loading && !S.contracts.length) { c.innerHTML = spinner(); return }
+  await Promise.all(S.contracts.map(async x => {
+    if (!S.details[x.id]) {
+      try { S.details[x.id] = await apiFetch(`/contracts/${x.id}?role=client`) } catch(e){}
+    }
+  }))
+  const rows = []
+  S.contracts.forEach(x => {
+    const det = S.details[x.id]
+    if (det) det.periods.forEach(p => rows.push({...p, cid:x.id, cp:x.party_b}))
+  })
+  rows.sort((a,b) => (a.payment_date||'z').localeCompare(b.payment_date||'z'))
+  c.innerHTML = `<div class="hd">Payments</div><div class="sub">All scheduled payments across contracts</div>
+<table class="tb"><thead><tr>
+  <th>Pay Date</th><th>Contract</th><th>Counterparty</th><th>#</th>
+  <th>Fixed</th><th>Floating</th><th>Net</th>
+  <th>Direction</th><th>Oracle</th><th>Status</th>
+</tr></thead><tbody>
+${rows.map(p => {
+  const st = pSt(p)
+  const dir = p.net_payer==='PARTY_A'
+    ? '<span style="color:var(--r)">You pay</span>'
+    : p.net_payer==='PARTY_B'
+      ? '<span style="color:var(--g)">You receive</span>'
+      : '—'
+  return `<tr>
+    <td class="m">${p.payment_date}</td>
+    <td class="id">${p.cid}</td>
+    <td>${p.cp}</td>
+    <td class="m">${p.number}</td>
+    <td class="m">${eur(p.fixed_amount)}</td>
+    <td class="m">${eur(p.floating_amount)}</td>
+    <td class="m" style="color:var(--warm);font-weight:500">${eur(p.net_amount)}</td>
+    <td>${p.fixed_amount!==null?dir:'—'}</td>
+    <td style="font-family:var(--fm);font-size:10px;color:var(--t3)">${p.oracle_rate?(p.oracle_rate*100).toFixed(3)+'%':'—'}</td>
+    <td>${pBadge(st)}</td>
+  </tr>`
+}).join('')}
+</tbody></table>`
+}
+
+// ── ORACLE ────────────────────────────────────────────────────────────────────
+function rO(c) {
+  const O = S.oracle
+  const rate = O.current_rate ? (Number(O.current_rate)*100).toFixed(3) : null
+  c.innerHTML = `<div class="hd">Oracle</div><div class="sub">Reference rate for floating leg calculations · ISDA 2021 5-step fallback waterfall</div>
+<div class="card"><div class="orc">
+  <div style="text-align:center;min-width:190px">
+    <div style="font-size:10px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;font-family:var(--fm)">EURIBOR 3M</div>
+    <div class="orc-v">${rate ? rate+'%' : '—'}</div>
+    <div style="margin-top:12px">${oracleTag()}</div>
+  </div>
+  <div style="width:1px;background:var(--b0);align-self:stretch"></div>
+  <div class="orc-m">
+    <strong>Source:</strong> ${O.source||'—'}<br>
+    <strong>Sources attempted:</strong> ${(O.sources_attempted||[]).join(' → ')||'—'}<br>
+    <strong>Fetch count:</strong> ${O.fetch_count||0}<br>
+    <strong>Anomalies:</strong> ${O.anomalies_detected||0}<br>
+    <strong>Last confirmed:</strong> ${O.last_confirmed ? (Number(O.last_confirmed)*100).toFixed(3)+'%' : 'None yet'}<br>
+    <strong>Challenge threshold:</strong> 5 bps
+  </div>
+</div></div>
+<div style="margin-top:20px;font-size:11px;color:var(--t2);line-height:2.4">
+  <span style="color:var(--g)">● V1</span> ECB SDW &nbsp;→&nbsp;
+  <span style="color:var(--warm)">◐ V2</span> ISDA 2021 €STR+spread &nbsp;→&nbsp;
+  <span style="color:var(--t3)">○ V3</span> Chainlink &nbsp;→&nbsp;
+  <span style="color:var(--t3)">○ V4</span> Bloomberg
+</div>`
+}
+
+// ── DOCUMENTS ─────────────────────────────────────────────────────────────────
+function rDc(c) {
+  const obs = []
+  S.contracts.forEach(x => {
+    const dets = x.compliance?.representations?.details || []
+    dets.filter(r=>r.status==='PENDING_REVIEW'||r.status==='BREACHED').forEach(r => {
+      obs.push({doc:r.name, cid:x.id, party:'You / Counterparty', due:'—', st:r.status==='BREACHED'?'overdue':'due soon'})
+    })
+  })
+  c.innerHTML = `<div class="hd">Documents</div><div class="sub">Required deliveries under your agreements — sourced from §4 obligations</div>
+<table class="tb"><thead><tr><th>Obligation</th><th>Contract</th><th>Party</th><th>Status</th></tr></thead><tbody>
+${obs.length
+  ? obs.map(o=>`<tr><td>${o.doc}</td><td class="id">${o.cid}</td><td>${o.party}</td><td><span class="p ${o.st==='overdue'?'p-r':'p-w'}">${o.st}</span></td></tr>`).join('')
+  : '<tr><td colspan="4" style="text-align:center;color:var(--t3);padding:20px">No outstanding obligations found.</td></tr>'}
+</tbody></table>
+<div style="font-size:10px;color:var(--t3);margin-top:8px">Contact your legal advisor at Linklaters LLP to deliver outstanding documents.</div>`
+}
+
+// ── ALERTS ────────────────────────────────────────────────────────────────────
+function rAl(c) {
+  const al = buildAlerts()
+  c.innerHTML = `<div class="hd">Alerts</div><div class="sub">Items requiring your attention — live from API</div>
+${al.length
+  ? al.map(a=>`<div class="al ${a.t}">
+  <div class="al-i">${a.i}</div>
+  <div>
+    <div class="al-t">${a.ti}</div>
+    <div class="al-d">${a.d}</div>
+    <div class="al-r">${a.r}</div>
+    <div class="al-a">
+      ${a.sign
+        ? `<button id="sign-btn-${a.sign}-alert" class="btn sign-btn" onclick="signContract('${a.sign}')">✍ Sign &amp; Activate</button>`
+        : '<button class="btn pr">View</button>'}
+      <button class="btn">Contact advisor</button>
+    </div>
+  </div>
+</div>`).join('')
+  : '<div class="card" style="text-align:center;color:var(--t3);padding:30px;font-size:11px">No alerts.</div>'}`
+}
+
+R()
+</script></body></html>
