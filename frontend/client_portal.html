@@ -250,23 +250,30 @@ body{background:var(--bg);color:var(--t1);font-family:var(--ff);font-size:13px;d
     <div class="si" onclick="N('o',this)">Oracle <span class="si-badge ok" id="sb-oracle">●</span></div>
     <div class="si" onclick="N('dc',this)">Documents <span class="si-badge al">!</span></div>
     <div class="si" onclick="N('al',this)">Alerts <span class="si-badge al" id="sb-alerts">—</span></div>
+    <div class="si" onclick="N('pr',this)">Profile</div>
   </div>
   <div class="side-ft">Legal Advisor<br><span>Linklaters LLP</span><br><br>Calc. Agent · Party A</div>
 </div>
 <div class="ct" id="C"></div>
 </div>
-<div class="ft">§1(b) ISDA 2002 · Legal text prevails · Payment Instructions only · Live API ↻ 5s</div>
+<div class="ft">§1(b) ISDA 2002 · Legal text prevails · Payment Instructions only · Live API ↻ 10s</div>
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────────────
-const API = 'http://localhost:8000/api'
+const API = '/api'
 
 // ── AUTH ──────────────────────────────────────────────────────────────────────
-;(function(){const r=localStorage.getItem('nomos_role');if(r&&r!=='client')window.location.href='login.html'})()
-function logout(){localStorage.removeItem('nomos_role');window.location.href='login.html'}
+;(function(){const r=localStorage.getItem('nomos_role');if(r&&r!=='client')window.location.href='/'})()
+function logout(){localStorage.removeItem('nomos_role');window.location.href='/'}
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
-let S = { contracts:[], oracle:{}, details:{}, loading:true, error:null, lastUpdate:null }
+let S = {
+  contracts:[], oracle:{}, details:{},
+  orc3: { rates:{}, lastFetch:null },
+  dd: {},       // keyed by contract_id
+  profile: {},
+  loading:true, error:null, lastUpdate:null
+}
 let view = 'd', EX = null
 
 // ── CLOCK ─────────────────────────────────────────────────────────────────────
@@ -286,15 +293,20 @@ async function apiPost(path, body) {
 // Auto-seed removed — contracts are created via the Advisor portal New Contract wizard.
 async function seed() { /* no-op */ }
 
-// ── DATA REFRESH ──────────────────────────────────────────────────────────────
+// ── DATA REFRESH (polled every 10s) ───────────────────────────────────────────
 async function refresh() {
   try {
-    const [cs, orc] = await Promise.all([
+    const [cs, orc, rates, prof] = await Promise.all([
       apiFetch('/contracts?role=client'),
-      apiFetch('/oracle/latest')
+      apiFetch('/oracle/latest'),
+      apiFetch('/oracle/rates').catch(()=>({})),
+      apiFetch('/client/profile').catch(()=>({})),
     ])
     S.contracts = cs
     S.oracle = orc
+    S.orc3.rates = rates.rates || {}
+    S.orc3.lastFetch = new Date()
+    S.profile = prof.profile || {}
     S.loading = false
     S.error = null
     S.lastUpdate = new Date()
@@ -307,7 +319,7 @@ async function refresh() {
   }
   R()
 }
-setInterval(refresh, 5000)
+setInterval(refresh, 10000)
 seed().then(refresh)
 
 // ── SIDEBAR ───────────────────────────────────────────────────────────────────
@@ -330,7 +342,7 @@ function updateSidebar() {
 
 // ── NAVIGATION ────────────────────────────────────────────────────────────────
 function N(v, el) { view=v; EX=null; document.querySelectorAll('.si').forEach(e=>e.classList.remove('on')); if(el) el.classList.add('on'); R() }
-function R() { const fn = ({d:rD,s:rS,p:rP,o:rO,dc:rDc,al:rAl})[view]; const res=fn(document.getElementById('C')); if(res instanceof Promise) res.catch(console.error) }
+function R() { const fn = ({d:rD,s:rS,p:rP,o:rO,dc:rDc,al:rAl,pr:rPr})[view]; const res=fn(document.getElementById('C')); if(res instanceof Promise) res.catch(console.error) }
 
 // ── DISPLAY HELPERS ───────────────────────────────────────────────────────────
 const eur = (v,d=0) => v!=null ? '€'+Number(v).toLocaleString('en-GB',{minimumFractionDigits:d,maximumFractionDigits:d}) : '—'
@@ -380,8 +392,23 @@ const spinner   = () => `<div style="padding:60px;text-align:center;color:var(--
 // ── SIGN CONTRACT ─────────────────────────────────────────────────────────────
 async function signContract(contractId) {
   const btn = document.getElementById('sign-btn-'+contractId)
-  if (btn) { btn.disabled=true; btn.textContent='Signing…' }
+  if (btn) { btn.disabled=true; btn.textContent='Checking…' }
   try {
+    // DD gate: verify signing readiness before attempting to sign
+    const readiness = await apiFetch('/contracts/'+contractId+'/signing-readiness')
+    if (!readiness.ready) {
+      if (btn) { btn.disabled=false; btn.textContent='✍ Sign & Activate' }
+      const n = readiness.blocking_count || 0
+      alert(
+        'Cannot sign: ' + readiness.message +
+        (n > 0 ? '\n\nMissing documents (' + n + '):\n' +
+          (readiness.missing||[]).map(d=>'• '+d.description+' ('+d.party+') — '+d.status).join('\n')
+        : '') +
+        '\n\nPlease upload and await validation of all pre-signing documents in the Documents tab.'
+      )
+      return
+    }
+    if (btn) btn.textContent='Signing…'
     await apiPost('/contracts/'+contractId+'/sign?signed_by='+encodeURIComponent('Client — '+contractId))
     delete S.details[contractId]
     await refresh()
@@ -631,48 +658,292 @@ ${rows.map(p => {
 // ── ORACLE ────────────────────────────────────────────────────────────────────
 function rO(c) {
   const O = S.oracle
-  const rate = O.current_rate ? (Number(O.current_rate)*100).toFixed(3) : null
-  c.innerHTML = `<div class="hd">Oracle</div><div class="sub">Reference rate for floating leg calculations · ISDA 2021 5-step fallback waterfall</div>
-<div class="card"><div class="orc">
-  <div style="text-align:center;min-width:190px">
-    <div style="font-size:10px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;font-family:var(--fm)">EURIBOR 3M</div>
-    <div class="orc-v">${rate ? rate+'%' : '—'}</div>
-    <div style="margin-top:12px">${oracleTag()}</div>
+  const R3 = S.orc3
+  const rates = R3.rates || {}
+
+  // Find the EURIBOR_3M rate from oracle v3 (or fall back to old oracle)
+  const e3m = rates['EURIBOR_3M'] || rates['EURIBOR 3M']
+  const displayRate = e3m
+    ? (Number(e3m.rate)*100).toFixed(4)
+    : (O.current_rate ? (Number(O.current_rate)*100).toFixed(3) : null)
+  const displayStatus = e3m?.status || O.status
+
+  function statusPill(st) {
+    if (st==='CONFIRMED') return '<span class="tag tag-g">● Confirmed</span>'
+    if (st==='FALLBACK'||st==='STATIC_FALLBACK') return '<span class="tag tag-w">△ Fallback</span>'
+    if (st==='STALE') return '<span class="tag tag-r">○ Stale</span>'
+    return '<span class="tag tag-b">— Pending</span>'
+  }
+
+  // Per-contract rate display
+  const contractRates = S.contracts.map(x => {
+    const det = S.details[x.id]
+    const lastRate = det?.periods.filter(p=>p.oracle_rate!=null).slice(-1)[0]?.oracle_rate
+    return `<tr>
+      <td class="id">${x.id}</td>
+      <td>${x.party_b}</td>
+      <td class="m">${pct(x.fixed_rate)}</td>
+      <td style="color:var(--warm);font-family:var(--fm);font-size:11px">${lastRate ? (Number(lastRate)*100).toFixed(4)+'%' : displayRate ? displayRate+'%' : '—'}</td>
+      <td>${statusPill(lastRate ? 'CONFIRMED' : displayStatus)}</td>
+    </tr>`
+  }).join('')
+
+  // All rates table from oracle v3
+  const allRateRows = Object.values(rates).map(r => `<tr>
+    <td class="m" style="color:var(--warm)">${r.rate_id}</td>
+    <td class="m">${r.rate ? (Number(r.rate)*100).toFixed(4)+'%' : '—'}</td>
+    <td><span class="tag ${r.status==='CONFIRMED'?'tag-g':r.status==='FALLBACK'||r.status==='STATIC_FALLBACK'?'tag-w':'tag-r'}">${r.status||'—'}</span></td>
+    <td style="font-size:10px;color:var(--t3)">${(r.fetch_timestamp||'—').slice(0,16).replace('T',' ')}</td>
+  </tr>`).join('')
+
+  c.innerHTML = `<div class="hd">Oracle</div>
+<div class="sub">Reference rates for floating leg calculations · ISDA 2021 5-step fallback waterfall</div>
+
+<div class="card">
+  <div class="orc">
+    <div style="text-align:center;min-width:190px">
+      <div style="font-size:10px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;font-family:var(--fm)">EURIBOR 3M</div>
+      <div class="orc-v">${displayRate ? displayRate+'%' : '—'}</div>
+      <div style="margin-top:12px">${statusPill(displayStatus)}</div>
+    </div>
+    <div style="width:1px;background:var(--b0);align-self:stretch"></div>
+    <div class="orc-m">
+      <strong>Source:</strong> ${e3m?.source || O.source||'—'}<br>
+      <strong>Last fetch:</strong> ${R3.lastFetch ? R3.lastFetch.toLocaleTimeString() : '—'}<br>
+      <strong>Fetch count:</strong> ${O.fetch_count||0}<br>
+      <strong>Anomalies detected:</strong> ${O.anomalies_detected||0}<br>
+      <strong>Challenge threshold:</strong> 5 bps · ISDA 2021 §5(b)
+    </div>
   </div>
-  <div style="width:1px;background:var(--b0);align-self:stretch"></div>
-  <div class="orc-m">
-    <strong>Source:</strong> ${O.source||'—'}<br>
-    <strong>Sources attempted:</strong> ${(O.sources_attempted||[]).join(' → ')||'—'}<br>
-    <strong>Fetch count:</strong> ${O.fetch_count||0}<br>
-    <strong>Anomalies:</strong> ${O.anomalies_detected||0}<br>
-    <strong>Last confirmed:</strong> ${O.last_confirmed ? (Number(O.last_confirmed)*100).toFixed(3)+'%' : 'None yet'}<br>
-    <strong>Challenge threshold:</strong> 5 bps
-  </div>
-</div></div>
-<div style="margin-top:20px;font-size:11px;color:var(--t2);line-height:2.4">
-  <span style="color:var(--g)">● V1</span> ECB SDW &nbsp;→&nbsp;
-  <span style="color:var(--warm)">◐ V2</span> ISDA 2021 €STR+spread &nbsp;→&nbsp;
-  <span style="color:var(--t3)">○ V3</span> Chainlink &nbsp;→&nbsp;
-  <span style="color:var(--t3)">○ V4</span> Bloomberg
+</div>
+
+${S.contracts.length ? `<div class="sh">Per-Contract Rates</div>
+<table class="tb"><thead><tr><th>Contract</th><th>Counterparty</th><th>Fixed Rate</th><th>EURIBOR 3M (last)</th><th>Status</th></tr></thead>
+<tbody>${contractRates}</tbody></table>` : ''}
+
+<div class="sh">All Rates Registry <span class="tag tag-v">${Object.keys(rates).length}</span></div>
+<table class="tb"><thead><tr><th>Rate ID</th><th>Value</th><th>Status</th><th>Last Fetched</th></tr></thead>
+<tbody>${allRateRows||'<tr><td colspan="4" style="text-align:center;color:var(--t3);padding:16px">No cached rates. Advisor portal can refresh from ECB.</td></tr>'}</tbody>
+</table>
+
+<div style="margin-top:16px;font-size:11px;color:var(--t2);line-height:2.4">
+  <span style="color:var(--g)">● Step 1</span> ECB SDW &nbsp;→&nbsp;
+  <span style="color:var(--warm)">◐ Step 2</span> ISDA 2021 €STR+spread &nbsp;→&nbsp;
+  <span style="color:var(--t3)">○ Step 3</span> Last confirmed (stale) &nbsp;→&nbsp;
+  <span style="color:var(--t3)">○ Step 4</span> Static fallback
 </div>`
 }
 
-// ── DOCUMENTS ─────────────────────────────────────────────────────────────────
-function rDc(c) {
-  const obs = []
-  S.contracts.forEach(x => {
-    const dets = x.compliance?.representations?.details || []
-    dets.filter(r=>r.status==='PENDING_REVIEW'||r.status==='BREACHED').forEach(r => {
-      obs.push({doc:r.name, cid:x.id, party:'You / Counterparty', due:'—', st:r.status==='BREACHED'?'overdue':'due soon'})
-    })
-  })
-  c.innerHTML = `<div class="hd">Documents</div><div class="sub">Required deliveries under your agreements — sourced from §4 obligations</div>
-<table class="tb"><thead><tr><th>Obligation</th><th>Contract</th><th>Party</th><th>Status</th></tr></thead><tbody>
-${obs.length
-  ? obs.map(o=>`<tr><td>${o.doc}</td><td class="id">${o.cid}</td><td>${o.party}</td><td><span class="p ${o.st==='overdue'?'p-r':'p-w'}">${o.st}</span></td></tr>`).join('')
-  : '<tr><td colspan="4" style="text-align:center;color:var(--t3);padding:20px">No outstanding obligations found.</td></tr>'}
-</tbody></table>
-<div style="font-size:10px;color:var(--t3);margin-top:8px">Contact your legal advisor at Linklaters LLP to deliver outstanding documents.</div>`
+// ── DOCUMENTS (Due Diligence Checklist) ───────────────────────────────────────
+async function rDc(c) {
+  if (S.loading && !S.contracts.length) { c.innerHTML = spinner(); return }
+  if (!S.ready) S.ready = {}
+
+  // Load DD summaries and signing readiness in parallel for all contracts
+  await Promise.all(S.contracts.flatMap(x => {
+    const tasks = []
+    if (!S.dd[x.id])
+      tasks.push(apiFetch(`/contracts/${x.id}/due-diligence`).then(r=>{S.dd[x.id]=r}).catch(e=>{S.dd[x.id]={error:e.message}}))
+    if (!S.ready[x.id])
+      tasks.push(apiFetch(`/contracts/${x.id}/signing-readiness`).then(r=>{S.ready[x.id]=r}).catch(()=>{S.ready[x.id]={ready:false,blocking_count:0,missing:[]}}))
+    return tasks
+  }))
+
+  function ragPill(rag) {
+    if (rag==='GREEN') return '<span class="p p-g">● All OK</span>'
+    if (rag==='AMBER') return '<span class="p p-w">◐ Pending</span>'
+    if (rag==='RED')   return '<span class="p p-r">○ Action needed</span>'
+    return '<span class="p p-gy">—</span>'
+  }
+  function docStatusPill(st) {
+    const map={REQUIRED:'p-w',UPLOADED:'p-b',VALIDATED:'p-g',REJECTED:'p-r',EXPIRED:'p-r',NOT_REQUIRED:'p-gy'}
+    const labels={REQUIRED:'MISSING',UPLOADED:'UPLOADED',VALIDATED:'VALIDATED',REJECTED:'REJECTED',EXPIRED:'EXPIRED',NOT_REQUIRED:'N/A'}
+    return `<span class="p ${map[st]||'p-b'}">${labels[st]||st}</span>`
+  }
+  function workflowBar(state) {
+    const steps=['KYC_PENDING','KYC_VALIDATED','DOCS_PENDING','DOCS_VALIDATED','READY_TO_SIGN']
+    const labels=['KYC','KYC ✓','Docs','Docs ✓','Ready ✓']
+    const cur=steps.indexOf(state)
+    return `<div style="display:flex;gap:0;margin-bottom:14px">`+
+      steps.map((s,i)=>`<div style="flex:1;text-align:center;padding:5px 2px;font-size:9px;border-radius:${i===0?'6px 0 0 6px':i===steps.length-1?'0 6px 6px 0':'0'};background:${i<=cur?'rgba(74,222,128,.12)':'rgba(255,255,255,.04)'};color:${i<=cur?'var(--g)':'var(--t3)'};border:1px solid ${i<=cur?'rgba(74,222,128,.25)':'var(--b0)'};margin-left:${i>0?'-1px':'0'}">${labels[i]}</div>`).join('')+
+    `</div>`
+  }
+
+  const blocks = S.contracts.map(x => {
+    const dd       = S.dd[x.id]
+    if (!dd || dd.error) return `<div class="card"><strong>${x.id}</strong> — <span style="color:var(--t3);font-size:11px">${dd?.error||'Due diligence module not available'}</span></div>`
+
+    const allDocs  = dd.documents || []
+    const preDocs  = allDocs.filter(d=>d.is_pre_signing)
+    const postDocs = allDocs.filter(d=>!d.is_pre_signing)
+    const preVal   = preDocs.filter(d=>d.status==='VALIDATED').length
+    const overdue  = dd.overdue_docs || []
+    const expiring = dd.expiring_soon || []
+    const wfState  = dd.workflow?.state || 'KYC_PENDING'
+    const ready    = S.ready[x.id]
+    const canSign  = ready?.ready
+    const blocking = ready?.blocking_count || 0
+
+    const pct = preDocs.length ? Math.round(100*preVal/preDocs.length) : 100
+
+    const signAreaHtml = x.status === 'PENDING_SIGNATURE'
+      ? canSign
+        ? `<button id="sign-btn-${x.id}" class="btn sign-btn" onclick="signContract('${x.id}')">✍ Sign &amp; Activate</button>`
+        : `<button id="sign-btn-${x.id}" class="btn sign-btn" disabled title="Due diligence incomplete: ${blocking} document${blocking!==1?'s':''} still required" style="opacity:.45;cursor:not-allowed">✍ Sign &amp; Activate</button>`
+      : x.status === 'ACTIVE'
+        ? `<span class="p p-g">● Active</span>`
+        : `<span class="p p-gy">${x.status}</span>`
+
+    function docRow(d) {
+      const uploadCell = (d.status==='REQUIRED'||d.status==='REJECTED'||d.status==='EXPIRED')
+        ? `<button class="btn pr" onclick="_ddUpload('${x.id}','${d.doc_id}','${d.doc_type}',this)">↑ Upload</button>`
+        : d.status==='UPLOADED' ? '<span style="font-size:10px;color:var(--bl)">⏳ Awaiting review</span>'
+        : d.status==='VALIDATED' ? '<span style="font-size:10px;color:var(--g)">✓ Accepted</span>'
+        : '—'
+      return `<tr${d.status==='REQUIRED'?' style="background:rgba(248,113,113,.025)"':''}>
+  <td><div style="font-size:11px">${d.description||d.doc_type}</div><div style="font-size:9px;color:var(--t3)">${d.linked_obligation||''}</div></td>
+  <td>${docStatusPill(d.status)}</td>
+  <td style="font-size:10px;color:var(--t3)">${d.due_date_obligation||'—'}</td>
+  <td>${uploadCell}</td>
+</tr>`
+    }
+
+    return `<div class="card" style="margin-bottom:16px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+  <div>
+    <div style="font-size:13px;font-weight:600">${x.id}</div>
+    <div style="font-size:10px;color:var(--t3)">Counterparty: ${x.party_b} · Schedule Part 3</div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">${ragPill(dd.rag_status)}${signAreaHtml}</div>
+</div>
+
+${workflowBar(wfState)}
+
+<div style="margin-bottom:14px">
+  <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--t3);margin-bottom:5px">
+    <span>Pre-signing documents</span>
+    <span>${preVal} of ${preDocs.length} validated${!canSign&&x.status==='PENDING_SIGNATURE'?' · <span style="color:var(--r)">'+blocking+' required</span>':''}</span>
+  </div>
+  <div style="background:rgba(255,255,255,.05);border-radius:4px;height:5px;overflow:hidden">
+    <div style="width:${pct}%;background:${pct===100?'var(--g)':'var(--warm)'};height:5px;border-radius:4px;transition:width .4s ease"></div>
+  </div>
+</div>
+
+${overdue.length ? `<div style="background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.2);border-radius:8px;padding:8px 14px;margin-bottom:10px;font-size:10px;color:var(--r)">⚠ Overdue: ${overdue.join(' · ')}</div>` : ''}
+${expiring.length ? `<div style="background:rgba(196,149,106,.06);border:1px solid rgba(196,149,106,.15);border-radius:8px;padding:8px 14px;margin-bottom:10px;font-size:10px;color:var(--warm)">Expiring soon: ${expiring.join(' · ')}</div>` : ''}
+
+<div style="font-size:11px;font-weight:600;color:var(--t2);margin-bottom:6px">Phase 1 — Pre-Signing Checklist</div>
+<table class="tb" style="margin-bottom:${postDocs.length?'14px':'0'}"><thead><tr>
+  <th>Document</th><th>Status</th><th>Due</th><th>Upload</th>
+</tr></thead><tbody>${preDocs.map(docRow).join('')}</tbody></table>
+
+${postDocs.length ? `<div style="font-size:11px;font-weight:600;color:var(--t2);margin-bottom:6px">Phase 2 — Post-Signing (Ongoing)</div>
+<table class="tb" style="margin-bottom:0"><thead><tr>
+  <th>Document</th><th>Status</th><th>Due</th><th>Upload</th>
+</tr></thead><tbody>${postDocs.map(docRow).join('')}</tbody></table>` : ''}
+</div>`
+  }).join('')
+
+  c.innerHTML = `<div class="hd">Documents</div>
+<div class="sub">Required deliveries under Schedule Part 3 · §4(a) ISDA 2002 · Pre-signing gate enforced</div>
+${blocks || '<div class="card" style="text-align:center;color:var(--t3);padding:30px;font-size:11px">No contracts or documents found.</div>'}
+<div style="font-size:10px;color:var(--t3);margin-top:8px">Contact Linklaters LLP for questions about your document obligations.</div>
+<div id="dd-upload-msg" style="display:none;margin-top:12px"></div>`
+
+  window._ddUpload = async (contractId, docId, docType, btn) => {
+    const fileData = prompt(`Upload "${docType}" for ${contractId}\n\nPaste file content or leave blank for stub:`)
+    if (fileData === null) return
+    btn.disabled = true; btn.textContent = 'Uploading…'
+    try {
+      const payload = {
+        doc_id:          docId,
+        document_type:   docType,
+        filename:        docType.toLowerCase().replace(/_/g,'-')+'.pdf',
+        uploaded_by:     'Client — '+contractId,
+        file_content_b64: fileData ? btoa(unescape(encodeURIComponent(fileData))) : btoa('STUB_CONTENT'),
+      }
+      await apiFetch('/contracts/'+contractId+'/due-diligence/upload', {
+        method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
+      })
+      delete S.dd[contractId]
+      delete S.ready[contractId]
+      const msg = document.getElementById('dd-upload-msg')
+      if (msg) { msg.style.display='block'; msg.innerHTML=`<div style="background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.2);border-radius:8px;padding:10px 14px;font-size:11px;color:var(--bl)">✓ Uploaded — advisor will be notified and must validate this document.</div>` }
+      await refresh()
+    } catch(e) {
+      alert('Upload error: '+e.message)
+      btn.disabled=false; btn.textContent='↑ Upload'
+    }
+  }
+}
+
+// ── PROFILE ───────────────────────────────────────────────────────────────────
+function rPr(c) {
+  const P = S.profile || {}
+  c.innerHTML = `<div class="hd">Profile</div>
+<div class="sub">Your company information — shared with your legal advisor and used for compliance checks</div>
+<div class="card">
+  <div style="font-size:12px;font-weight:600;margin-bottom:16px;color:var(--t2)">Company Details</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <div>
+      <div style="font-size:10px;color:var(--t3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:5px">Legal Company Name</div>
+      <input id="pr-name" class="fi" value="${P.company_name||''}" placeholder="Alpha Corp S.A."/>
+    </div>
+    <div>
+      <div style="font-size:10px;color:var(--t3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:5px">Jurisdiction</div>
+      <input id="pr-juris" class="fi" value="${P.jurisdiction||''}" placeholder="FR"/>
+    </div>
+    <div>
+      <div style="font-size:10px;color:var(--t3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:5px">LEI (Legal Entity Identifier)</div>
+      <input id="pr-lei" class="fi" value="${P.lei||''}" placeholder="2138007XKZTKFHVXL357"/>
+    </div>
+    <div>
+      <div style="font-size:10px;color:var(--t3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:5px">Contact Email</div>
+      <input id="pr-email" class="fi" value="${P.contact_email||''}" placeholder="legal@alphacorp.com"/>
+    </div>
+    <div>
+      <div style="font-size:10px;color:var(--t3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:5px">Advisor Key (required to save)</div>
+      <input id="pr-key" class="fi" value="${P.advisor_key||''}" placeholder="Provided by Linklaters LLP" type="password"/>
+    </div>
+  </div>
+  <div style="margin-top:16px;display:flex;gap:8px;align-items:center">
+    <button class="btn pr" onclick="_savePr(this)">Save Profile</button>
+    <span id="pr-msg" style="font-size:10px;color:var(--t3)"></span>
+  </div>
+</div>
+
+<div class="card" style="margin-top:12px">
+  <div style="font-size:12px;font-weight:600;margin-bottom:12px;color:var(--t2)">Legal Advisor</div>
+  <div style="font-size:11px;color:var(--t2);line-height:2.4">
+    <strong>Firm:</strong> Linklaters LLP<br>
+    <strong>Calculation Agent role:</strong> Party A<br>
+    <strong>ISDA Master Agreement:</strong> 2002 (English Law)<br>
+    <strong>Governing Law:</strong> §13 ISDA 2002
+  </div>
+</div>`
+
+  window._savePr = async (btn) => {
+    btn.disabled=true; btn.textContent='Saving…'
+    const msg = document.getElementById('pr-msg')
+    try {
+      const res = await apiFetch('/client/profile', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          company_name: document.getElementById('pr-name').value,
+          jurisdiction: document.getElementById('pr-juris').value,
+          lei: document.getElementById('pr-lei').value,
+          contact_email: document.getElementById('pr-email').value,
+          advisor_key: document.getElementById('pr-key').value,
+        })
+      })
+      S.profile = res.profile || {}
+      if (msg) { msg.style.color='var(--g)'; msg.textContent='✓ Profile saved' }
+    } catch(e) {
+      if (msg) { msg.style.color='var(--r)'; msg.textContent='⚠ '+e.message }
+    }
+    btn.disabled=false; btn.textContent='Save Profile'
+  }
 }
 
 // ── ALERTS ────────────────────────────────────────────────────────────────────

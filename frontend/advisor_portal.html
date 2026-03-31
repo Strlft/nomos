@@ -324,8 +324,9 @@ select.fi option{background:var(--s2)}
   <div class="si" onclick="N('mon',this)">Monitoring §3/§4/§5 <span class="si-badge vi" id="sb-cts">—</span></div>
   <div class="si" onclick="N('cb',this)">Clause Builder</div>
   <div class="si" onclick="N('net',this)">Netting Opinions</div>
+  <div class="si" onclick="N('dd',this)">Due Diligence <span class="si-badge al" id="sb-dd">—</span></div>
   <div class="side-l">Operations</div>
-  <div class="si" onclick="N('orc',this)">Oracle</div>
+  <div class="si" onclick="N('orc',this)">Oracle <span class="si-badge ok" id="sb-orc">●</span></div>
   <div class="si" onclick="N('aud',this)">Audit Trail</div>
   <div class="si" onclick="N('not',this)">Notices §12</div>
   <div class="side-ft">Firm: <span style="color:var(--vi)">Linklaters LLP</span><br>Clients: Alpha Corp S.A.<br><span id="sb-ft">Contracts: —</span></div>
@@ -338,18 +339,23 @@ select.fi option{background:var(--s2)}
 <div id="nc-inner"></div>
 </div></div>
 
-<div class="ft">§1(b) ISDA 2002 · Confirmation &gt; Schedule &gt; MA &gt; Code · Legal text always prevails · Live API ↻ 5s</div>
+<div class="ft">§1(b) ISDA 2002 · Confirmation &gt; Schedule &gt; MA &gt; Code · Legal text always prevails · Live API ↻ 10s</div>
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────────────
-const API = 'http://localhost:8000/api'
+const API = '/api'
 
 // ── AUTH ──────────────────────────────────────────────────────────────────────
-;(function(){const r=localStorage.getItem('nomos_role');if(r&&r!=='advisor')window.location.href='login.html'})()
-function logout(){localStorage.removeItem('nomos_role');window.location.href='login.html'}
+;(function(){const r=localStorage.getItem('nomos_role');if(r&&r!=='advisor')window.location.href='/'})()
+function logout(){localStorage.removeItem('nomos_role');window.location.href='/'}
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
-let S = { contracts:[], oracle:{}, details:{}, loading:true, error:null, lastUpdate:null }
+let S = {
+  contracts:[], oracle:{}, details:{},
+  orc3: { rates:{}, events:[], regulatory:[], lastFetch:null },
+  dd: {},   // keyed by contract_id
+  loading:true, error:null, lastUpdate:null
+}
 let view = 'd'
 
 // ── CLOCK ─────────────────────────────────────────────────────────────────────
@@ -366,15 +372,22 @@ async function apiPost(path, body) {
   return apiFetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:body?JSON.stringify(body):undefined})
 }
 
-// ── DATA REFRESH (polled every 5s) ────────────────────────────────────────────
+// ── DATA REFRESH (polled every 10s) ───────────────────────────────────────────
 async function refresh() {
   try {
-    const [cs, orc] = await Promise.all([
+    const [cs, orc, rates, events, regulatory] = await Promise.all([
       apiFetch('/contracts?role=advisor'),
-      apiFetch('/oracle/latest')
+      apiFetch('/oracle/latest'),
+      apiFetch('/oracle/rates').catch(()=>({})),
+      apiFetch('/oracle/events').catch(()=>({})),
+      apiFetch('/oracle/regulatory').catch(()=>({alerts:[]})),
     ])
     S.contracts = cs
     S.oracle = orc
+    S.orc3.rates = rates.rates || {}
+    S.orc3.events = events.events || []
+    S.orc3.regulatory = regulatory.alerts || []
+    S.orc3.lastFetch = new Date()
     await Promise.all(cs.map(x =>
       apiFetch(`/contracts/${x.id}?role=advisor`).then(d => S.details[x.id] = d).catch(()=>{})
     ))
@@ -387,7 +400,7 @@ async function refresh() {
   }
   R()
 }
-setInterval(refresh, 5000)
+setInterval(refresh, 10000)
 refresh()
 
 // ── SIDEBAR ───────────────────────────────────────────────────────────────────
@@ -404,11 +417,25 @@ function updateSidebar() {
       ? `<span class="dot"></span>Offline`
       : `<span class="dot pulse"></span>Live API`
   }
+  // Oracle badge
+  const ob = document.getElementById('sb-orc')
+  if(ob) {
+    const rateCount = Object.keys(S.orc3.rates).length
+    ob.textContent = rateCount ? rateCount+' rates' : '●'
+    ob.className = 'si-badge '+(rateCount?'ok':'al')
+  }
+  // DD badge — count contracts with RED or pending human gates
+  const ddEl = document.getElementById('sb-dd')
+  if(ddEl) {
+    const ddIssues = Object.values(S.dd).filter(d=>d.rag_status==='RED'||(d.human_gates_pending&&d.human_gates_pending>0)).length
+    ddEl.textContent = ddIssues || '—'
+    ddEl.className = 'si-badge '+(ddIssues?'al':'')
+  }
 }
 
 // ── NAVIGATION ────────────────────────────────────────────────────────────────
 function N(v, el) { view=v; document.querySelectorAll('.si').forEach(e=>e.classList.remove('on')); if(el) el.classList.add('on'); R() }
-function R() { const fn=({d:rD,act:rAct,mon:rMon,cb:rCb,net:rNet,orc:rOrc,aud:rAud,not:rNot})[view]; const res=fn(document.getElementById('C')); if(res instanceof Promise) res.catch(console.error) }
+function R() { const fn=({d:rD,act:rAct,mon:rMon,cb:rCb,net:rNet,orc:rOrc,dd:rDd,aud:rAud,not:rNot})[view]; const res=fn(document.getElementById('C')); if(res instanceof Promise) res.catch(console.error) }
 
 // ── DISPLAY HELPERS ───────────────────────────────────────────────────────────
 const eur = (v,d=2) => v!=null ? '€'+Number(v).toLocaleString('en-GB',{minimumFractionDigits:d,maximumFractionDigits:d}) : '—'
@@ -704,36 +731,244 @@ ${nettingRows.map(r=>`
 <div class="al inf"><div>ℹ</div><div><div class="al-t">SRR applies to both jurisdictions</div><div class="al-d">Temporary stay on close-out rights (max 2 Business Days) may apply for bank counterparties under resolution.</div></div></div>`
 }
 
-// ── ORACLE ────────────────────────────────────────────────────────────────────
+// ── ORACLE v3 ─────────────────────────────────────────────────────────────────
 function rOrc(c) {
   const O = S.oracle
-  const rate = O.current_rate ? (Number(O.current_rate)*100).toFixed(3) : null
-  const st = O.status==='CONFIRMED'?'<span class="p p-g">● Confirmed</span>':O.status==='FALLBACK'?'<span class="p p-w">△ ISDA 2021 Fallback</span>':'<span class="p p-b">— Pending</span>'
-  c.innerHTML = `<div class="hd">Oracle${updBadge()}</div><div class="sub">EURIBOR 3M reference rate · ISDA 2021 5-step fallback waterfall</div>
-<div class="card"><div style="display:flex;align-items:center;gap:32px">
-  <div style="text-align:center;min-width:170px">
-    <div style="font-size:10px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;font-family:var(--fm)">EURIBOR 3M</div>
-    <div style="font-family:var(--fm);font-size:46px;font-weight:300;color:var(--warm);letter-spacing:-2px">${rate?rate+'%':'—'}</div>
-    <div style="margin-top:12px">${st}</div>
+  const R3 = S.orc3
+  const rates = R3.rates || {}
+  const events = R3.events || []
+  const regulatory = R3.regulatory || []
+
+  function statusPill(st) {
+    if (!st) return '<span class="p p-gy">—</span>'
+    if (st==='CONFIRMED') return '<span class="p p-g">● Confirmed</span>'
+    if (st==='FALLBACK'||st==='STATIC_FALLBACK') return '<span class="p p-w">△ Fallback</span>'
+    if (st==='STALE') return '<span class="p p-r">○ Stale</span>'
+    if (st==='CHALLENGED') return '<span class="p p-v">⚡ Challenged</span>'
+    return `<span class="p p-b">${st}</span>`
+  }
+  function sevCls(s) { return s==='HIGH'?'cr':s==='MEDIUM'?'wr':'inf' }
+
+  const rateRows = Object.values(rates).map(r => `<tr>
+    <td class="m" style="color:var(--warm)">${r.rate_id||'—'}</td>
+    <td class="m">${r.rate ? (Number(r.rate)*100).toFixed(4)+'%' : '—'}</td>
+    <td>${statusPill(r.status)}</td>
+    <td style="font-size:10px;color:var(--t3)">${r.source||'—'}</td>
+    <td style="font-size:10px;color:var(--t3)">${(r.fetch_timestamp||'—').slice(0,16).replace('T',' ')}</td>
+  </tr>`).join('')
+
+  const eventRows = events.slice(0,10).map(e => `
+<div class="al ${sevCls(e.severity)}">
+  <div style="flex:1">
+    <div class="al-t">${e.headline||'—'} <span class="tag ${e.severity==='HIGH'?'tag-r':e.severity==='MEDIUM'?'tag-w':'tag-b'}" style="margin-left:6px">${e.severity}</span></div>
+    <div class="al-d">${(e.description||'').slice(0,140)}${(e.description||'').length>140?'…':''}</div>
+    <div class="al-r">${e.source_url||''} · ${(e.published_at||'').slice(0,10)} · Contracts: ${(e.linked_contracts||[]).join(', ')||'none'}</div>
   </div>
-  <div style="width:1px;background:var(--b0);align-self:stretch"></div>
-  <div style="font-size:11px;color:var(--t2);line-height:2.2">
-    <strong>Source:</strong> ${O.source||'—'}<br>
-    <strong>Fallback chain:</strong> ${(O.sources_attempted||[]).join(' → ')||'—'}<br>
-    <strong>Fetch count:</strong> ${O.fetch_count||0}<br>
-    <strong>Anomalies:</strong> ${O.anomalies_detected||0}<br>
-    <strong>Last confirmed:</strong> ${O.last_confirmed?(Number(O.last_confirmed)*100).toFixed(3)+'%':'None yet'}<br>
-    <strong>Challenge threshold:</strong> 5 bps · §5(b) SLC
+</div>`).join('')
+
+  const regRows = regulatory.map(a => `
+<div class="al ${a.severity==='HIGH'?'cr':a.severity==='MEDIUM'?'wr':'inf'}" style="align-items:flex-start">
+  <div style="flex:1">
+    <div class="al-t">${a.regulation_name} <span class="tag ${a.severity==='HIGH'?'tag-r':a.severity==='MEDIUM'?'tag-w':'tag-b'}" style="margin-left:6px">${a.severity}</span></div>
+    <div class="al-d">${a.impact_description}</div>
+    <div class="al-r">${a.jurisdiction} · Effective: ${a.effective_date} · Contracts: ${(a.affected_contract_types||[]).join(', ')}</div>
   </div>
-</div></div>
-<div style="margin-top:16px;display:flex;gap:8px">
-  <button class="btn act" onclick="_fetchOracle(this)">⟳ Fetch Live Rate</button>
-  <button class="btn" onclick="alert('Rate challenge initiated — Calculation Agent notified')">Challenge Rate</button>
+</div>`).join('')
+
+  c.innerHTML = `<div class="hd">Oracle v3${updBadge()}</div>
+<div class="sub">Market Data (9 rates) · Event Monitor · Regulatory Watch · ISDA 2021 fallback waterfall</div>
+
+<div style="display:flex;gap:8px;margin-bottom:20px">
+  <button class="btn act" onclick="_refreshRates(this)">⟳ Refresh All Rates (Live ECB)</button>
+  <span style="font-size:10px;color:var(--t3);padding:6px 0">Last fetched: ${R3.lastFetch ? R3.lastFetch.toLocaleTimeString() : '—'}</span>
+</div>
+
+<div class="sh">Layer 1 — Rate Registry <span class="tag tag-v">${Object.keys(rates).length} rates</span></div>
+<table class="tb"><thead><tr><th>Rate ID</th><th>Value</th><th>Status</th><th>Source</th><th>Fetched</th></tr></thead>
+<tbody>${rateRows||'<tr><td colspan="5" style="text-align:center;color:var(--t3);padding:16px">No cached rates yet — click Refresh to fetch from ECB</td></tr>'}</tbody>
+</table>
+
+<div class="sh">Layer 2 — Market Events <span class="tag ${events.length?'tag-r':'tag-g'}">${events.length}</span></div>
+${eventRows||'<div class="card" style="text-align:center;color:var(--t3);padding:20px;font-size:11px">No market events. EventMonitor requires NEWSAPI_KEY to fetch live events.</div>'}
+
+<div class="sh" style="margin-top:24px">Layer 3 — Regulatory Watch <span class="tag tag-w">${regulatory.length} alerts</span></div>
+${regRows||'<div class="card" style="text-align:center;color:var(--t3);padding:20px;font-size:11px">No regulatory alerts loaded.</div>'}`
+
+  window._refreshRates = async (btn) => {
+    btn.disabled=true; btn.textContent='Fetching from ECB…'
+    try {
+      const res = await apiFetch('/oracle/rates/refresh', {method:'POST'})
+      S.orc3.rates = res.rates || {}
+      S.orc3.lastFetch = new Date()
+      rOrc(c)
+    } catch(e) { alert('Rate refresh failed: '+e.message) }
+    btn.disabled=false; btn.textContent='⟳ Refresh All Rates (Live ECB)'
+  }
+}
+
+// ── DUE DILIGENCE ─────────────────────────────────────────────────────────────
+async function rDd(c) {
+  if (S.loading && !S.contracts.length) { c.innerHTML=spinner(); return }
+  if (!S.contracts.length) {
+    c.innerHTML='<div class="hd">Due Diligence</div><div style="padding:40px;text-align:center;color:var(--t3)">No contracts loaded.</div>'
+    return
+  }
+
+  // Load DD summaries for all contracts
+  await Promise.all(S.contracts.map(async x => {
+    if (!S.dd[x.id]) {
+      try { S.dd[x.id] = await apiFetch(`/contracts/${x.id}/due-diligence`) } catch(e) { S.dd[x.id]={error:e.message} }
+    }
+  }))
+
+  function ragPill(rag) {
+    if (rag==='GREEN') return '<span class="p p-g">● GREEN</span>'
+    if (rag==='AMBER') return '<span class="p p-w">◐ AMBER</span>'
+    if (rag==='RED')   return '<span class="p p-r">○ RED</span>'
+    return '<span class="p p-gy">—</span>'
+  }
+  function docStatusPill(st) {
+    const map = { REQUIRED:'p-w', UPLOADED:'p-b', VALIDATED:'p-g', REJECTED:'p-r', EXPIRED:'p-r', NOT_REQUIRED:'p-gy' }
+    return `<span class="p ${map[st]||'p-b'}">${st}</span>`
+  }
+  function wfBadge(state) {
+    const map = {
+      INITIATED:'p-gy', KYC_PENDING:'p-w', KYC_VALIDATED:'p-b',
+      DOCS_PENDING:'p-w', DOCS_VALIDATED:'p-b', READY_TO_SIGN:'p-g'
+    }
+    return `<span class="p ${map[state]||'p-gy'}" style="font-size:9px">${(state||'—').replace(/_/g,' ')}</span>`
+  }
+
+  // Build a flat, sorted list of all UPLOADED docs across all contracts
+  // Priority: human_gate (0) > overdue (1) > regular (2)
+  const today = new Date().toISOString().slice(0,10)
+  const allPending = []
+  S.contracts.forEach(x => {
+    const dd = S.dd[x.id]
+    if (!dd || dd.error) return
+    const docs = dd.documents || []
+    const pendingGates = (dd.human_gates?.pending || [])
+    const overdueIds = new Set((dd.overdue_docs||[]))
+    const gateDocIds = new Set(pendingGates.map(g=>g.doc_id).filter(Boolean))
+    docs.filter(d=>d.status==='UPLOADED').forEach(d => {
+      const isGate = gateDocIds.has(d.doc_id)
+      const isOverdue = overdueIds.has(d.description) || (d.due_date_obligation && d.due_date_obligation < today)
+      allPending.push({ d, contractId: x.id, contractLabel: `${x.id} — ${x.party_b||''}`, priority: isGate?0:isOverdue?1:2, dd })
+    })
+  })
+  allPending.sort((a,b) => a.priority - b.priority || a.contractId.localeCompare(b.contractId))
+
+  const totalPending = allPending.length
+
+  // Per-contract post-signing overdue docs
+  const postSigningOverdue = []
+  S.contracts.forEach(x => {
+    const dd = S.dd[x.id]
+    if (!dd || dd.error) return
+    ;(dd.post_signing_overdue||[]).forEach(d => postSigningOverdue.push({d, contractId:x.id, contractLabel:`${x.id} — ${x.party_b||''}`}))
+  })
+
+  // Pending validations table
+  const pendingRows = allPending.map(({d, contractId, contractLabel, priority, dd}) => {
+    const wfState = dd.workflow?.state || ''
+    const isGate = priority===0
+    const isOverdue = priority===1
+    const urgencyLabel = isGate
+      ? '<span style="font-size:9px;font-weight:700;color:var(--r)">HUMAN GATE</span>'
+      : isOverdue ? '<span style="font-size:9px;font-weight:600;color:var(--warm)">OVERDUE</span>'
+      : '<span style="font-size:9px;color:var(--t3)">PENDING</span>'
+    return `<tr id="dd-row-${d.doc_id}">
+  <td style="font-size:11px">${urgencyLabel}</td>
+  <td style="font-size:11px">${contractLabel} ${wfBadge(wfState)}</td>
+  <td style="font-size:11px">${d.description||d.doc_type}</td>
+  <td style="font-size:10px;color:var(--t3)">${d.party||'—'}</td>
+  <td>${docStatusPill(d.status)}</td>
+  <td style="font-size:10px;color:var(--t3)">${d.due_date_obligation||'—'}</td>
+  <td><input id="note-${d.doc_id}" type="text" placeholder="Notes…" style="font-size:10px;padding:3px 6px;border:1px solid var(--bd);border-radius:4px;background:var(--bg2);color:var(--t1);width:130px"></td>
+  <td style="white-space:nowrap">
+    <button class="btn approve" onclick="_ddValidate('${d.doc_id}','${contractId}',true)">✓ Accept</button>
+    <button class="btn danger" style="margin-left:4px" onclick="_ddValidate('${d.doc_id}','${contractId}',false)">✕ Reject</button>
+  </td>
+</tr>`
+  }).join('')
+
+  // Post-signing overdue section (§5(a)(ii) breach risk)
+  const postSigningSection = postSigningOverdue.length ? `
+<div class="card" style="margin-bottom:16px;border:1px solid rgba(248,113,113,.3);background:rgba(248,113,113,.04)">
+  <div style="font-size:13px;font-weight:700;color:var(--r);margin-bottom:6px">Post-Signing Overdue — §5(a)(ii) Breach Risk</div>
+  <div style="font-size:10px;color:var(--t2);margin-bottom:10px">These recurring obligations are overdue. Failure to deliver may constitute a §5(a)(ii) Failure to Pay or Deliver — potential Event of Default.</div>
+  <table class="tb"><thead><tr>
+    <th>Contract</th><th>Document</th><th>Party</th><th>Due Date</th><th>Status</th>
+  </tr></thead><tbody>
+  ${postSigningOverdue.map(({d,contractLabel})=>`<tr>
+    <td style="font-size:11px">${contractLabel}</td>
+    <td style="font-size:11px">${d.description||d.doc_type}</td>
+    <td style="font-size:10px;color:var(--t3)">${d.party||'—'}</td>
+    <td style="font-size:10px;color:var(--r)">${d.due_date_obligation||'—'}</td>
+    <td>${docStatusPill(d.status)}</td>
+  </tr>`).join('')}
+  </tbody></table>
+</div>` : ''
+
+  // Per-contract overview cards
+  const overviewBlocks = S.contracts.map(x => {
+    const dd = S.dd[x.id]
+    if (!dd || dd.error) return `<div class="card" style="margin-bottom:8px"><div style="font-size:12px;font-weight:600">${x.id}</div><div style="color:var(--t3);font-size:11px">${dd?.error||'DD module not available'}</div></div>`
+    const docs = dd.documents || []
+    const wfState = dd.workflow?.state || '—'
+    const sr = dd.signing_readiness || {}
+    const preDocs = docs.filter(d=>d.is_pre_signing)
+    const preVal = preDocs.filter(d=>d.status==='VALIDATED').length
+    return `<div class="card" style="margin-bottom:8px;padding:10px 16px">
+<div style="display:flex;justify-content:space-between;align-items:center">
+  <div>
+    <span style="font-size:13px;font-weight:600">${x.id}</span>
+    <span style="font-size:11px;color:var(--t3);margin-left:8px">${x.party_b||''}</span>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    ${ragPill(dd.rag_status)}
+    ${wfBadge(wfState)}
+    <span style="font-size:10px;color:var(--t3)">${preVal}/${preDocs.length} pre-signing</span>
+    <span style="font-size:10px;color:var(--t3)">${docs.filter(d=>d.status==='VALIDATED').length}/${docs.length} total</span>
+  </div>
+</div>
 </div>`
-  window._fetchOracle = async (btn) => {
-    btn.disabled=true; btn.textContent='Fetching…'
-    try { S.oracle = await apiFetch('/oracle/latest'); R() } catch(e) { alert(e.message) }
-    btn.disabled=false; btn.textContent='⟳ Fetch Live Rate'
+  }).join('')
+
+  c.innerHTML = `<div class="hd">Due Diligence${updBadge()}</div>
+<div class="sub">Schedule Part 3 · §4(a) Obligations · Human gates + Auto-tracked deadlines</div>
+
+${postSigningSection}
+
+<div class="card" style="margin-bottom:16px">
+  <div style="font-size:13px;font-weight:700;margin-bottom:12px">
+    Pending Validations
+    ${totalPending ? `<span style="font-size:11px;font-weight:400;color:var(--r);margin-left:8px">${totalPending} document${totalPending>1?'s':''} awaiting review across all contracts</span>` : '<span style="font-size:11px;font-weight:400;color:var(--g);margin-left:8px">All caught up</span>'}
+  </div>
+  ${totalPending ? `<table class="tb"><thead><tr>
+    <th>Priority</th><th>Contract</th><th>Document</th><th>Party</th><th>Status</th><th>Due</th><th>Notes</th><th>Action</th>
+  </tr></thead><tbody>
+  ${pendingRows}
+  </tbody></table>` : '<div style="font-size:11px;color:var(--t3);padding:8px 0">No documents pending validation.</div>'}
+</div>
+
+<div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--t2)">Contract Overview</div>
+${overviewBlocks}
+
+<div style="font-size:10px;color:var(--t3);margin-top:8px">GREEN = all validated · AMBER = items pending · RED = overdue or human gate pending · HUMAN GATE = mandatory advisor review</div>`
+
+  window._ddValidate = async (docId, contractId, accepted) => {
+    const notesEl = document.getElementById('note-'+docId)
+    const notes = notesEl ? notesEl.value.trim() : ''
+    try {
+      await apiPost(`/contracts/${contractId}/due-diligence/${docId}/validate`, {
+        advisor: 'J.Smith (Linklaters)',
+        accepted,
+        notes: notes || (accepted ? 'Reviewed and accepted by advisor' : 'Rejected — see advisor notes')
+      })
+      delete S.dd[contractId]
+      await refresh()
+    } catch(e) { alert('Validate error: '+e.message) }
   }
 }
 
