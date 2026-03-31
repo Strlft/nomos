@@ -1,0 +1,78 @@
+{
+  "_template_meta": {
+    "id": "nomos_standard_v1",
+    "description": "Nomos standard clause library for ISDA 2002-framework IRS contracts. Wording is original; all section references point to the ISDA 2002 Master Agreement framework.",
+    "version": "1.0.0",
+    "notes": "Law firms may supply a replacement JSON file with the same clause keys to substitute their own preferred wording. The PDF generators use this file verbatim."
+  },
+
+  "clause_1a": "All capitalised terms used in this Smart Legal Contract that are not separately defined herein carry the meanings assigned to them under the ISDA 2002 Master Agreement and the ISDA 2006 Definitions. Any reference to a Section, unless the context otherwise requires, is a reference to a section of the ISDA 2002 Master Agreement.",
+
+  "clause_1b_summary": "DOCUMENT HIERARCHY — §1(b): Where any conflict arises between documents in this stack, this Confirmation takes precedence over the Schedule, the Schedule takes precedence over the Master Agreement, and the Execution Engine is subordinate to this legal text in all cases.",
+
+  "clause_1b": "Where any conflict arises between this Confirmation and the Schedule, the terms of this Confirmation shall govern. Where any conflict arises between the Schedule and the standard printed form of the Master Agreement, the Schedule shall govern. The Execution Engine and all Payment Instructions it generates are subordinate to this Contract and may not override any term set out herein.",
+
+  "clause_1c": "Both parties confirm that this Contract and every Confirmation issued under it together constitute one single agreement between them, as provided for under §1(c). Each party acknowledges that this single-agreement structure is a precondition of its willingness to transact, and that it forms the legal foundation upon which close-out netting under §6 may be exercised.",
+
+  "clause_2a_i": "Each party is obliged to make every payment set out in this Contract, subject to the conditions and limitations of the Master Agreement. All payments shall be settled on the applicable due date using freely transferable funds, delivered through channels customary for {currency}-denominated transactions.",
+
+  "clause_2a_iii": "A party's obligation to make any payment under this Contract is contingent on two conditions being continuously satisfied: (1) the counterparty must not be subject to any continuing Event of Default or Potential Event of Default; and (2) no Early Termination Date may have occurred or been effectively designated. The Execution Engine evaluates both conditions at each calculation cycle and automatically withholds any Payment Instructions upon breach of either condition.",
+
+  "clause_2c": "Where both parties owe amounts in {currency} on the same date under the same Transaction, those obligations are automatically offset against one another and replaced by a single net payment obligation running in favour of the party owed the larger sum. Multiple Transaction Payment Netting has been elected as {mtpn_status}, with effect from the Effective Date (Schedule Part 4(i)).",
+
+  "clause_3": "Each party represents to the other, as of each date on which a Transaction is entered into, that: (a) it has full corporate power and authority to execute and perform this Agreement; (b) no Event of Default or Potential Event of Default has occurred with respect to it and is continuing; (c) no litigation or proceeding is pending or threatened that could materially impair its ability to perform; (d) all information it has provided is accurate and complete in all material respects; (e) Payer Tax Representations are as specified in the Schedule; (f) Payee Tax Representations are as specified in the Schedule; (g) each party enters into this Agreement as principal, acting in its own name and not as agent for any third party.",
+
+  "clause_4": "Each party undertakes throughout the term of this Contract to: (a) promptly deliver all Specified Information required under the Schedule; (b) maintain all authorisations, approvals and consents necessary to perform its obligations; (c) comply with all applicable laws and regulations in each relevant jurisdiction; and (d) notify the other party without delay of any circumstance affecting its ability to make payments free of withholding tax, and to furnish updated tax documentation as required.",
+
+  "clause_6a": "Where an Event of Default has occurred and is continuing, the Non-defaulting Party may bring all outstanding Transactions to a close by delivering written notice designating an Early Termination Date, which must fall no more than 20 days from the date of that notice. Automatic Early Termination is elected as {aet_status} (Schedule Part 1(e)).",
+
+  "clause_6e": "The Early Termination Amount payable upon close-out equals the net Close-out Amount, adjusted by any Unpaid Amounts owed between the parties. Under the Event of Default pathway, the Non-defaulting Party acts as sole Determining Party and all Transactions are brought to an end. Under the Termination Event pathway, each party independently determines a Close-out Amount and the results are averaged; only Affected Transactions are terminated. The Close-out Amount is assessed on a replacement-cost basis in accordance with §6(e)(i), using commercially reasonable procedures.",
+
+  "clause_7": "Neither party may assign or transfer any rights or obligations under this Contract without the prior written consent of the other party, except that a transfer may be made without consent: (a) to a surviving entity following a merger, consolidation or amalgamation in which the transferring party is not the survivor; (b) to an Affiliate of the transferring party, provided that Affiliate has the legal capacity to assume all obligations; or (c) where the transfer is required to avoid a Tax Event pursuant to §6(b)(ii).",
+
+  "clause_8": "The Contractual Currency for all payments under this Contract is {currency}. The Termination Currency is {termination_currency}, as elected in Schedule Part 1(f). Where conversion between currencies is necessary, the prevailing market exchange rate on the relevant calculation date shall apply.",
+
+  "clause_9": "§9(e): This Contract may be executed in any number of counterparts, each of which constitutes an original and all of which together form a single instrument. §9(h)(i)(1): Any sum that remains unpaid beyond its due date shall bear interest at the Default Rate — being the payee's reasonable cost of funding plus 1% per annum — accruing daily from the original due date until the date of actual receipt.",
+
+  "clause_10_12": "§10: All payments shall flow through the Offices specified in the Confirmation. §11: The Defaulting Party shall indemnify the Non-defaulting Party against all reasonable costs incurred in enforcing any obligation arising under this Contract. §12: All formal notices under this Contract must be in writing. Electronic delivery is permitted and is effective on the date of delivery, directed to the addresses and contact details set out in the Schedule.",
+
+  "clause_13a_english": "This Agreement and each Transaction shall be governed by and construed in accordance with English law.",
+
+  "clause_13a_newyork": "This Agreement and each Transaction shall be governed by and construed in accordance with the laws of the State of New York, without reference to any choice of law rules that would require the application of the laws of any other jurisdiction.",
+
+  "clause_13b_english": "Each party irrevocably submits to: (A) the non-exclusive jurisdiction of the English courts in respect of any dispute that does not involve a Convention Court; and (B) the exclusive jurisdiction of the English courts in respect of any dispute that involves a Convention Court.",
+
+  "clause_13b_newyork": "Each party irrevocably submits to the non-exclusive jurisdiction of the courts of the State of New York and the United States District Court sitting in the Borough of Manhattan in New York City, for the purpose of resolving any dispute arising in connection with this Agreement.",
+
+  "clause_13c": "Each party irrevocably designates the Process Agent named in Schedule Part 4(b) to receive service of process on its behalf. Service of process may also be effected in the manner prescribed for the delivery of notices under §12(a).",
+
+  "clause_13d": "Each party irrevocably waives, to the fullest extent permitted by applicable law, any entitlement to immunity from jurisdiction, pre-judgment attachment or execution to which it might otherwise be entitled in connection with any dispute arising under this Agreement.",
+
+  "confirmation_preamble": "The purpose of this letter agreement (this \"Confirmation\") is to set out and confirm the agreed terms of the Transaction entered into between the parties as of the Trade Date specified below (the \"Transaction\"). This Confirmation forms part of, and is subject to, the ISDA 2002 Master Agreement dated as of {date_of_agreement}, as amended and supplemented from time to time (the \"Agreement\"), between {party_a_name} (\"Party A\") and {party_b_name} (\"Party B\").",
+
+  "confirmation_definitions_note": "The definitions and provisions of the 2006 ISDA Definitions are incorporated by reference into this Confirmation. Where any conflict arises between those incorporated definitions and the specific terms of this Confirmation, the terms of this Confirmation shall prevail.",
+
+  "confirmation_hierarchy": "Where any conflict arises between this Confirmation and the Schedule, the terms of this Confirmation shall govern. Where any conflict arises between the Schedule and the standard printed form of the Master Agreement, the Schedule shall govern. The Execution Engine is subordinate to this Confirmation and may not override any term set out herein.",
+
+  "notice_failure_to_pay_body": "We hereby give notice that an Event of Default has arisen under §5(a)(i) of the Agreement. {party_defaulting} has failed to make a payment of {currency} {amount} that fell due on {due_date} in respect of Transaction {contract_id}. The applicable grace period of {grace_period} expired on {grace_end} without payment having been received.",
+
+  "notice_failure_to_pay_consequence": "By reason of the occurrence and continuation of this Event of Default, we are exercising our right under §2(a)(iii) to suspend all further payments due from us under the Agreement with immediate effect. We preserve all rights available to us under the Agreement, including our right to designate an Early Termination Date under §6(a).",
+
+  "notice_breach_body": "We hereby give notice that a breach has arisen under §5(a)(ii) of the Agreement. {party_defaulting} has failed to comply with or perform the obligation identified below:\n\nObligation: {obligation}\nDue date: {due_date}\nSection: {section}",
+
+  "notice_breach_consequence": "Under §5(a)(ii), you have 30 days from the date of this notice to remedy the breach in full. If the breach remains outstanding at the end of that period, an Event of Default will have arisen and we reserve the right to designate an Early Termination Date under §6(a).",
+
+  "notice_etd_body": "We refer to our notice of Event of Default delivered on {eod_notice_date} in respect of the \"{eod_type}\". That Event of Default is continuing and remains unremedied.\n\nActing pursuant to §6(a), we hereby designate {etd_date} as the Early Termination Date for all outstanding Transactions under the Agreement.",
+
+  "notice_etd_consequence": "Following the designation of the Early Termination Date, we will, in our capacity as Determining Party, calculate the Early Termination Amount in accordance with §6(e) as of the Early Termination Date. Once determined, payment of the Early Termination Amount will be due in {currency} within two Local Business Days of our delivery of notice of that amount.",
+
+  "notice_delivery_reminder_body": "We write to remind you of your obligation under §4(a) of the Agreement to deliver the following item of Specified Information:\n\nDocument: {document}\nDelivery due: {due_date}\n\nAs of the date of this letter, the document has not been received. We ask that you arrange delivery without further delay.",
+
+  "notice_delivery_reminder_consequence": "Please be advised that failure to deliver Specified Information may affect the continuing accuracy of representations made under §3(d) and, if not remedied promptly, may give rise to an actionable breach under §5(a)(ii).",
+
+  "notice_tax_change_body": "We give you notice pursuant to §4(d) of the Agreement of a change of circumstance that may affect our ability to make payments under the Agreement free of withholding tax:\n\nNature of change: {description}\nEffective date: {effective_date}",
+
+  "notice_tax_change_consequence": "This notification is given in satisfaction of our obligation under §4(d). We will furnish updated tax documentation as soon as practicable. Depending on its characterisation, this change may constitute a Tax Event under §5(b)(iii), in which case either party may elect to terminate Affected Transactions by designating an Early Termination Date under §6(b)(ii).",
+
+  "footer_isda_disclaimer": "This document references the ISDA 2002 framework. It is not a reproduction of ISDA documentation."
+}

@@ -1,15 +1,20 @@
 """
 =============================================================================
   CONFIRMATION & NOTICE GENERATOR
-  ISDA 2002 · Vanilla IRS · EUR
+  ISDA 2002-framework · Vanilla IRS · EUR
 
   Two generators:
   1. generate_confirmation_pdf() — per-trade Confirmation document
   2. generate_notice_pdf() — formal §12 notices
 
-  HIERARCHY CLAUSE (§1(b) ISDA 2002):
+  HIERARCHY CLAUSE (§1(b)):
   The Confirmation prevails over the Schedule, which prevails over the MA.
   This Confirmation IS the highest-priority document in the stack.
+
+  TEMPLATE SYSTEM:
+  Clause wording is loaded from templates/<template_id>.json at runtime.
+  Law firms may supply a replacement JSON with the same clause keys to
+  substitute their own preferred wording.
 =============================================================================
 """
 
@@ -26,6 +31,7 @@ from decimal import Decimal
 import hashlib, json, os
 
 _OUTPUTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "outputs")
+_TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "templates")
 
 # ─── Styles ───────────────────────────────────────────────────────────────
 DK = HexColor("#1a1d21")
@@ -71,25 +77,71 @@ def _tbl(data, cw=None, hdr=True):
     return t
 
 
+def _load_template(template_id):
+    """Load clause texts from templates/<template_id>.json."""
+    path = os.path.join(_TEMPLATES_DIR, f"{template_id}.json")
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+# ── Notice metadata (title and §-reference only; body/consequence in JSON) ──
+NOTICE_TEMPLATES = {
+    "FAILURE_TO_PAY": {
+        "title": "Notice of Failure to Pay",
+        "isda_ref": "§5(a)(i)",
+        "body_key": "notice_failure_to_pay_body",
+        "consequence_key": "notice_failure_to_pay_consequence",
+    },
+    "BREACH_OF_AGREEMENT": {
+        "title": "Notice of Breach of Agreement",
+        "isda_ref": "§5(a)(ii)",
+        "body_key": "notice_breach_body",
+        "consequence_key": "notice_breach_consequence",
+    },
+    "ETD_DESIGNATION": {
+        "title": "Designation of Early Termination Date",
+        "isda_ref": "§6(a)",
+        "body_key": "notice_etd_body",
+        "consequence_key": "notice_etd_consequence",
+    },
+    "DELIVERY_REMINDER": {
+        "title": "Reminder — Delivery of Specified Information",
+        "isda_ref": "§4(a)",
+        "body_key": "notice_delivery_reminder_body",
+        "consequence_key": "notice_delivery_reminder_consequence",
+    },
+    "TAX_CHANGE": {
+        "title": "Notice of Change in Tax Status",
+        "isda_ref": "§4(d)",
+        "body_key": "notice_tax_change_body",
+        "consequence_key": "notice_tax_change_consequence",
+    },
+}
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # 1. CONFIRMATION PDF
 # ═══════════════════════════════════════════════════════════════════════════
 
 def generate_confirmation_pdf(params, schedule=None, initiation=None,
-                                output_path=None, payment_schedule=None):
+                               template_id="nomos_standard_v1",
+                               output_path=None, payment_schedule=None):
     """
-    Generate a formal ISDA Confirmation PDF for a vanilla IRS.
+    Generate a formal Confirmation PDF for a vanilla IRS.
 
-    This is the document that CREATES the Transaction.
-    It is the highest-priority document in the §1(b) hierarchy.
+    This document creates the Transaction and sits at the top of the §1(b)
+    hierarchy. Clause wording is read from templates/<template_id>.json.
 
     Args:
         params: SwapParameters (economic terms)
         schedule: ScheduleElections (optional — referenced by ID)
         initiation: ContractInitiation (optional — tracks who/when)
+        template_id: clause template to use (default: "nomos_standard_v1")
         output_path: file path for the PDF
         payment_schedule: list of CalculationPeriod (optional — for schedule table)
     """
+    tpl = _load_template(template_id)
+
     if not output_path:
         output_path = os.path.join(_OUTPUTS_DIR, f"{params.contract_id}-Confirmation.pdf")
 
@@ -126,24 +178,17 @@ def generate_confirmation_pdf(params, schedule=None, initiation=None,
 
     # ── PREAMBLE ────────────────────────────────────────────────────────────
     schedule_ref = (schedule.schedule_id if schedule else "N/A")
+    date_of_agreement = str(schedule.date_of_agreement if schedule and schedule.date_of_agreement else "[date]")
+
+    story.append(Paragraph(f"Dear {params.party_b.short_name},", sB))
     story.append(Paragraph(
-        f"Dear {params.party_b.short_name},", sB))
-    story.append(Paragraph(
-        f"The purpose of this letter agreement (this <b>\"Confirmation\"</b>) is to confirm "
-        f"the terms and conditions of the Transaction entered into between us on the Trade Date "
-        f"specified below (the <b>\"Transaction\"</b>). This Confirmation constitutes a "
-        f"\"Confirmation\" as referred to in the ISDA 2002 Master Agreement dated as of "
-        f"{schedule.date_of_agreement if schedule and schedule.date_of_agreement else '[date]'} "
-        f"as amended and supplemented from time to time (the <b>\"Agreement\"</b>), between "
-        f"{params.party_a.name} (<b>\"Party A\"</b>) and {params.party_b.name} "
-        f"(<b>\"Party B\"</b>).", sB))
-    story.append(Paragraph(
-        "The definitions and provisions contained in the 2006 ISDA Definitions (as published "
-        "by the International Swaps and Derivatives Association, Inc.) are incorporated into "
-        "this Confirmation. In the event of any inconsistency between those definitions and "
-        "provisions and this Confirmation, this Confirmation will govern.", sB))
-    story.append(Paragraph(
-        f"<b>Schedule Reference:</b> {schedule_ref}", sRef))
+        tpl["confirmation_preamble"].format(
+            date_of_agreement=date_of_agreement,
+            party_a_name=params.party_a.name,
+            party_b_name=params.party_b.name,
+        ), sB))
+    story.append(Paragraph(tpl["confirmation_definitions_note"], sB))
+    story.append(Paragraph(f"<b>Schedule Reference:</b> {schedule_ref}", sRef))
     story.append(Spacer(1, 10))
 
     # ── GENERAL TERMS ───────────────────────────────────────────────────────
@@ -153,7 +198,7 @@ def generate_confirmation_pdf(params, schedule=None, initiation=None,
         ["Effective Date:", str(params.effective_date)],
         ["Termination Date:", str(params.termination_date)],
         ["Notional Amount:", f"{params.currency} {params.notional:,.2f}"],
-        ["Calculation Agent:", f"{params.calculation_agent} (§14 ISDA 2002)"],
+        ["Calculation Agent:", f"{params.calculation_agent} (§14)"],
         ["Business Days:", "TARGET2 and London" if is_english else "New York"],
         ["Business Day Convention:", "Modified Following (ISDA 2006 §4.12(ii))"],
     ]
@@ -237,19 +282,14 @@ def generate_confirmation_pdf(params, schedule=None, initiation=None,
     # ── HIERARCHY CLAUSE ────────────────────────────────────────────────────
     next_section += 1
     story.append(Paragraph(f"<b>{next_section}. Hierarchy</b>", sBold))
-    story.append(Paragraph(
-        "In the event of any inconsistency between this Confirmation and the Schedule to "
-        "the Agreement, this Confirmation will prevail. In the event of any inconsistency "
-        "between the Schedule and the printed form of the Master Agreement, the Schedule will "
-        "prevail. The Execution Engine is subordinate to this Confirmation in all cases.", sB))
+    story.append(Paragraph(tpl["confirmation_hierarchy"], sB))
     story.append(Spacer(1, 8))
 
     # ── GOVERNING LAW ───────────────────────────────────────────────────────
     next_section += 1
     story.append(Paragraph(f"<b>{next_section}. Governing Law</b>", sBold))
     story.append(Paragraph(
-        f"This Confirmation will be governed by and construed in accordance with "
-        f"{'English law' if is_english else 'the laws of the State of New York'}.", sB))
+        tpl["clause_13a_english"] if is_english else tpl["clause_13a_newyork"], sB))
     story.append(Spacer(1, 12))
 
     # ── SIGNATURE BLOCKS ────────────────────────────────────────────────────
@@ -288,14 +328,16 @@ def generate_confirmation_pdf(params, schedule=None, initiation=None,
     }, sort_keys=True)
     conf_hash = hashlib.sha256(conf_data.encode()).hexdigest()
 
+    story.append(Paragraph(tpl["footer_isda_disclaimer"], sRef))
     story.append(Paragraph(
         f"Confirmation fingerprint (SHA-256): {conf_hash}", sRef))
     story.append(Paragraph(
-        "§1(b) ISDA 2002 — This Confirmation prevails over the Schedule and the Master Agreement.",
+        "§1(b) — This Confirmation takes precedence over the Schedule and the Master Agreement.",
         sFt))
 
     doc.build(story)
     print(f"  [CONFIRMATION] Generated: {output_path}")
+    print(f"  [CONFIRMATION] Template:  {template_id}")
     print(f"  [CONFIRMATION] Hash: {conf_hash[:16]}...")
     return output_path, conf_hash
 
@@ -304,103 +346,11 @@ def generate_confirmation_pdf(params, schedule=None, initiation=None,
 # 2. NOTICE PDF
 # ═══════════════════════════════════════════════════════════════════════════
 
-NOTICE_TEMPLATES = {
-    "FAILURE_TO_PAY": {
-        "title": "Notice of Failure to Pay",
-        "isda_ref": "§5(a)(i) ISDA 2002",
-        "body": (
-            "We hereby notify you that an Event of Default has occurred under "
-            "Section 5(a)(i) (Failure to Pay or Deliver) of the Agreement. "
-            "{party_defaulting} has failed to make a payment of {currency} {amount} "
-            "due on {due_date} under Transaction {contract_id}. "
-            "The applicable grace period of {grace_period} has expired as of {grace_end}."
-        ),
-        "consequence": (
-            "As a result of the occurrence and continuance of this Event of Default, "
-            "and in accordance with Section 2(a)(iii) of the Agreement, our obligation "
-            "to make any further payments under the Agreement is suspended. "
-            "We reserve all rights under the Agreement, including the right to designate "
-            "an Early Termination Date pursuant to Section 6(a)."
-        ),
-    },
-    "BREACH_OF_AGREEMENT": {
-        "title": "Notice of Breach of Agreement",
-        "isda_ref": "§5(a)(ii) ISDA 2002",
-        "body": (
-            "We hereby notify you that a breach has occurred under Section 5(a)(ii) "
-            "(Breach of Agreement) of the Agreement. {party_defaulting} has failed to "
-            "comply with or perform the obligation specified below:\n\n"
-            "Obligation: {obligation}\n"
-            "Due date: {due_date}\n"
-            "Section: {section}"
-        ),
-        "consequence": (
-            "In accordance with Section 5(a)(ii), you have 30 days from the date of "
-            "this notice to remedy the breach. If the breach is not remedied within this "
-            "period, it will constitute an Event of Default and we may designate an "
-            "Early Termination Date pursuant to Section 6(a)."
-        ),
-    },
-    "ETD_DESIGNATION": {
-        "title": "Designation of Early Termination Date",
-        "isda_ref": "§6(a) ISDA 2002",
-        "body": (
-            "We refer to the Event of Default notified to you on {eod_notice_date} "
-            "(the \"{eod_type}\"). The Event of Default is continuing.\n\n"
-            "Pursuant to Section 6(a) of the Agreement, we hereby designate "
-            "{etd_date} as the Early Termination Date in respect of all outstanding "
-            "Transactions under the Agreement."
-        ),
-        "consequence": (
-            "In accordance with Section 6(e), we will calculate the Early Termination "
-            "Amount as the Determining Party. The Early Termination Amount will be "
-            "determined as of the Early Termination Date. Payment of the Early "
-            "Termination Amount will be made in {currency} within two Local Business "
-            "Days of notice of the amount."
-        ),
-    },
-    "DELIVERY_REMINDER": {
-        "title": "Reminder — Delivery of Specified Information",
-        "isda_ref": "§4(a) ISDA 2002",
-        "body": (
-            "We write to remind you of your obligation under Section 4(a) of the "
-            "Agreement to deliver the following:\n\n"
-            "Document: {document}\n"
-            "Due date: {due_date}\n\n"
-            "As of the date of this letter, we have not received this document. "
-            "Please arrange for delivery at your earliest convenience."
-        ),
-        "consequence": (
-            "Please note that failure to deliver Specified Information may affect "
-            "the accuracy of representations made under Section 3(d) of the Agreement "
-            "and may constitute a breach under Section 5(a)(ii) if not remedied."
-        ),
-    },
-    "TAX_CHANGE": {
-        "title": "Notice of Change in Tax Status",
-        "isda_ref": "§4(d) ISDA 2002",
-        "body": (
-            "In accordance with Section 4(d) of the Agreement, we hereby notify you "
-            "that a change has occurred which may affect our ability to make payments "
-            "under the Agreement free of withholding tax.\n\n"
-            "Nature of change: {description}\n"
-            "Effective date: {effective_date}"
-        ),
-        "consequence": (
-            "This notification is made in accordance with our obligations under "
-            "Section 4(d). We will provide updated tax forms as soon as practicable. "
-            "This change may constitute a Tax Event under Section 5(b)(iii) of the "
-            "Agreement, in which case either party may designate an Early Termination "
-            "Date in respect of the Affected Transactions pursuant to Section 6(b)(ii)."
-        ),
-    },
-}
-
-
 def generate_notice_pdf(notice_type, from_party, to_party, contract_id,
-                         details, output_path=None, governing_law="English Law"):
+                         details, output_path=None, governing_law="English Law",
+                         template_id="nomos_standard_v1"):
     """
-    Generate a formal §12 ISDA 2002 notice PDF.
+    Generate a formal §12 notice PDF.
 
     Args:
         notice_type: key from NOTICE_TEMPLATES
@@ -410,10 +360,13 @@ def generate_notice_pdf(notice_type, from_party, to_party, contract_id,
         details: dict with template variables (amount, due_date, etc.)
         output_path: file path
         governing_law: for jurisdiction reference
+        template_id: clause template to use (default: "nomos_standard_v1")
     """
     template = NOTICE_TEMPLATES.get(notice_type)
     if not template:
         raise ValueError(f"Unknown notice type: {notice_type}")
+
+    tpl = _load_template(template_id)
 
     if not output_path:
         output_path = os.path.join(_OUTPUTS_DIR, f"{contract_id}-Notice-{notice_type}.pdf")
@@ -435,8 +388,8 @@ def generate_notice_pdf(notice_type, from_party, to_party, contract_id,
     story.append(Paragraph(f"<b>Contract:</b> {contract_id}", sB))
     story.append(Spacer(1, 14))
 
-    # Body
-    body_text = template["body"].format(
+    # Body — loaded from template JSON
+    body_text = tpl[template["body_key"]].format(
         contract_id=contract_id,
         **{k: v for k, v in details.items()}
     )
@@ -446,8 +399,8 @@ def generate_notice_pdf(notice_type, from_party, to_party, contract_id,
             story.append(Spacer(1, 4))
     story.append(Spacer(1, 8))
 
-    # Consequence
-    consequence = template["consequence"].format(
+    # Consequence — loaded from template JSON
+    consequence = tpl[template["consequence_key"]].format(
         **{k: v for k, v in details.items()}
     )
     story.append(Paragraph(consequence, sB))
@@ -455,15 +408,15 @@ def generate_notice_pdf(notice_type, from_party, to_party, contract_id,
 
     # Delivery method
     story.append(Paragraph(
-        "This notice is given in accordance with Section 12 of the Agreement. "
-        "Delivery by email is effective on the date of delivery pursuant to "
-        "Section 12(a)(vi).", sRef))
+        "This notice is given in accordance with §12 of the Agreement. "
+        "Electronic delivery takes effect on the date of receipt at the address specified in the Schedule.",
+        sRef))
     story.append(Spacer(1, 20))
 
     # Signature
     story.append(Paragraph("Yours faithfully,", sB))
     story.append(Spacer(1, 30))
-    story.append(Paragraph(f"____________________________", sB))
+    story.append(Paragraph("____________________________", sB))
     story.append(Paragraph(f"For and on behalf of <b>{from_party}</b>", sB))
 
     # Footer
@@ -475,9 +428,10 @@ def generate_notice_pdf(notice_type, from_party, to_party, contract_id,
     }, sort_keys=True)
     notice_hash = hashlib.sha256(notice_data.encode()).hexdigest()
 
+    story.append(Paragraph(tpl["footer_isda_disclaimer"], sRef))
     story.append(Paragraph(f"Notice fingerprint: {notice_hash}", sRef))
     story.append(Paragraph(
-        f"§12 ISDA 2002 · {template['isda_ref']} · "
+        f"§12 · {template['isda_ref']} · "
         f"{'English law' if 'English' in governing_law else 'New York law'}",
         sFt))
 

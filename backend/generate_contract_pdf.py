@@ -3,14 +3,19 @@
   SMART LEGAL CONTRACT — PDF GENERATOR
   ISDA 2002 Master Agreement · Vanilla IRS
 
-  Generates a complete 14-section ISDA 2002 contract PDF from SwapParameters.
+  Generates a complete 14-section contract PDF from SwapParameters.
   §13 Governing Law and §14 Definitions are DYNAMIC based on the governing
   law election in Schedule Part 4(h).
 
-  HIERARCHY CLAUSE (§1(b) ISDA 2002):
+  HIERARCHY CLAUSE (§1(b)):
   This PDF IS the governing legal instrument (Layer 1).
   The Execution Engine is subordinate to this document.
   Confirmation > Schedule > Master Agreement > Code.
+
+  TEMPLATE SYSTEM:
+  Clause wording is loaded from templates/<template_id>.json at runtime.
+  Law firms may supply a replacement JSON with the same clause keys to
+  substitute their own preferred wording.
 
   Dependencies: reportlab
 =============================================================================
@@ -30,6 +35,7 @@ from decimal import Decimal
 import hashlib, json, os
 
 _OUTPUTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "outputs")
+_TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "templates")
 
 # ─── Color palette ────────────────────────────────────────────────────────
 DARK = HexColor("#1a2332")
@@ -63,15 +69,26 @@ style_footer = ParagraphStyle("Footer", parent=styles["Normal"],
     fontSize=7, textColor=GREY, alignment=TA_CENTER)
 
 
-def generate_contract_pdf(params, output_path, netting_assessment=None):
+def _load_template(template_id):
+    """Load clause texts from templates/<template_id>.json."""
+    path = os.path.join(_TEMPLATES_DIR, f"{template_id}.json")
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def generate_contract_pdf(params, output_path, netting_assessment=None,
+                          template_id="nomos_standard_v1"):
     """
-    Generate a full ISDA 2002 Smart Legal Contract PDF.
+    Generate a full Smart Legal Contract PDF (ISDA 2002-framework IRS).
 
     Args:
-        params: SwapParameters from irs_engine_v2.py
+        params: SwapParameters from engine.py
         output_path: path for the output PDF
         netting_assessment: optional NettingAssessment from netting_opinion_module
+        template_id: clause template to use (default: "nomos_standard_v1")
     """
+
+    tpl = _load_template(template_id)
 
     doc = SimpleDocTemplate(output_path, pagesize=A4,
         topMargin=2*cm, bottomMargin=2*cm, leftMargin=2.5*cm, rightMargin=2.5*cm)
@@ -97,6 +114,9 @@ def generate_contract_pdf(params, output_path, netting_assessment=None):
         "local insolvency law. The non-defaulting party may be required to close out "
         "within a reasonable period."
     )
+    currency = getattr(params, "currency", "EUR")
+    mtpn_status = "Applicable" if params.mtpn_elected else "Not Applicable"
+    aet_status = "Applicable" if params.automatic_early_termination else "Not Applicable"
 
     # ── TITLE PAGE ─────────────────────────────────────────────────────────
     story.append(Spacer(1, 60))
@@ -121,8 +141,8 @@ def generate_contract_pdf(params, output_path, netting_assessment=None):
         ["Day Count (Fixed / Float)", f"{params.fixed_day_count} / {params.floating_day_count}"],
         ["Payment Frequency", "Quarterly"],
         ["Termination Currency (§8/Part 1(f))", params.termination_currency],
-        ["MTPN (Part 4(i))", "Applicable" if params.mtpn_elected else "Not Applicable"],
-        ["AET (Part 1(e))", "Applicable" if params.automatic_early_termination else "Not Applicable"],
+        ["MTPN (Part 4(i))", mtpn_status],
+        ["AET (Part 1(e))", aet_status],
         ["Calculation Agent (§14)", params.calculation_agent],
     ]
     t = Table(party_data, colWidths=[180, 280])
@@ -141,9 +161,7 @@ def generate_contract_pdf(params, output_path, netting_assessment=None):
     story.append(t)
     story.append(Spacer(1, 20))
     story.append(Paragraph(
-        "<b>HIERARCHY CLAUSE — §1(b) ISDA 2002:</b> In the event of any inconsistency, "
-        "this Confirmation prevails over the Schedule, which prevails over the Master Agreement. "
-        "The Execution Engine is subordinate to this legal text in all cases.",
+        f"<b>{tpl['clause_1b_summary']}</b>",
         style_note))
 
     story.append(PageBreak())
@@ -152,74 +170,39 @@ def generate_contract_pdf(params, output_path, netting_assessment=None):
     story.append(Paragraph("SECTION 1 — INTERPRETATION", style_h1))
 
     story.append(Paragraph("<b>1(a) — Defined Terms</b>", style_h2))
-    story.append(Paragraph(
-        "Capitalised terms used in this Smart Legal Contract and not otherwise defined have "
-        "the meanings given to them in the ISDA 2002 Master Agreement and the ISDA 2006 "
-        "Definitions. References to Sections are to sections of the ISDA 2002 Master Agreement "
-        "unless otherwise specified.", style_body))
+    story.append(Paragraph(tpl["clause_1a"], style_body))
 
     story.append(Paragraph("<b>1(b) — Hierarchy Clause (Priority of Documents)</b>", style_h2))
-    story.append(Paragraph(
-        "In the event of any inconsistency between the provisions of this Confirmation and "
-        "the Schedule to the Master Agreement, this Confirmation will prevail. In the event "
-        "of any inconsistency between the provisions of the Schedule and the printed form of "
-        "the Master Agreement, the Schedule will prevail. The Execution Engine and any Payment "
-        "Instructions produced thereby are subordinate to the legal text of this Contract in "
-        "all cases.", style_body))
+    story.append(Paragraph(tpl["clause_1b"], style_body))
     story.append(Paragraph("■ AUTOMATED: Priority logic encoded in engine — Confirmation parameters override defaults.", style_auto))
 
     story.append(Paragraph("<b>1(c) — Single Agreement</b>", style_h2))
-    story.append(Paragraph(
-        "The parties acknowledge and agree that this Contract and all Confirmations form a single "
-        "agreement between them (as contemplated by Section 1(c) of the Master Agreement) and that, "
-        "but for this acknowledgement and agreement, they would not enter into any Transactions. "
-        "This provision is the legal foundation for close-out netting under Section 6.", style_body))
+    story.append(Paragraph(tpl["clause_1c"], style_body))
 
     # ── SECTION 2 — OBLIGATIONS ────────────────────────────────────────────
     story.append(Paragraph("SECTION 2 — OBLIGATIONS", style_h1))
 
     story.append(Paragraph("<b>2(a)(i) — Payment Obligations</b>", style_h2))
     story.append(Paragraph(
-        "Each party will make each payment specified in this Contract, subject to the other "
-        "provisions of the Master Agreement. Payments will be made on the due date in freely "
-        "transferable funds in a manner customary for payments in EUR.", style_body))
+        tpl["clause_2a_i"].format(currency=currency), style_body))
 
     story.append(Paragraph("<b>2(a)(iii) — Conditions Precedent (Circuit Breaker)</b>", style_h2))
-    story.append(Paragraph(
-        "The obligation of each party to make any payment is subject to: (1) no Event of Default "
-        "or Potential Event of Default with respect to the other party has occurred and is continuing; "
-        "(2) no Early Termination Date has occurred or been effectively designated. The Execution "
-        "Engine monitors these conditions at every calculation cycle and suspends Payment Instructions "
-        "automatically if any condition is breached.", style_body))
+    story.append(Paragraph(tpl["clause_2a_iii"], style_body))
     story.append(Paragraph("■ AUTOMATED: §2(a)(iii) circuit breaker — engine halts all payment instructions on EoD/PEoD.", style_auto))
     story.append(Paragraph(f"<i>{section_2aiii_note}</i>", style_note))
 
     story.append(Paragraph("<b>2(c) — Netting of Payments</b>", style_h2))
     story.append(Paragraph(
-        "Payments in EUR due on the same date in respect of the same Transaction are automatically "
-        "netted to a single net payment. Multiple Transaction Payment Netting is elected as "
-        f"{'Applicable' if params.mtpn_elected else 'Not Applicable'} from the Effective Date "
-        "(Schedule Part 4(i)).", style_body))
+        tpl["clause_2c"].format(currency=currency, mtpn_status=mtpn_status), style_body))
     story.append(Paragraph("■ AUTOMATED: §2(c) netting calculated by engine — single net payment instruction issued per period.", style_auto))
 
     # ── SECTION 3 — REPRESENTATIONS ────────────────────────────────────────
     story.append(Paragraph("SECTION 3 — REPRESENTATIONS", style_h1))
-    story.append(Paragraph(
-        "Each party represents to the other on each date on which a Transaction is entered into "
-        "that: (a) it has the power and authority to enter into this Agreement; (b) no Event of "
-        "Default or Potential Event of Default has occurred and is continuing; (c) there is no "
-        "pending or threatened litigation or proceeding; (d) all specified information is accurate "
-        "in all material respects; (e) Payer Tax Representations as specified in the Schedule; "
-        "(f) Payee Tax Representations as specified in the Schedule; (g) No Agency — each party "
-        "enters as principal, not as agent.", style_body))
+    story.append(Paragraph(tpl["clause_3"], style_body))
 
     # ── SECTION 4 — AGREEMENTS ─────────────────────────────────────────────
     story.append(Paragraph("SECTION 4 — AGREEMENTS", style_h1))
-    story.append(Paragraph(
-        "Each party agrees: (a) to furnish specified information to the other party; "
-        "(b) to maintain all authorisations necessary; (c) to comply with all applicable laws; "
-        "(d) tax agreement — to give notice of any failure to make payments free of withholding "
-        "tax and to provide the relevant tax forms.", style_body))
+    story.append(Paragraph(tpl["clause_4"], style_body))
 
     # ── SECTION 5 — EVENTS OF DEFAULT & TERMINATION EVENTS ─────────────────
     story.append(Paragraph("SECTION 5 — EVENTS OF DEFAULT AND TERMINATION EVENTS", style_h1))
@@ -264,75 +247,47 @@ def generate_contract_pdf(params, output_path, netting_assessment=None):
     # ── SECTION 6 — EARLY TERMINATION ──────────────────────────────────────
     story.append(Paragraph("SECTION 6 — EARLY TERMINATION; CLOSE-OUT NETTING", style_h1))
     story.append(Paragraph(
-        "<b>6(a)</b> — If an Event of Default has occurred and is continuing, the Non-defaulting Party "
-        "may designate an Early Termination Date by not more than 20 days notice. "
-        f"Automatic Early Termination: {'Applicable' if params.automatic_early_termination else 'Not Applicable'} "
-        "(Part 1(e) Schedule).", style_body))
+        f"<b>6(a)</b> — {tpl['clause_6a'].format(aet_status=aet_status)}", style_body))
     story.append(Paragraph("✗ HUMAN GATE: ETD designation requires written notice by Non-defaulting Party.", style_human))
 
     story.append(Paragraph(
-        "<b>6(e)</b> — Early Termination Amount = Close-out Amount (net) + Unpaid Amounts (net). "
-        "EoD path: Non-defaulting Party determines; all Transactions terminated. "
-        "TE path: Both parties determine; result averaged; only Affected Transactions. "
-        "Close-out Amount determined on replacement cost basis per §6(e)(i).", style_body))
+        f"<b>6(e)</b> — {tpl['clause_6e']}", style_body))
     story.append(Paragraph("■ AUTOMATED: Waterfall arithmetic (indicative). Close-out Amount quantum = HUMAN GATE.", style_auto))
 
     # ── SECTIONS 7-12 ──────────────────────────────────────────────────────
     story.append(Paragraph("SECTION 7 — TRANSFER", style_h1))
-    story.append(Paragraph(
-        "Neither party may transfer any rights or obligations without prior written consent, "
-        "except: (a) pursuant to a consolidation, merger or amalgamation; (b) to an Affiliate; "
-        "(c) pursuant to §6(b)(ii) to avoid a Tax Event.", style_body))
+    story.append(Paragraph(tpl["clause_7"], style_body))
 
     story.append(Paragraph("SECTION 8 — CONTRACTUAL CURRENCY", style_h1))
     story.append(Paragraph(
-        f"The Contractual Currency is EUR. Termination Currency: {params.termination_currency} "
-        "(Part 1(f) Schedule). Conversion at the rate prevailing on the relevant date.", style_body))
+        tpl["clause_8"].format(currency=currency, termination_currency=params.termination_currency),
+        style_body))
 
     story.append(Paragraph("SECTION 9 — MISCELLANEOUS", style_h1))
-    story.append(Paragraph(
-        "§9(e): This Contract may be executed in counterparts. §9(h)(i)(1): Default Rate = "
-        "payee's cost of funding + 1% p.a., accruing from original due date.", style_body))
+    story.append(Paragraph(tpl["clause_9"], style_body))
     story.append(Paragraph("■ AUTOMATED: Default interest calculated by engine on overdue amounts.", style_auto))
 
     story.append(Paragraph("SECTIONS 10-12 — OFFICES, EXPENSES, NOTICES", style_h1))
-    story.append(Paragraph(
-        "§10: Payments through Offices specified in Confirmation. §11: Defaulting Party "
-        "indemnifies enforcement costs. §12: Notices in writing, including electronic form, "
-        "to addresses in the Schedule.", style_body))
+    story.append(Paragraph(tpl["clause_10_12"], style_body))
 
     # ── SECTION 13 — GOVERNING LAW (DYNAMIC) ──────────────────────────────
     story.append(Paragraph("SECTION 13 — GOVERNING LAW AND JURISDICTION", style_h1))
 
     story.append(Paragraph("<b>13(a) — Governing Law</b>", style_h2))
     story.append(Paragraph(
-        f"This Agreement and each Transaction will be governed by and construed in accordance "
-        f"with <b>{gov_law_full}</b>"
-        f"{'.' if is_english else ' (without reference to choice of law doctrine).'}",
+        tpl["clause_13a_english"] if is_english else tpl["clause_13a_newyork"],
         style_body))
 
     story.append(Paragraph("<b>13(b) — Jurisdiction</b>", style_h2))
-    if is_english:
-        story.append(Paragraph(
-            "Each party irrevocably submits to (A) the <b>non-exclusive jurisdiction of the "
-            "English courts</b> if the Proceedings do not involve a Convention Court and "
-            "(B) the <b>exclusive jurisdiction of the English courts</b> if the Proceedings "
-            "do involve a Convention Court.", style_body))
-    else:
-        story.append(Paragraph(
-            "Each party irrevocably submits to the <b>non-exclusive jurisdiction of the courts "
-            "of the State of New York and the United States District Court</b> located in the "
-            "Borough of Manhattan in New York City.", style_body))
+    story.append(Paragraph(
+        tpl["clause_13b_english"] if is_english else tpl["clause_13b_newyork"],
+        style_body))
 
     story.append(Paragraph("<b>13(c) — Service of Process</b>", style_h2))
-    story.append(Paragraph(
-        "Each party irrevocably appoints the Process Agent specified in Part 4(b) of the Schedule. "
-        "Service of process may be given in the manner provided for notices in §12(a).", style_body))
+    story.append(Paragraph(tpl["clause_13c"], style_body))
 
     story.append(Paragraph("<b>13(d) — Waiver of Immunities</b>", style_h2))
-    story.append(Paragraph(
-        "Each party waives, to the extent permitted by applicable law, all immunity from "
-        "jurisdiction, attachment or execution.", style_body))
+    story.append(Paragraph(tpl["clause_13d"], style_body))
 
     # ── SECTION 14 — DEFINITIONS (DYNAMIC) ─────────────────────────────────
     story.append(Paragraph("SECTION 14 — DEFINITIONS", style_h1))
@@ -340,7 +295,7 @@ def generate_contract_pdf(params, output_path, netting_assessment=None):
     definitions = [
         ("Calculation Agent", params.calculation_agent),
         ("Close-out Amount", "§6(e)(i) — replacement cost basis, commercially reasonable procedures"),
-        ("Contractual Currency", "EUR (§8(a))"),
+        ("Contractual Currency", f"{currency} (§8(a))"),
         ("Convention Court", "Brussels Convention Art. 17 / Lugano Convention Art. 17"
          if is_english else "N/A (New York law)"),
         ("Default Rate", "Payee's cost of funding + 1% p.a. (§9(h)(i)(1))"),
@@ -355,8 +310,7 @@ def generate_contract_pdf(params, output_path, netting_assessment=None):
         ("Local Business Day",
          "TARGET2 open + London open (for EUR payments)" if is_english else
          "A day on which commercial banks are open in New York City"),
-        ("Multiple Transaction Payment Netting",
-         "Applicable" if params.mtpn_elected else "Not Applicable"),
+        ("Multiple Transaction Payment Netting", mtpn_status),
         ("Proceedings",
          "Any suit, action or proceeding relating to any dispute under this Agreement"),
         ("Termination Currency", f"{params.termination_currency} (Part 1(f))"),
@@ -408,14 +362,15 @@ def generate_contract_pdf(params, output_path, netting_assessment=None):
         ]))
         story.append(t_na)
         story.append(Paragraph(
-            "<i>This assessment is based on publicly available ISDA netting opinion status data. "
-            "It does NOT constitute legal advice. Parties must obtain independent legal advice "
-            "on netting enforceability for their specific circumstances.</i>", style_note))
+            "<i>This assessment draws on publicly available netting opinion status data. "
+            "It does not constitute legal advice. Each party must obtain independent legal "
+            "counsel on netting enforceability for its specific circumstances.</i>", style_note))
 
     # ── FOOTER ─────────────────────────────────────────────────────────────
     story.append(Spacer(1, 30))
+    story.append(Paragraph(tpl["footer_isda_disclaimer"], style_footer))
     story.append(Paragraph(
-        "§1(b) ISDA 2002 — This legal text always prevails over the Execution Engine. "
+        "§1(b) — This legal text always prevails over the Execution Engine. "
         "Confirmation > Schedule > Master Agreement > Code.",
         style_footer))
     story.append(Paragraph(
@@ -425,6 +380,7 @@ def generate_contract_pdf(params, output_path, netting_assessment=None):
     # ── BUILD PDF ──────────────────────────────────────────────────────────
     doc.build(story)
     print(f"  [PDF] Generated: {output_path}")
+    print(f"  [PDF] Template:  {template_id}")
     print(f"  [PDF] Governing Law: {params.governing_law}")
     print(f"  [PDF] Jurisdiction: {'English Courts' if is_english else 'NY Courts'}")
     return output_path
