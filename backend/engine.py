@@ -246,6 +246,7 @@ class SwapParameters:
     # ── Identification ──────────────────────────────────────────────────────
     contract_id: str                    # e.g. "SLC-IRS-EUR-001"
     isda_version: str = "ISDA 2002 Master Agreement"
+    schedule_id: Optional[str] = None  # References ScheduleElections.schedule_id — links this Confirmation to its Schedule
 
     # ── Parties ─────────────────────────────────────────────────────────────
     party_a: PartyDetails = field(default_factory=lambda: PartyDetails(
@@ -295,8 +296,13 @@ class SwapParameters:
     # These are ISDA standard defaults — do not modify without legal advice
     grace_period_failure_to_pay_days: int = 1    # §5(a)(i): 1 Local Business Day
     grace_period_breach_days: int = 30           # §5(a)(ii): 30 calendar days
-    waiting_period_illegality_days: int = 3      # §5(b)(i): 3 LBDs
-    waiting_period_force_majeure_days: int = 8   # §5(b)(ii): 8 LBDs
+    waiting_period_illegality_days: int = 3      # §5(b)(i): 3 Local Business Days
+    waiting_period_force_majeure_days: int = 8   # §5(b)(ii): 8 Local Business Days
+
+    # ── Default Rate §9(h)(i)(1) ISDA 2002 ──────────────────────────────────
+    # = payee's cost of funding + 1% p.a. (§14 definition).
+    # Default proxy: 5% funding cost + 1% = 6%. Override per Schedule Part 6.
+    default_rate: Decimal = Decimal("0.06")
 
     # ── Calculation Agent ────────────────────────────────────────────────────
     calculation_agent: str = "Party A"           # §14 Definition
@@ -359,7 +365,8 @@ class ScheduleElections:
 
     # ── Identification ──────────────────────────────────────────────────────
     schedule_id: str = ""                # auto-generated from party names
-    date_of_agreement: Optional[date] = None
+    date_of_agreement: Optional[date] = None   # Date Schedule was executed
+    master_agreement_date: Optional[date] = None  # Date MA was executed (often same as date_of_agreement; MA is the printed form)
     status: str = "DRAFT"               # DRAFT → NEGOTIATING → AGREED → SIGNED
 
     # ── Part 1: Termination Provisions ────────────────────────────────────
@@ -558,6 +565,9 @@ class EventOfDefaultRecord:
     notice_given: bool = False                  # Has notice been given? §5(a)(i)
     early_termination_designated: bool = False  # §6(a) notice issued
     is_potential_eod: bool = True               # Becomes False after grace expires
+    # §2(a)(iii): cured=True when the underlying condition is remedied.
+    # Only PEoDs can be cured this way; full EoDs require §6 close-out.
+    cured: bool = False
 
 
 @dataclass
@@ -1162,17 +1172,21 @@ class CalculationEngine:
         """
         §2(c) ISDA 2002 — Payment Netting (AUTOMATED)
 
-        Logic:
-        - Party A owes fixed_amount (fixed leg)
-        - Party B owes floating_amount (floating leg)
-        - Net = |fixed - floating|
-        - Payer = the party whose obligation is larger
+        Basic §2(c) netting applies to all payments due on the SAME DATE under
+        the SAME TRANSACTION in the SAME CURRENCY.  It is unconditional — no
+        Schedule election is needed to activate same-transaction netting.
 
-        If MTPN is also elected and there are multiple transactions,
-        this method should be called with aggregated amounts per date/currency.
+        Multiple Transaction Payment Netting (MTPN) — Schedule Part 4(i):
+        When params.mtpn_elected=True, netting extends across ALL Transactions
+        between the parties on the same date in the same currency.  For a
+        single-Transaction engine this has no additional effect; a multi-
+        Transaction caller must aggregate fixed/floating amounts per
+        payment-date/currency pair BEFORE calling this method.
 
-        Returns: (net_amount, net_payer)
+        NOTE: this engine is single-Transaction — the MTPN flag is recorded in
+        the Schedule but has no effect here.  See params.mtpn_elected.
         """
+        # §2(c) same-transaction netting — always applies
         net = (fixed_amount - floating_amount).quantize(self.ROUNDING, rounding=ROUND_HALF_UP)
 
         if net > Decimal("0"):
@@ -1238,7 +1252,9 @@ class EoDMonitor:
         self.params = params
         self.active_eods: List[EventOfDefaultRecord] = []
         self.active_tes: List[TerminationEventRecord] = []
-        self._suspended: bool = False
+        # §2(a)(iii): suspension is now computed dynamically from active_eods
+        # so that cured PEoDs lift the suspension automatically.
+        # (No longer a one-way persistent flag.)
         self.cal = BusinessDayCalendar(["TARGET2", "LONDON"])
 
     # ── §5(a)(i): Failure to Pay ─────────────────────────────────────────────
@@ -1263,9 +1279,12 @@ class EoDMonitor:
         grace_end = self.cal.add_business_days(
             period.payment_date, self.params.grace_period_failure_to_pay_days)
 
-        if today > grace_end and not period.payment_confirmed:
-            # Determine which party failed (simplified: Party A = fixed payer)
-            # In production: depends on who the net_payer is
+        # §5(a)(i): EoD fires ON grace_end (≥), not the day after (>).
+        # Grace period expires "by the end of the first Local Business Day after
+        # notice" — if today IS that day and payment is still unconfirmed, it is
+        # a full EoD. BUG WAS: `today > grace_end` fired one day too late.
+        if today >= grace_end and not period.payment_confirmed:
+            # Determine which party failed based on who the net_payer is
             defaulting = (DefaultingParty.PARTY_A
                           if period.net_payer == NetPayer.PARTY_A
                           else DefaultingParty.PARTY_B)
@@ -1561,8 +1580,11 @@ class EoDMonitor:
         Waiting Period: 3 LBDs before ETD can be designated.
         §5(d): Payments DEFERRED during waiting period.
         §5(c)(i): Excludes simultaneous EoD under §5(a)(i)/(ii)(1)/(iii)(1).
+        ISDA 2002 §5(b)(i): waiting period = 3 LOCAL BUSINESS DAYS (not calendar).
+        BUG WAS: used timedelta (calendar days). Fix: BusinessDayCalendar.add_business_days.
         """
-        waiting_end = today + timedelta(days=self.params.waiting_period_illegality_days)
+        waiting_end = self.cal.add_business_days(
+            today, self.params.waiting_period_illegality_days)
         rec = TerminationEventRecord(
             te_type=TerminationEvent.ILLEGALITY,
             affected_party=affected_party,
@@ -1583,8 +1605,11 @@ class EoDMonitor:
         §5(b)(ii): Force Majeure — performance impossible/impracticable.
         Waiting Period: 8 LBDs before ETD can be designated.
         §5(d): Payments DEFERRED — not cancelled — during waiting period.
+        ISDA 2002 §5(b)(ii): waiting period = 8 LOCAL BUSINESS DAYS (not calendar).
+        BUG WAS: used timedelta (calendar days). Fix: BusinessDayCalendar.add_business_days.
         """
-        waiting_end = today + timedelta(days=self.params.waiting_period_force_majeure_days)
+        waiting_end = self.cal.add_business_days(
+            today, self.params.waiting_period_force_majeure_days)
         rec = TerminationEventRecord(
             te_type=TerminationEvent.FORCE_MAJEURE,
             affected_party=affected_party,
@@ -1640,11 +1665,13 @@ class EoDMonitor:
 
     def _register_eod(self, rec: EventOfDefaultRecord):
         """
-        Registers an EoD and suspends payment obligations if it is a full EoD
-        or a Potential EoD (§2(a)(iii) suspends on both).
+        Registers an EoD or PEoD.  Suspension is NOT stored as a persistent flag —
+        `is_suspended` is computed dynamically so that cured PEoDs automatically
+        lift the §2(a)(iii) condition without any separate 'unsuspend' call.
+        §2(a)(iii): "…unless an Event of Default or Potential Event of Default
+        with respect to the other party has occurred and is continuing."
         """
         self.active_eods.append(rec)
-        self._suspended = True  # §2(a)(iii): suspend ALL payment obligations
         status = "POTENTIAL EoD" if rec.is_potential_eod else "EVENT OF DEFAULT"
         print(f"\n  {'⚠' if rec.is_potential_eod else '🚨'} [{status}] {rec.eod_type.value}")
         print(f"     Party: {rec.affected_party.value}")
@@ -1655,10 +1682,51 @@ class EoDMonitor:
     @property
     def is_suspended(self) -> bool:
         """
-        §2(a)(iii) condition: True if any EoD or PEoD is active.
-        When True, NO payment instructions should be issued.
+        §2(a)(iii) ISDA 2002 — "conditions precedent" check.
+
+        Returns True only while at least one EoD or PEoD is CONTINUING
+        (i.e. not yet cured).  This replaces the original one-way bool flag,
+        which incorrectly kept the contract suspended even after a PEoD was
+        remedied within the grace period.
+
+        Rules:
+        - A Potential EoD (cured=False) → suspended.
+        - A Potential EoD (cured=True)  → no longer continuing → not suspended.
+        - A full EoD (cured=False)      → suspended (only lifted via §6 close-out).
         """
-        return self._suspended
+        return any(not r.cured for r in self.active_eods)
+
+    def cure_potential_eod(
+        self,
+        eod_type: EventOfDefault,
+        affected_party: DefaultingParty,
+    ) -> bool:
+        """
+        Mark the earliest uncured Potential EoD of the given type/party as cured.
+
+        §2(a)(iii): When the underlying condition giving rise to a PEoD is
+        remedied (e.g. the overdue payment is received within the grace period),
+        the PEoD is no longer 'continuing' and the §2(a)(iii) suspension MUST
+        be lifted.  Full EoDs are NOT cured by this method — they require §6
+        close-out (designated Early Termination Date).
+
+        Returns True if a PEoD was found and cured, False otherwise.
+        """
+        for rec in self.active_eods:
+            if (rec.is_potential_eod
+                    and not rec.cured
+                    and rec.eod_type == eod_type
+                    and rec.affected_party == affected_party):
+                rec.cured = True
+                print(
+                    f"  [§2(a)(iii)] PEoD {eod_type.value} "
+                    f"({affected_party.value}) CURED — §2(a)(iii) suspension lifted"
+                    if not self.is_suspended else
+                    f"  [§2(a)(iii)] PEoD {eod_type.value} "
+                    f"({affected_party.value}) CURED — other EoDs still active"
+                )
+                return True
+        return False
 
     def has_active_eod(self) -> bool:
         """Returns True if any non-potential (full) EoD is recorded."""
@@ -1670,8 +1738,9 @@ class EoDMonitor:
             "total_eods": len(self.active_eods),
             "full_eods": sum(1 for r in self.active_eods if not r.is_potential_eod),
             "potential_eods": sum(1 for r in self.active_eods if r.is_potential_eod),
+            "cured_eods": sum(1 for r in self.active_eods if r.cured),
             "termination_events": len(self.active_tes),
-            "suspended": self._suspended,
+            "suspended": self.is_suspended,   # computed — reflects cured PEoDs
             "eod_types": [r.eod_type.value for r in self.active_eods],
             "te_types": [r.te_type.value for r in self.active_tes],
         }
@@ -1787,22 +1856,43 @@ class ComplianceMonitor:
         ))
 
         # §3(b) Absence of Certain Events — AUTO-CHECKABLE
-        # "No Event of Default or Potential Event of Default has occurred
-        #  and is continuing with respect to it"
-        active_eods = self.eod_monitor.active_eods
+        # ISDA 2002 §3(b): "No Event of Default or Potential Event of Default
+        # has occurred and is CONTINUING WITH RESPECT TO IT."
+        # Each party represents this FOR ITSELF — the rep is breached only for
+        # the party that has a continuing EoD/PEoD.
+        # BUG WAS: both parties were marked BREACHED when only one had an EoD.
+        active_eods = [r for r in self.eod_monitor.active_eods if not r.cured]
         active_tes = self.eod_monitor.active_tes
+        party_a_eods = [r for r in active_eods
+                        if r.affected_party == DefaultingParty.PARTY_A]
+        party_b_eods = [r for r in active_eods
+                        if r.affected_party == DefaultingParty.PARTY_B]
         if active_eods or active_tes:
             detail_parts = []
-            for eod in active_eods:
-                detail_parts.append(f"{eod.eod_type.value} ({eod.isda_reference})")
+            for eod in party_a_eods:
+                detail_parts.append(
+                    f"Party A — {eod.eod_type.value} "
+                    f"({'PEoD' if eod.is_potential_eod else 'EoD'}) "
+                    f"({eod.isda_reference})"
+                )
+            for eod in party_b_eods:
+                detail_parts.append(
+                    f"Party B — {eod.eod_type.value} "
+                    f"({'PEoD' if eod.is_potential_eod else 'EoD'}) "
+                    f"({eod.isda_reference})"
+                )
             for te in active_tes:
-                detail_parts.append(f"{te.te_type.value} ({te.isda_reference})")
+                detail_parts.append(
+                    f"{te.affected_party} — {te.te_type.value} ({te.isda_reference})"
+                )
             results.append(self.RepCheck(
                 section="§3(b)", name="Absence of Certain Events",
                 status=self.RepStatus.BREACHED, check_date=check_date,
                 auto_checked=True,
-                detail=f"BREACHED: Active events detected: {'; '.join(detail_parts)}. "
-                       f"§2(a)(iii) circuit breaker should be active.",
+                detail=(
+                    f"BREACHED for: {'; '.join(detail_parts)}. "
+                    f"§2(a)(iii) circuit breaker is {'active' if self.eod_monitor.is_suspended else 'inactive (events cured)'}."
+                ),
                 requires_human=False
             ))
         else:
@@ -2133,10 +2223,14 @@ class ComplianceMonitor:
         Returns a list of escalation recommendations.
         """
         escalations = []
+        # §5(a)(ii): cure period is 30 calendar days from the date of notice.
+        # The obligation becoming overdue is the event; the escalation threshold
+        # must fire ON day 30 (>=), not the day after (>).
+        # BUG WAS: `> 30` caused escalation one day too late vs the cure period.
         overdue_severe = [
             o for o in self.obligations
             if o.status == self.ObligationStatus.OVERDUE
-            and (today - o.due_date).days > 30  # More than 30 days overdue
+            and (today - o.due_date).days >= 30  # §5(a)(ii): ≥30 calendar days
         ]
 
         for ob in overdue_severe:
@@ -2346,10 +2440,13 @@ class CloseOutModule:
                     and period.payment_date <= etd):
                 # Calculate default interest to ETD
                 days_overdue = (etd - period.payment_date).days
+                # §9(h)(i)(1) Default Rate = payee's cost of funding + 1% p.a.
+                # Configurable via SwapParameters.default_rate (default 6%).
+                # BUG WAS: hardcoded Decimal("0.06") with no override path.
                 default_interest = self.calc.calculate_default_interest(
                     period.net_amount or Decimal("0"),
                     days_overdue,
-                    Decimal("0.06")  # Default Rate proxy: 5% + 1% §14
+                    self.params.default_rate
                 )
                 total_owed = (period.net_amount or Decimal("0")) + default_interest
 
@@ -2421,9 +2518,11 @@ class CloseOutModule:
 
         # ── Step 3: Waterfall §6(e)(ii) ─────────────────────────────────────
         if is_eod:
-            # EoD: Non-defaulting Party's determination used
-            # (Both parties determine; result averaged per §6(e)(ii))
-            # Simplified: use Non-defaulting Party's Close-out Amount
+            # EoD §6(e)(i)(3): the Non-defaulting Party is the sole Determining
+            # Party.  Only ONE party's determination is used — NOT averaged.
+            # (Averaging applies only for bilateral Termination Events §6(e)(i)(4).)
+            # BUG WAS: comment wrongly said "result averaged per §6(e)(ii)"
+            # — the code was correct but the comment was misleading.
             if determining_party == "PARTY_A":
                 effective_coa = close_out_a
                 unpaid_to_det = unpaid_a
@@ -2632,16 +2731,44 @@ class IRSExecutionEngine:
         self.schedule = schedule or ScheduleElections()
         self.initiation = initiation or ContractInitiation()
 
-        # Propagate Schedule elections into params for backward compatibility
+        # Apply Schedule elections as baseline; Confirmation overrides win per §1(b).
+        # Strategy: capture any Confirmation values that differ from dataclass defaults
+        # (these were explicitly set in the Confirmation), apply Schedule values, then
+        # restore those explicit Confirmation overrides.
         if schedule:
+            # Step 1 — record explicit Confirmation overrides (non-default values)
+            _SW_DEFAULTS = {
+                'governing_law':               "English Law",
+                'mtpn_elected':                True,
+                'termination_currency':        "EUR",
+                'automatic_early_termination': False,
+                'cross_default_elected':       False,
+                'cross_default_threshold':     None,
+                'csa_elected':                 False,
+                'calculation_agent':           "Party A",
+            }
+            _conf_overrides = {
+                k: getattr(params, k)
+                for k in _SW_DEFAULTS
+                if getattr(params, k) != _SW_DEFAULTS[k]
+            }
+            # Step 2 — apply Schedule (layer 3 baseline)
             params.governing_law = schedule.governing_law
             params.mtpn_elected = schedule.mtpn_elected
             params.termination_currency = schedule.termination_currency
             params.automatic_early_termination = schedule.aet_party_a or schedule.aet_party_b
-            params.cross_default_elected = schedule.cross_default_party_a or schedule.cross_default_party_b
+            params.cross_default_elected = (
+                schedule.cross_default_party_a or schedule.cross_default_party_b
+            )
             params.cross_default_threshold = schedule.cross_default_threshold_a
             params.csa_elected = schedule.csa_elected
             params.calculation_agent = schedule.calculation_agent
+            # Step 3 — restore Confirmation overrides (layer 2 wins per §1(b))
+            for _k, _v in _conf_overrides.items():
+                setattr(params, _k, _v)
+            # Step 4 — link schedule_id into Confirmation if not already set
+            if not params.schedule_id:
+                params.schedule_id = schedule.schedule_id
 
         self.oracle = OracleModule(params)
         self.calc = CalculationEngine(params)
@@ -2653,6 +2780,19 @@ class IRSExecutionEngine:
         self.state = ContractState.ACTIVE
         self.periods: List[CalculationPeriod] = []
         self.close_out_result: Optional[CloseOutCalculation] = None
+
+        # ── Module 9: Due Diligence & Covenant Monitoring ─────────────────
+        # CovenantChecker tracks required documents and covenant conditions
+        # per Schedule Part 3 / §4 ISDA 2002.
+        # Imported conditionally to keep engine self-contained.
+        try:
+            from due_diligence import CovenantChecker
+            self.dd_checker = CovenantChecker(params.contract_id, params)
+            self.dd_checker.compliance = self.compliance   # back-reference
+            self._dd_module_available = True
+        except ImportError:
+            self.dd_checker = None
+            self._dd_module_available = False
 
         # ── Module 8: Netting Opinion Check ──────────────────────────────
         # Pre-trade assessment of close-out netting enforceability
@@ -2682,6 +2822,14 @@ class IRSExecutionEngine:
 
         # ── Schedule Generation ──────────────────────────────────────────
         self.periods = self.schedule_gen.generate()
+
+        # ── Module 9: Due Diligence — Required Documents ─────────────────
+        # Initialise all required document stubs (status=REQUIRED).
+        # Client will upload; advisor will validate. No network call.
+        if self._dd_module_available and self.dd_checker:
+            self.dd_checker.initialise_required_documents()
+        else:
+            print(f"  [INIT] Due Diligence module not available.")
 
         # ── Module 8: Netting Opinion Check ──────────────────────────────
         # Runs BEFORE contract activation — produces advisory warnings.
@@ -2930,15 +3078,31 @@ class IRSExecutionEngine:
         return results
 
     def confirm_payment(self, period_number: int):
-        """Human approval of a Payment Instruction."""
+        """Human approval of a Payment Instruction.
+
+        §2(a)(iii): If a Potential EoD was registered for this period's failure
+        to pay, confirming the payment remedies the underlying condition and the
+        PEoD must be marked cured so the §2(a)(iii) suspension is lifted.
+        Only PEoDs are cured this way; full EoDs require §6 close-out.
+        """
         period = self.periods[period_number - 1]
         period.payment_confirmed = True
         print(f"\n  ✓ PAYMENT CONFIRMED: Period {period_number} — EUR {period.net_amount:,.2f}")
+
+        # §2(a)(iii): cure any PEoD whose condition is now remedied
+        if period.net_payer is not None:
+            defaulting = (DefaultingParty.PARTY_A
+                          if period.net_payer == NetPayer.PARTY_A
+                          else DefaultingParty.PARTY_B)
+            self.eod_monitor.cure_potential_eod(
+                EventOfDefault.FAILURE_TO_PAY, defaulting)
+
         self.audit.log("PAYMENT_CONFIRMED", {
             "period": period_number,
             "amount": str(period.net_amount),
             "payer": period.net_payer.value if period.net_payer else None,
-            "confirmed_by": "CALCULATION_AGENT"
+            "confirmed_by": "CALCULATION_AGENT",
+            "suspended_after": self.eod_monitor.is_suspended,
         }, actor="CALCULATION_AGENT")
 
     def trigger_early_termination(self, trigger_type: str,

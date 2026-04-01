@@ -178,7 +178,13 @@ def generate_confirmation_pdf(params, schedule=None, initiation=None,
 
     # ── PREAMBLE ────────────────────────────────────────────────────────────
     schedule_ref = (schedule.schedule_id if schedule else "N/A")
-    date_of_agreement = str(schedule.date_of_agreement if schedule and schedule.date_of_agreement else "[date]")
+    # Use master_agreement_date if set (MA and Schedule are separate docs executed together);
+    # fall back to date_of_agreement (Schedule date) per common practice.
+    _ma_date = (
+        getattr(schedule, 'master_agreement_date', None) or
+        (schedule.date_of_agreement if schedule else None)
+    )
+    date_of_agreement = str(_ma_date) if _ma_date else "[date]"
 
     story.append(Paragraph(f"Dear {params.party_b.short_name},", sB))
     story.append(Paragraph(
@@ -265,12 +271,14 @@ def generate_confirmation_pdf(params, schedule=None, initiation=None,
 
     # CSA reference
     if schedule and schedule.csa_elected:
+        def _csa_amt(v):
+            return f"{params.currency} {v:,.0f}" if v is not None else "Not specified"
         story.append(Paragraph(
             f"<b>Credit Support:</b> This Transaction is subject to the Credit Support Annex "
             f"dated as of {schedule.date_of_agreement or '[date]'} between the parties. "
-            f"Threshold (Party A): {params.currency} {schedule.csa_threshold_party_a:,.0f}. "
-            f"Threshold (Party B): {params.currency} {schedule.csa_threshold_party_b:,.0f}. "
-            f"Minimum Transfer Amount: {params.currency} {schedule.csa_mta:,.0f}.", sB))
+            f"Threshold (Party A): {_csa_amt(schedule.csa_threshold_party_a)}. "
+            f"Threshold (Party B): {_csa_amt(schedule.csa_threshold_party_b)}. "
+            f"Minimum Transfer Amount: {_csa_amt(schedule.csa_mta)}.", sB))
 
     # Oracle
     story.append(Paragraph(
