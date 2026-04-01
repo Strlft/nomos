@@ -176,6 +176,16 @@ body{background:var(--bg);color:var(--t1);font-family:var(--ff);font-size:13px;d
 .btn.sign-btn:hover{background:var(--warm);box-shadow:0 2px 12px rgba(196,149,106,.3)}
 .btn.sign-btn:disabled{background:rgba(196,149,106,.3)}
 
+/* ── Comments ── */
+.cmt{border:1px solid var(--b0);border-radius:8px;padding:10px 14px;margin-bottom:6px;background:var(--s1)}
+.cmt-open{border-left:2px solid var(--warm)}
+.cmt-resolved{border-left:2px solid var(--g);opacity:.75}
+.cmt-meta{font-size:9px;color:var(--t3);font-family:var(--fm);margin-bottom:4px;display:flex;gap:10px;align-items:center}
+.cmt-text{font-size:11px;color:var(--t2);line-height:1.6}
+.cmt-ta{width:100%;font-size:11px;padding:8px 10px;border:1px solid var(--b1);border-radius:6px;background:var(--s2);color:var(--t1);resize:vertical;min-height:60px;font-family:var(--ff);transition:border-color .15s}
+.cmt-ta:focus{outline:none;border-color:rgba(196,149,106,.4)}
+.pdf-frame{width:100%;height:420px;border:none;display:block;border-radius:0 0 6px 6px}
+
 /* ── Alert items ── */
 .al{
   border-radius:var(--rad);padding:16px 20px;margin-bottom:10px;
@@ -271,6 +281,7 @@ let S = {
   contracts:[], oracle:{}, details:{},
   orc3: { rates:{}, lastFetch:null },
   dd: {},       // keyed by contract_id
+  comments: {}, // keyed by contract_id
   profile: {},
   loading:true, error:null, lastUpdate:null
 }
@@ -394,24 +405,33 @@ async function signContract(contractId) {
   const btn = document.getElementById('sign-btn-'+contractId)
   if (btn) { btn.disabled=true; btn.textContent='Checking…' }
   try {
-    // DD gate: verify signing readiness before attempting to sign
+    // DD + comments gate: verify signing readiness before attempting to sign
     const readiness = await apiFetch('/contracts/'+contractId+'/signing-readiness')
     if (!readiness.ready) {
       if (btn) { btn.disabled=false; btn.textContent='✍ Sign & Activate' }
       const n = readiness.blocking_count || 0
+      const oc = readiness.open_comments || 0
       alert(
         'Cannot sign: ' + readiness.message +
         (n > 0 ? '\n\nMissing documents (' + n + '):\n' +
           (readiness.missing||[]).map(d=>'• '+d.description+' ('+d.party+') — '+d.status).join('\n')
         : '') +
-        '\n\nPlease upload and await validation of all pre-signing documents in the Documents tab.'
+        (oc > 0 ? '\n\nOpen comments: ' + oc + ' comment(s) must be resolved by your advisor.' : '') +
+        '\n\nPlease complete the pre-signing checklist in the Documents tab.'
       )
       return
     }
     if (btn) btn.textContent='Signing…'
-    await apiPost('/contracts/'+contractId+'/sign?signed_by='+encodeURIComponent('Client — '+contractId))
+    const result = await apiPost('/contracts/'+contractId+'/sign?signed_by='+encodeURIComponent('Client — '+contractId))
     delete S.details[contractId]
+    delete S.comments[contractId]
     await refresh()
+    if (result?.signature_hash) {
+      setTimeout(() => alert(
+        '✓ Contract signed and activated.\n\nSignature Hash (SHA-256):\n' + result.signature_hash +
+        '\n\nThis hash is stored in the immutable audit trail per §1(b) ISDA 2002.'
+      ), 300)
+    }
   } catch(e) {
     if (btn) { btn.disabled=false; btn.textContent='✍ Sign & Activate' }
     alert('Error signing contract: '+e.message)
@@ -739,13 +759,15 @@ async function rDc(c) {
   if (S.loading && !S.contracts.length) { c.innerHTML = spinner(); return }
   if (!S.ready) S.ready = {}
 
-  // Load DD summaries and signing readiness in parallel for all contracts
+  // Load DD summaries, signing readiness, and comments in parallel for all contracts
   await Promise.all(S.contracts.flatMap(x => {
     const tasks = []
     if (!S.dd[x.id])
       tasks.push(apiFetch(`/contracts/${x.id}/due-diligence`).then(r=>{S.dd[x.id]=r}).catch(e=>{S.dd[x.id]={error:e.message}}))
     if (!S.ready[x.id])
-      tasks.push(apiFetch(`/contracts/${x.id}/signing-readiness`).then(r=>{S.ready[x.id]=r}).catch(()=>{S.ready[x.id]={ready:false,blocking_count:0,missing:[]}}))
+      tasks.push(apiFetch(`/contracts/${x.id}/signing-readiness`).then(r=>{S.ready[x.id]=r}).catch(()=>{S.ready[x.id]={ready:false,blocking_count:0,missing:[],open_comments:0}}))
+    if (!S.comments[x.id])
+      tasks.push(apiFetch(`/contracts/${x.id}/comments`).then(r=>{S.comments[x.id]=r}).catch(()=>{S.comments[x.id]={comments:[],open_count:0}}))
     return tasks
   }))
 
@@ -780,16 +802,26 @@ async function rDc(c) {
     const overdue  = dd.overdue_docs || []
     const expiring = dd.expiring_soon || []
     const wfState  = dd.workflow?.state || 'KYC_PENDING'
-    const ready    = S.ready[x.id]
-    const canSign  = ready?.ready
-    const blocking = ready?.blocking_count || 0
+    const ready        = S.ready[x.id]
+    const cmtData      = S.comments[x.id] || {comments:[], open_count:0}
+    const openComments = cmtData.open_count || 0
+    const canSign      = (ready?.ready ?? false) && openComments === 0
+    const blocking     = ready?.blocking_count || 0
 
     const pct = preDocs.length ? Math.round(100*preVal/preDocs.length) : 100
+
+    const signDisabledTitle = !canSign
+      ? (blocking > 0 && openComments > 0
+          ? `${blocking} document(s) required · ${openComments} open comment(s) to resolve`
+          : blocking > 0
+            ? `Due diligence incomplete: ${blocking} document${blocking!==1?'s':''} still required`
+            : `${openComments} open comment${openComments!==1?'s':''} must be resolved before signing`)
+      : ''
 
     const signAreaHtml = x.status === 'PENDING_SIGNATURE'
       ? canSign
         ? `<button id="sign-btn-${x.id}" class="btn sign-btn" onclick="signContract('${x.id}')">✍ Sign &amp; Activate</button>`
-        : `<button id="sign-btn-${x.id}" class="btn sign-btn" disabled title="Due diligence incomplete: ${blocking} document${blocking!==1?'s':''} still required" style="opacity:.45;cursor:not-allowed">✍ Sign &amp; Activate</button>`
+        : `<button id="sign-btn-${x.id}" class="btn sign-btn" disabled title="${signDisabledTitle}" style="opacity:.45;cursor:not-allowed">✍ Sign &amp; Activate</button>`
       : x.status === 'ACTIVE'
         ? `<span class="p p-g">● Active</span>`
         : `<span class="p p-gy">${x.status}</span>`
@@ -832,6 +864,50 @@ ${workflowBar(wfState)}
 ${overdue.length ? `<div style="background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.2);border-radius:8px;padding:8px 14px;margin-bottom:10px;font-size:10px;color:var(--r)">⚠ Overdue: ${overdue.join(' · ')}</div>` : ''}
 ${expiring.length ? `<div style="background:rgba(196,149,106,.06);border:1px solid rgba(196,149,106,.15);border-radius:8px;padding:8px 14px;margin-bottom:10px;font-size:10px;color:var(--warm)">Expiring soon: ${expiring.join(' · ')}</div>` : ''}
 
+<!-- ── PDF Preview ── -->
+${x.status === 'PENDING_SIGNATURE' || x.status === 'ACTIVE' ? `
+<div style="margin-bottom:16px;border:1px solid var(--b1);border-radius:8px;overflow:hidden">
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;background:var(--s2);border-bottom:1px solid var(--b0)">
+    <div style="font-size:11px;font-weight:600;color:var(--t2)">Confirmation PDF</div>
+    <a href="/api/contracts/${x.id}/pdf" download="confirmation-${x.id}.pdf"
+       style="font-size:10px;color:var(--warm);text-decoration:none;border:1px solid rgba(196,149,106,.3);border-radius:4px;padding:3px 10px;transition:all .15s"
+       onmouseover="this.style.background='rgba(196,149,106,.1)'" onmouseout="this.style.background=''">
+      ↓ Download PDF
+    </a>
+  </div>
+  <iframe class="pdf-frame" src="/api/contracts/${x.id}/pdf" title="Confirmation PDF — ${x.id}"></iframe>
+</div>` : ''}
+
+<!-- ── Comments Section ── -->
+<div style="margin-bottom:16px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <div style="font-size:11px;font-weight:600;color:var(--t2)">Pre-Signing Comments</div>
+    <span style="font-size:10px;${openComments>0?'color:var(--r)':'color:var(--g)'}">
+      ${openComments>0 ? openComments+' open' : '✓ No open comments'}
+    </span>
+  </div>
+  <div id="cmts-${x.id}">
+    ${cmtData.comments.length ? cmtData.comments.map(cm=>`
+    <div class="cmt ${cm.status==='OPEN'?'cmt-open':'cmt-resolved'}">
+      <div class="cmt-meta">
+        <span>${cm.author}</span>
+        <span>${cm.timestamp.slice(0,16).replace('T',' ')} UTC</span>
+        <span class="p ${cm.status==='OPEN'?'p-w':'p-g'}" style="font-size:8px">${cm.status}</span>
+        ${cm.status==='RESOLVED'?`<span style="color:var(--g)">✓ resolved by ${cm.resolved_by}</span>`:''}
+      </div>
+      <div class="cmt-text">${cm.text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+    </div>`).join('') : '<div style="font-size:11px;color:var(--t3);padding:6px 0">No comments yet.</div>'}
+  </div>
+  ${x.status === 'PENDING_SIGNATURE' ? `
+  <div style="margin-top:10px">
+    <textarea id="cmt-txt-${x.id}" class="cmt-ta" placeholder="Add a question or comment before signing…"></textarea>
+    <div style="margin-top:6px;display:flex;gap:8px;align-items:center">
+      <button class="btn pr" onclick="_addComment('${x.id}',this)">Submit Comment</button>
+      <span id="cmt-msg-${x.id}" style="font-size:10px;color:var(--t3)"></span>
+    </div>
+  </div>` : ''}
+</div>
+
 <div style="font-size:11px;font-weight:600;color:var(--t2);margin-bottom:6px">Phase 1 — Pre-Signing Checklist</div>
 <table class="tb" style="margin-bottom:${postDocs.length?'14px':'0'}"><thead><tr>
   <th>Document</th><th>Status</th><th>Due</th><th>Upload</th>
@@ -873,6 +949,28 @@ ${blocks || '<div class="card" style="text-align:center;color:var(--t3);padding:
     } catch(e) {
       alert('Upload error: '+e.message)
       btn.disabled=false; btn.textContent='↑ Upload'
+    }
+  }
+
+  window._addComment = async (contractId, btn) => {
+    const ta = document.getElementById('cmt-txt-'+contractId)
+    const msg = document.getElementById('cmt-msg-'+contractId)
+    const text = ta ? ta.value.trim() : ''
+    if (!text) { if (msg) { msg.style.color='var(--r)'; msg.textContent='Please enter a comment.' }; return }
+    btn.disabled = true; btn.textContent = 'Submitting…'
+    try {
+      await apiPost('/contracts/'+contractId+'/comments', {
+        author: 'Client — '+contractId,
+        role: 'client',
+        text,
+      })
+      delete S.comments[contractId]
+      delete S.ready[contractId]
+      if (ta) ta.value = ''
+      await refresh()
+    } catch(e) {
+      if (msg) { msg.style.color='var(--r)'; msg.textContent='Error: '+e.message }
+      btn.disabled=false; btn.textContent='Submit Comment'
     }
   }
 }

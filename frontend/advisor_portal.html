@@ -297,6 +297,12 @@ select.fi option{background:var(--s2)}
   font-size:11px;color:var(--t3);font-weight:500;
   border-top:1px solid var(--b0);padding-top:16px;margin:16px 0 12px;
 }
+/* ── Comments ── */
+.cmt{border:1px solid var(--b0);border-radius:8px;padding:10px 14px;margin-bottom:6px;background:var(--bg2,var(--s1))}
+.cmt-open{border-left:2px solid var(--warm)}
+.cmt-resolved{border-left:2px solid var(--g);opacity:.75}
+.cmt-meta{font-size:9px;color:var(--t3);font-family:var(--fm);margin-bottom:4px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.cmt-text{font-size:11px;color:var(--t2);line-height:1.6}
 </style></head><body>
 
 <div class="top">
@@ -353,7 +359,8 @@ function logout(){localStorage.removeItem('nomos_role');window.location.href='/'
 let S = {
   contracts:[], oracle:{}, details:{},
   orc3: { rates:{}, events:[], regulatory:[], lastFetch:null },
-  dd: {},   // keyed by contract_id
+  dd: {},       // keyed by contract_id
+  comments: {}, // keyed by contract_id
   loading:true, error:null, lastUpdate:null
 }
 let view = 'd'
@@ -935,10 +942,59 @@ async function rDd(c) {
 </div>`
   }).join('')
 
+  // Load comments for all contracts
+  await Promise.all(S.contracts.map(async x => {
+    if (!S.comments[x.id]) {
+      try { S.comments[x.id] = await apiFetch(`/contracts/${x.id}/comments`) }
+      catch(e) { S.comments[x.id] = {comments:[], open_count:0} }
+    }
+  }))
+
+  // Build comments section
+  const allOpenComments = []
+  S.contracts.forEach(x => {
+    const cmts = S.comments[x.id]?.comments || []
+    cmts.filter(c=>c.status==='OPEN').forEach(c => allOpenComments.push({c, contractId:x.id, partyB:x.party_b||''}))
+  })
+
+  const commentSection = `
+<div class="card" style="margin-bottom:16px">
+  <div style="font-size:13px;font-weight:700;margin-bottom:12px">
+    Pre-Signing Comments
+    ${allOpenComments.length
+      ? `<span style="font-size:11px;font-weight:400;color:var(--r);margin-left:8px">${allOpenComments.length} open comment${allOpenComments.length>1?'s':''} blocking signing</span>`
+      : '<span style="font-size:11px;font-weight:400;color:var(--g);margin-left:8px">No open comments</span>'}
+  </div>
+  ${S.contracts.map(x => {
+    const cmtData = S.comments[x.id] || {comments:[], open_count:0}
+    const cmts = cmtData.comments || []
+    if (!cmts.length) return ''
+    return `<div style="margin-bottom:12px">
+  <div style="font-size:11px;font-weight:600;color:var(--t2);margin-bottom:6px">${x.id} <span style="color:var(--t3);font-weight:400">· ${x.party_b||''}</span>${cmtData.open_count>0?` <span style="color:var(--r);font-size:10px">· ${cmtData.open_count} open</span>`:''}</div>
+  ${cmts.map(cm=>`
+  <div class="cmt ${cm.status==='OPEN'?'cmt-open':'cmt-resolved'}" id="adv-cmt-${cm.comment_id}">
+    <div class="cmt-meta">
+      <span>${cm.author}</span>
+      <span>${(cm.timestamp||'').slice(0,16).replace('T',' ')} UTC</span>
+      <span class="p ${cm.status==='OPEN'?'p-w':'p-g'}" style="font-size:8px">${cm.status}</span>
+      ${cm.status==='RESOLVED'?`<span style="color:var(--g)">✓ ${cm.resolved_by}</span>`:''}
+    </div>
+    <div class="cmt-text">${cm.text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+    ${cm.status==='OPEN'?`<div style="margin-top:8px">
+      <button class="btn" style="color:var(--vi);border-color:rgba(167,139,250,.3);font-size:10px"
+        onclick="_resolveComment('${x.id}','${cm.comment_id}',this)">✓ Resolve</button>
+    </div>`:''}
+  </div>`).join('')}
+</div>`
+  }).filter(Boolean).join('') || '<div style="font-size:11px;color:var(--t3)">No comments on any contract.</div>'}
+</div>`
+
   c.innerHTML = `<div class="hd">Due Diligence${updBadge()}</div>
 <div class="sub">Schedule Part 3 · §4(a) Obligations · Human gates + Auto-tracked deadlines</div>
 
 ${postSigningSection}
+
+${commentSection}
 
 <div class="card" style="margin-bottom:16px">
   <div style="font-size:13px;font-weight:700;margin-bottom:12px">
@@ -956,6 +1012,20 @@ ${postSigningSection}
 ${overviewBlocks}
 
 <div style="font-size:10px;color:var(--t3);margin-top:8px">GREEN = all validated · AMBER = items pending · RED = overdue or human gate pending · HUMAN GATE = mandatory advisor review</div>`
+
+  window._resolveComment = async (contractId, commentId, btn) => {
+    btn.disabled = true; btn.textContent = 'Resolving…'
+    try {
+      await apiPost(`/contracts/${contractId}/comments/${commentId}/resolve`, {
+        resolved_by: 'J.Smith (Linklaters)'
+      })
+      delete S.comments[contractId]
+      await refresh()
+    } catch(e) {
+      alert('Error resolving comment: '+e.message)
+      btn.disabled=false; btn.textContent='✓ Resolve'
+    }
+  }
 
   window._ddValidate = async (docId, contractId, accepted) => {
     const notesEl = document.getElementById('note-'+docId)

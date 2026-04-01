@@ -20,6 +20,10 @@
   POST /api/contracts/{id}/obligation/{s}/deliver → mark obligation delivered
   GET  /api/contracts/{id}/audit                → full audit trail
   GET  /api/contracts/{id}/compliance           → §3/§4 compliance summary
+  GET  /api/contracts/{id}/pdf                  → serve Confirmation PDF
+  GET  /api/contracts/{id}/comments             → list all comments
+  POST /api/contracts/{id}/comments             → add a comment
+  POST /api/contracts/{id}/comments/{cmt}/resolve → advisor resolves comment
 
   DUE DILIGENCE (Schedule Part 3 / §4):
   ──────────────
@@ -186,6 +190,8 @@ _MAX_NOTIONAL = Decimal("2_000_000_000")
 
 _engines: Dict[str, "IRSExecutionEngine"] = {}
 _schedules: Dict[str, "ScheduleElections"] = {}
+_comments: Dict[str, list] = {}     # contract_id → list of comment dicts
+_contract_pdfs: Dict[str, str] = {} # contract_id → PDF filesystem path
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -639,6 +645,7 @@ def api_create_contract(data: dict) -> dict:
             payment_schedule=engine.periods,
         )
         initiation.confirmation_hash = conf_hash
+        _contract_pdfs[cid] = pdf_path
         engine.audit.log("CONFIRMATION_PDF_GENERATED", {
             "path": pdf_path,
             "hash": conf_hash,
@@ -704,6 +711,29 @@ def api_sign_contract(contract_id: str, signed_by: str = "PARTY_B") -> dict:
                 isda_ref="§4 ISDA 2002 — Agreement to Deliver",
             )
 
+    # Open comments gate: all comments must be RESOLVED before signing
+    open_comments = [c for c in _comments.get(contract_id, []) if c["status"] == "OPEN"]
+    if open_comments:
+        _http_error(
+            409, "OPEN_COMMENTS",
+            f"Contract '{contract_id}' has {len(open_comments)} open comment(s). "
+            "All comments must be resolved by the advisor before signing.",
+            isda_ref="§1(b) ISDA 2002 — pre-signing conditions not met",
+        )
+
+    # Compute SHA-256 signature hash over key contract params + timestamp
+    _signed_ts = datetime.utcnow().isoformat() + "Z"
+    _sig_payload = json.dumps({
+        "contract_id": contract_id,
+        "notional": float(eng.params.notional),
+        "fixed_rate": float(eng.params.fixed_rate),
+        "effective_date": str(eng.params.effective_date),
+        "termination_date": str(eng.params.termination_date),
+        "signed_by": str(signed_by).strip(),
+        "signed_timestamp": _signed_ts,
+    }, sort_keys=True)
+    signature_hash = hashlib.sha256(_sig_payload.encode()).hexdigest()
+
     eng.state = ContractState.ACTIVE
     eng.initiation.signed_party_b = True
     eng.initiation.signed_party_b_date = date.today()
@@ -714,6 +744,7 @@ def api_sign_contract(contract_id: str, signed_by: str = "PARTY_B") -> dict:
         "party": "PARTY_B",
         "date": str(date.today()),
         "new_state": "ACTIVE",
+        "signature_hash": signature_hash,
         "note": "Confirmation executed — contract now ACTIVE per §1(b) ISDA 2002",
         "isda_reference": "§1(b) ISDA 2002 — Confirmation binding upon execution",
     }, actor=str(signed_by).strip())
@@ -725,6 +756,7 @@ def api_sign_contract(contract_id: str, signed_by: str = "PARTY_B") -> dict:
         "status": "ACTIVE",
         "signed_by": str(signed_by).strip(),
         "signed_date": str(date.today()),
+        "signature_hash": signature_hash,
         "isda_ref": "§1(b) ISDA 2002 — Confirmation prevails over Schedule and MA",
     }
 
@@ -1192,20 +1224,34 @@ def api_signing_readiness(contract_id: str) -> dict:
 
     eng = _get_engine(contract_id)
 
+    open_count = sum(1 for c in _comments.get(contract_id, []) if c["status"] == "OPEN")
+
     if not _DD_OK or not eng.dd_checker:
-        # Graceful degradation: if DD module is absent, don't block signing
+        # Graceful degradation: if DD module is absent, only block on open comments
         return {
-            "ready": True,
+            "ready": open_count == 0,
             "workflow_state": "DD_NOT_INITIALISED",
             "pre_signing_total": 0,
             "pre_signing_validated": 0,
             "blocking_count": 0,
             "blocking_documents": [],
             "missing": [],
-            "message": "DD checker not initialised — signing not blocked.",
+            "open_comments": open_count,
+            "message": (
+                "DD checker not initialised — signing not blocked."
+                if open_count == 0
+                else f"DD checker not initialised but {open_count} open comment(s) must be resolved."
+            ),
         }
 
-    return eng.dd_checker.workflow.signing_readiness(eng.dd_checker.documents)
+    result = dict(eng.dd_checker.workflow.signing_readiness(eng.dd_checker.documents))
+    result["open_comments"] = open_count
+    if open_count and result.get("ready"):
+        result["ready"] = False
+        existing_msg = result.get("message", "")
+        suffix = f"{open_count} open comment(s) must be resolved before signing."
+        result["message"] = (existing_msg + " " + suffix).strip() if existing_msg else suffix
+    return result
 
 
 def api_upload_dd(contract_id: str, data: dict) -> dict:
@@ -1404,6 +1450,115 @@ def api_audit_trail(contract_id: str) -> list:
     return list(eng.audit._entries)
 
 
+# ─── PDF serving ──────────────────────────────────────────────────────────────
+
+def api_contract_pdf(contract_id: str) -> str:
+    """
+    Return the filesystem path of the Confirmation PDF for a contract.
+    Caller (FastAPI route) serves it as FileResponse.
+    """
+    _get_engine(contract_id)  # raises KeyError if contract not found
+    pdf_path = _contract_pdfs.get(contract_id)
+    if not pdf_path:
+        _http_error(404, "PDF_NOT_FOUND",
+                    f"Confirmation PDF not available for '{contract_id}' — "
+                    "PDF may not have been generated at contract creation.")
+    if not os.path.exists(pdf_path):
+        _http_error(404, "PDF_FILE_MISSING",
+                    f"PDF file not found on disk: {pdf_path}")
+    return pdf_path
+
+
+# ─── Comments endpoints ───────────────────────────────────────────────────────
+
+def api_add_comment(contract_id: str, data: dict) -> dict:
+    """
+    POST /api/contracts/{id}/comments — add a pre-signing comment.
+
+    Fields: text (required), author (required), role ("client" | "advisor").
+    """
+    _get_engine(contract_id)
+    text = str(data.get("text", "")).strip()
+    author = str(data.get("author", "")).strip()
+    if not text:
+        _http_error(400, "MISSING_TEXT", "comment text is required")
+    if not author:
+        _http_error(400, "MISSING_AUTHOR", "comment author is required")
+
+    comments = _comments.setdefault(contract_id, [])
+    comment_id = f"CMT-{len(comments) + 1:04d}"
+    comment = {
+        "comment_id": comment_id,
+        "contract_id": contract_id,
+        "author": author,
+        "role": str(data.get("role", "client")),
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "text": text,
+        "status": "OPEN",
+        "resolved_by": None,
+        "resolved_at": None,
+    }
+    comments.append(comment)
+
+    eng = _engines[contract_id]
+    eng.audit.log("COMMENT_ADDED", {
+        "comment_id": comment_id,
+        "author": author,
+        "text_preview": text[:100],
+    }, actor=author)
+
+    logger.info(f"[{contract_id}] Comment {comment_id} added by '{author}'")
+    return {"status": "ok", "comment": comment}
+
+
+def api_list_comments(contract_id: str) -> dict:
+    """GET /api/contracts/{id}/comments — list all comments for a contract."""
+    _get_engine(contract_id)
+    comments = _comments.get(contract_id, [])
+    open_count = sum(1 for c in comments if c["status"] == "OPEN")
+    return {
+        "status": "ok",
+        "contract_id": contract_id,
+        "comments": list(comments),
+        "open_count": open_count,
+        "total": len(comments),
+    }
+
+
+def api_resolve_comment(contract_id: str, comment_id: str, data: dict) -> dict:
+    """
+    POST /api/contracts/{id}/comments/{comment_id}/resolve
+    Advisor marks a comment as RESOLVED.
+    HUMAN GATE — explicit advisor action required.
+    """
+    _get_engine(contract_id)
+    resolved_by = str(data.get("resolved_by", "")).strip()
+    if not resolved_by:
+        _http_error(400, "MISSING_RESOLVER", "resolved_by is required")
+
+    comments = _comments.get(contract_id, [])
+    comment = next((c for c in comments if c["comment_id"] == comment_id), None)
+    if comment is None:
+        _http_error(404, "COMMENT_NOT_FOUND",
+                    f"Comment '{comment_id}' not found on contract '{contract_id}'")
+    if comment["status"] == "RESOLVED":
+        _http_error(409, "ALREADY_RESOLVED",
+                    f"Comment '{comment_id}' is already resolved")
+
+    comment["status"] = "RESOLVED"
+    comment["resolved_by"] = resolved_by
+    comment["resolved_at"] = datetime.utcnow().isoformat() + "Z"
+
+    eng = _engines[contract_id]
+    eng.audit.log("COMMENT_RESOLVED", {
+        "comment_id": comment_id,
+        "resolved_by": resolved_by,
+    }, actor=resolved_by)
+
+    logger.info(f"[{contract_id}] Comment {comment_id} resolved by '{resolved_by}'")
+    return {"status": "ok", "comment": comment}
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # FASTAPI APP
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1473,6 +1628,16 @@ if HAS_FASTAPI:
         advisor: str
         notes: str = ""
         accepted: bool = True
+
+    class AddCommentRequest(BaseModel):
+        """Body for POST /api/contracts/{id}/comments"""
+        author: str
+        text: str
+        role: str = "client"
+
+    class ResolveCommentRequest(BaseModel):
+        """Body for POST /api/contracts/{id}/comments/{comment_id}/resolve"""
+        resolved_by: str
 
     # ── App ──────────────────────────────────────────────────────────────────
 
@@ -1749,6 +1914,81 @@ if HAS_FASTAPI:
             raise
         except Exception as e:
             logger.error(f"[{contract_id}] signing-readiness error: {e}")
+            raise HTTPException(500, detail={
+                "code": "INTERNAL_ERROR", "message": str(e)})
+
+    # ── PDF endpoint ──────────────────────────────────────────────────────────
+
+    @app.get("/api/contracts/{contract_id}/pdf", tags=["Contracts"])
+    def contract_pdf(contract_id: str):
+        """Serve the Confirmation PDF for a PENDING_SIGNATURE or ACTIVE contract."""
+        try:
+            pdf_path = api_contract_pdf(contract_id)
+            return FileResponse(
+                pdf_path,
+                media_type="application/pdf",
+                filename=f"confirmation-{contract_id}.pdf",
+                headers={"Content-Disposition": f'inline; filename="confirmation-{contract_id}.pdf"'},
+            )
+        except KeyError:
+            raise HTTPException(404, detail={
+                "code": "CONTRACT_NOT_FOUND",
+                "message": f"Contract '{contract_id}' not found"})
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"[{contract_id}] pdf serve error: {e}")
+            raise HTTPException(500, detail={
+                "code": "INTERNAL_ERROR", "message": str(e)})
+
+    # ── Comments endpoints ────────────────────────────────────────────────────
+
+    @app.get("/api/contracts/{contract_id}/comments", tags=["Contracts"])
+    def list_comments(contract_id: str):
+        """List all pre-signing comments for a contract."""
+        try:
+            return api_list_comments(contract_id)
+        except KeyError:
+            raise HTTPException(404, detail={
+                "code": "CONTRACT_NOT_FOUND",
+                "message": f"Contract '{contract_id}' not found"})
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(500, detail={
+                "code": "INTERNAL_ERROR", "message": str(e)})
+
+    @app.post("/api/contracts/{contract_id}/comments", tags=["Contracts"])
+    def add_comment(contract_id: str, req: AddCommentRequest):
+        """Add a pre-signing comment. Blocks signing until resolved."""
+        try:
+            return api_add_comment(contract_id, req.dict())
+        except KeyError:
+            raise HTTPException(404, detail={
+                "code": "CONTRACT_NOT_FOUND",
+                "message": f"Contract '{contract_id}' not found"})
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"[{contract_id}] add_comment error: {e}")
+            raise HTTPException(500, detail={
+                "code": "INTERNAL_ERROR", "message": str(e)})
+
+    @app.post("/api/contracts/{contract_id}/comments/{comment_id}/resolve",
+              tags=["Contracts"])
+    def resolve_comment(contract_id: str, comment_id: str,
+                        req: ResolveCommentRequest):
+        """Advisor resolves a comment. HUMAN GATE."""
+        try:
+            return api_resolve_comment(contract_id, comment_id, req.dict())
+        except KeyError:
+            raise HTTPException(404, detail={
+                "code": "CONTRACT_NOT_FOUND",
+                "message": f"Contract '{contract_id}' or comment not found"})
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"[{contract_id}/{comment_id}] resolve_comment error: {e}")
             raise HTTPException(500, detail={
                 "code": "INTERNAL_ERROR", "message": str(e)})
 
