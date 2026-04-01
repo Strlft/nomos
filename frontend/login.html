@@ -140,12 +140,12 @@ body::before{
 <script>
 function login(role) {
   localStorage.setItem('nomos_role', role)
-  window.location.href = role === 'advisor' ? 'advisor_portal.html' : 'client_portal.html'
+  window.location.href = role === 'advisor' ? '/advisor' : '/client'
 }
 ;(function(){
   const r = localStorage.getItem('nomos_role')
-  if (r === 'advisor') window.location.href = 'advisor_portal.html'
-  else if (r === 'client') window.location.href = 'client_portal.html'
+  if (r === 'advisor') window.location.href = '/advisor'
+  else if (r === 'client') window.location.href = '/client'
 })()
 </script>
 </body>

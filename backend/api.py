@@ -2026,7 +2026,7 @@ if HAS_FASTAPI:
     # ── App ──────────────────────────────────────────────────────────────────
 
     app = FastAPI(
-        title="DerivAI API",
+        title="Nomos API",
         description="Smart Legal Contract Engine — ISDA 2002 Master Agreement",
         version="0.3",
         docs_url="/docs",
@@ -2529,7 +2529,7 @@ if __name__ == "__main__":
         import uvicorn
         # Change working directory to project root so relative paths (outputs/, etc.) resolve correctly
         os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        print("DerivAI API starting on http://localhost:8000")
+        print("Nomos API starting on http://localhost:8000")
         print("  Login    → http://localhost:8000/")
         print("  Client   → http://localhost:8000/client")
         print("  Advisor  → http://localhost:8000/advisor")
@@ -2554,7 +2554,7 @@ if __name__ == "__main__":
         print(f"  {'─'*56}")
 
     print("\n" + "═" * 60)
-    print("  DerivAI API — Full Flow Test")
+    print("  Nomos API — Full Flow Test")
     print("  create → sign → execute → approve PI → notice")
     print("═" * 60)
 

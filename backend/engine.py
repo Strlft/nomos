@@ -1754,7 +1754,7 @@ class ComplianceMonitor:
     """
     Monitors ongoing compliance with §3 Representations and §4 Agreements.
 
-    WHAT THIS MODULE DOES (CONTRACT MONITORING — core DerivAI value):
+    WHAT THIS MODULE DOES (CONTRACT MONITORING — core Nomos value):
     ──────────────────────────────────────────────────────────────────
     §3 Representations are deemed REPEATED at each payment date (per ISDA 2002
     Section 3 preamble). The engine checks at each cycle whether the conditions

@@ -303,10 +303,55 @@ select.fi option{background:var(--s2)}
 .cmt-resolved{border-left:2px solid var(--g);opacity:.75}
 .cmt-meta{font-size:9px;color:var(--t3);font-family:var(--fm);margin-bottom:4px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .cmt-text{font-size:11px;color:var(--t2);line-height:1.6}
+
+/* ── Toast notifications ── */
+#toast-container{position:fixed;bottom:36px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:380px}
+.toast{padding:11px 16px;border-radius:10px;font-size:11px;line-height:1.5;pointer-events:auto;animation:toastIn .2s ease;display:flex;align-items:flex-start;gap:10px;background:var(--s2);border:1px solid var(--b1);box-shadow:0 8px 32px rgba(0,0,0,.6);color:var(--t1);word-break:break-word}
+.toast.ok{border-left:3px solid var(--g)}.toast.err{border-left:3px solid var(--r)}.toast.inf{border-left:3px solid var(--bl)}.toast.wr{border-left:3px solid var(--warm)}
+@keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes toastOut{to{opacity:0;transform:translateY(8px)}}
+
+/* ── Mobile hamburger ── */
+.menu-btn{display:none;width:34px;height:34px;border-radius:7px;background:var(--b0);border:1px solid var(--b1);cursor:pointer;align-items:center;justify-content:center;flex-direction:column;gap:4px;padding:8px;flex-shrink:0}
+.menu-btn span{width:16px;height:1.5px;background:var(--t2);border-radius:1px;display:block;transition:all .2s}
+.side-overlay{display:none;position:fixed;inset:0;z-index:99;background:rgba(0,0,0,.45)}
+
+/* ── Search / sort bar ── */
+.search-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.search-input{background:var(--s2);border:1px solid var(--b1);border-radius:7px;padding:7px 12px;color:var(--t1);font-family:var(--ff);font-size:11px;outline:none;transition:border-color var(--trans);width:220px}
+.search-input:focus{border-color:rgba(167,139,250,.45)}
+.sort-btn{font-size:10px;padding:5px 11px;border-radius:6px;cursor:pointer;border:1px solid var(--b0);background:transparent;color:var(--t3);font-family:var(--ff);transition:all var(--trans)}
+.sort-btn:hover{background:var(--b0);color:var(--t1)}.sort-btn.act{color:var(--vi);border-color:rgba(167,139,250,.3);background:var(--viBg)}
+
+/* ── Breadcrumb ── */
+.bc{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--t3);margin-bottom:18px;font-family:var(--fm)}
+.bc a{cursor:pointer;text-decoration:underline;text-underline-offset:2px;transition:color .15s}.bc a:hover{color:var(--t1)}
+
+/* ── Responsive ── */
+@media(max-width:860px){
+  .side{position:fixed;left:0;top:54px;bottom:28px;z-index:100;transform:translateX(-100%);transition:transform .22s ease;background:var(--s1);border-right:1px solid var(--b1);box-shadow:4px 0 28px rgba(0,0,0,.5)}
+  .side.open{transform:translateX(0)}
+  .side-overlay{display:block}
+  .menu-btn{display:flex}
+  .ct{padding:22px 18px}
+  .kpi-row{grid-template-columns:repeat(3,1fr)}
+  .netting-grid{grid-template-columns:1fr}
+}
+@media(max-width:600px){
+  .kpi-row{grid-template-columns:repeat(2,1fr)}
+  .fr2,.fr3{grid-template-columns:1fr}
+  .cg{grid-template-columns:1fr 1fr}
+  .modal{width:96vw;padding:24px 18px}
+  .search-input{width:100%}
+  .search-row{flex-direction:column;align-items:stretch}
+  .top-user{display:none}
+  .top-sep{display:none}
+}
 </style></head><body>
 
 <div class="top">
   <div class="top-l">
+    <div class="menu-btn" id="menu-btn" onclick="_toggleSide()"><span></span><span></span><span></span></div>
     <div class="logo-mark">N</div>
     <div class="logo-name">Nomos</div>
     <span class="role-pill">Advisor</span>
@@ -345,6 +390,9 @@ select.fi option{background:var(--s2)}
 <div id="nc-inner"></div>
 </div></div>
 
+<div id="toast-container"></div>
+<div class="side-overlay" id="side-overlay" style="display:none" onclick="_closeSide()"></div>
+
 <div class="ft">§1(b) ISDA 2002 · Confirmation &gt; Schedule &gt; MA &gt; Code · Legal text always prevails · Live API ↻ 10s</div>
 
 <script>
@@ -354,6 +402,62 @@ const API = '/api'
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 ;(function(){const r=localStorage.getItem('nomos_role');if(r&&r!=='advisor')window.location.href='/'})()
 function logout(){localStorage.removeItem('nomos_role');window.location.href='/'}
+
+// ── TOAST NOTIFICATIONS ───────────────────────────────────────────────────────
+function toast(msg, type='inf', duration=4200) {
+  const tc = document.getElementById('toast-container')
+  if (!tc) return
+  const icon = {ok:'<span style="color:var(--g);font-size:13px">✓</span>', err:'<span style="color:var(--r);font-size:13px">⚠</span>', inf:'<span style="color:var(--bl);font-size:13px">ℹ</span>', wr:'<span style="color:var(--warm);font-size:13px">⚠</span>'}[type] || ''
+  const t = document.createElement('div')
+  t.className = 'toast '+type
+  t.innerHTML = icon + `<span>${msg}</span>`
+  tc.appendChild(t)
+  setTimeout(()=>{ t.style.animation='toastOut .2s ease forwards'; setTimeout(()=>t.remove(),200) }, duration)
+}
+
+// ── BREADCRUMB ────────────────────────────────────────────────────────────────
+function crumb(...parts) {
+  const links = parts.map((p,i) => i===parts.length-1
+    ? `<span style="color:var(--t2)">${p}</span>`
+    : `<a onclick="N('d',null)">${p}</a>`)
+  return `<div class="bc"><a onclick="N('d',null)">Nomos</a><span>›</span>${links.join('<span>›</span>')}</div>`
+}
+
+// ── MOBILE SIDEBAR ────────────────────────────────────────────────────────────
+function _toggleSide() {
+  const s = document.querySelector('.side'), o = document.getElementById('side-overlay')
+  if (!s) return
+  const open = s.classList.toggle('open')
+  if (o) o.style.display = open ? 'block' : 'none'
+}
+function _closeSide() {
+  const s = document.querySelector('.side'), o = document.getElementById('side-overlay')
+  if (s) s.classList.remove('open')
+  if (o) o.style.display = 'none'
+}
+
+// ── CONTRACT SORT / FILTER ────────────────────────────────────────────────────
+let _ctSort = null, _ctQuery = ''
+function _sortedContracts() {
+  let D = [...S.contracts]
+  const q = _ctQuery.toLowerCase()
+  if (q) D = D.filter(x =>
+    (x.id||'').toLowerCase().includes(q) ||
+    (x.party_a||'').toLowerCase().includes(q) ||
+    (x.party_b||'').toLowerCase().includes(q) ||
+    (x.status||'').toLowerCase().includes(q)
+  )
+  if (_ctSort === 'date')   D.sort((a,b) => (b.created_at||b.id||'').localeCompare(a.created_at||a.id||''))
+  if (_ctSort === 'status') D.sort((a,b) => (a.status||'').localeCompare(b.status||''))
+  if (_ctSort === 'cp')     D.sort((a,b) => (a.party_b||'').localeCompare(b.party_b||''))
+  return D
+}
+function _sortBy(field, btn) {
+  _ctSort = _ctSort === field ? null : field
+  document.querySelectorAll('.sort-btn').forEach(b=>b.classList.remove('act'))
+  if (_ctSort && btn) btn.classList.add('act')
+  rD(document.getElementById('C'))
+}
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let S = {
@@ -441,7 +545,7 @@ function updateSidebar() {
 }
 
 // ── NAVIGATION ────────────────────────────────────────────────────────────────
-function N(v, el) { view=v; document.querySelectorAll('.si').forEach(e=>e.classList.remove('on')); if(el) el.classList.add('on'); R() }
+function N(v, el) { view=v; document.querySelectorAll('.si').forEach(e=>e.classList.remove('on')); if(el) el.classList.add('on'); _closeSide(); R() }
 function R() { const fn=({d:rD,act:rAct,mon:rMon,cb:rCb,net:rNet,orc:rOrc,dd:rDd,aud:rAud,not:rNot})[view]; const res=fn(document.getElementById('C')); if(res instanceof Promise) res.catch(console.error) }
 
 // ── DISPLAY HELPERS ───────────────────────────────────────────────────────────
@@ -537,11 +641,12 @@ async function approvePi(contractId, period) {
     await apiPost(`/contracts/${contractId}/approve-pi/${period}?approver=J.Smith%20(Linklaters)`)
     delete S.details[contractId]
     await refresh()
+    toast(`Payment Instruction P${period} approved — ${contractId}`, 'ok')
     const el = document.getElementById(`pi-row-${contractId}-${period}`)
     if (el) { el.style.background='rgba(74,222,128,.04)'; setTimeout(()=>el.style.background='',1500) }
   } catch(e) {
     if (btn) { btn.disabled=false; btn.textContent='✓ Approve PI' }
-    alert('Error approving PI: '+e.message)
+    toast('Error approving PI: '+e.message, 'err')
   }
 }
 
@@ -553,9 +658,10 @@ async function executePeriod(contractId, period) {
     await apiPost(`/contracts/${contractId}/execute?period=${period}`)
     delete S.details[contractId]
     await refresh()
+    toast(`Period P${period} calculated — ${contractId}`, 'ok')
   } catch(e) {
     if (btn) { btn.disabled=false; btn.textContent='⟳ Run' }
-    alert('Error executing period: '+e.message)
+    toast('Error executing period: '+e.message, 'err')
   }
 }
 
@@ -575,10 +681,11 @@ async function generateNotice(contractId, noticeType) {
     if (btn) { btn.disabled=false; btn.textContent='Generate Notice' }
     const el = document.getElementById('notice-result')
     if (el) { el.innerHTML=`<div style="background:var(--viBg);border:1px solid rgba(167,139,250,.2);border-radius:8px;padding:12px 16px;font-size:11px;color:var(--vi)">✓ Notice generated · Type: ${r.type} · Hash: ${r.hash?.slice(0,16)}… · File: ${r.pdf}</div>`; el.style.display='block' }
+    toast(`Notice ${noticeType} generated`, 'ok')
     await refresh()
   } catch(e) {
     if (btn) { btn.disabled=false; btn.textContent='Generate Notice' }
-    alert('Error: '+e.message)
+    toast('Notice error: '+e.message, 'err')
   }
 }
 
@@ -589,10 +696,10 @@ async function _approveAdvisorB(contractId, btn) {
     const r = await apiPost(`/contracts/${contractId}/approve-advisor`, {
       approved_by: 'J.Smith (Linklaters) — Advisor B'
     })
-    alert(`✓ Approved: ${r.note}`)
+    toast('Advisor B approved: '+r.note, 'ok')
     await refresh()
   } catch(e) {
-    alert('Error: '+e.message)
+    toast('Error: '+e.message, 'err')
     if (btn) { btn.disabled=false; btn.textContent='Approve B' }
   }
 }
@@ -628,8 +735,10 @@ function rD(c) {
   const critActs = acts.filter(a=>a.sev==='critical')
   const totalNotional = D.reduce((s,x)=>s+x.notional,0)
 
+  const SD = _sortedContracts()
   c.innerHTML = `
 ${errBanner()}
+${crumb('Advisor Dashboard')}
 <div class="hd">Advisor Dashboard${updBadge()}</div>
 <div class="sub">All clients · All contracts · ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</div>
 <div class="kpi-row">
@@ -644,8 +753,16 @@ ${errBanner()}
 ${actionsHtml(acts.slice(0,6))}
 
 <div class="sh" style="margin-top:28px">Contracts Overview</div>
+<div class="search-row">
+  <input class="search-input" id="ct-search" placeholder="Search by ID, party, status…" value="${_ctQuery}" oninput="_ctQuery=this.value;rD(document.getElementById('C'))"/>
+  <button class="sort-btn${_ctSort==='date'?' act':''}" onclick="_sortBy('date',this)">↓ Date</button>
+  <button class="sort-btn${_ctSort==='status'?' act':''}" onclick="_sortBy('status',this)">↓ Status</button>
+  <button class="sort-btn${_ctSort==='cp'?' act':''}" onclick="_sortBy('cp',this)">↓ Party B</button>
+  ${_ctQuery||_ctSort?`<button class="sort-btn" onclick="_ctSort=null;_ctQuery='';rD(document.getElementById('C'))">✕ Clear</button>`:''}
+  <span style="font-size:10px;color:var(--t3);padding:4px 0">${SD.length}/${D.length} contract${D.length!==1?'s':''}</span>
+</div>
 <table class="tb"><thead><tr><th>Contract</th><th>Mode</th><th>Client</th><th>Counterparty</th><th>Notional</th><th>Gov. Law</th><th>Netting</th><th>Periods</th><th>Workflow Status</th></tr></thead><tbody>
-${D.map(x => {
+${SD.map(x => {
   const det = S.details[x.id]
   const calc = x.periods_calculated||0
   const wf = x.workflow_status || x.status
@@ -668,7 +785,7 @@ ${D.map(x => {
 function rAct(c) {
   if (S.loading && !S.contracts.length) { c.innerHTML=spinner(); return }
   const acts = buildActions()
-  c.innerHTML = `<div class="hd">Pending Actions${updBadge()}</div>
+  c.innerHTML = `${crumb('Pending Actions')}<div class="hd">Pending Actions${updBadge()}</div>
 <div class="sub">${acts.length} item${acts.length!==1?'s':''} requiring advisor decision</div>
 ${actionsHtml(acts)}`
 }
@@ -684,7 +801,7 @@ function rMon(c) {
   const ctSelector = S.contracts.length > 1
     ? `<div style="margin-bottom:20px;display:flex;gap:8px">${S.contracts.map(ct=>`<button class="btn ${ct.id===x.id?'act':''}" onclick="_monSel('${ct.id}')">${ct.id}</button>`).join('')}</div>` : ''
 
-  c.innerHTML = `<div class="hd">Compliance Monitoring${updBadge()}</div>
+  c.innerHTML = `${crumb('Compliance Monitoring')}<div class="hd">Compliance Monitoring${updBadge()}</div>
 <div class="sub">§3 Representations · §4 Agreements · §5 Events of Default — clause-by-clause · Contract: ${x.id}</div>
 ${ctSelector}
 <div class="sh">§3 Representations <span class="tag tag-v">Repeated each Payment Date</span></div>
@@ -729,7 +846,7 @@ function rCb(c) {
     {ref:'Break',     name:'Break Clause',                 desc:'Optional early termination right at specified break dates',           auto:false, mandatory:false, on:false},
     {ref:'§3(g)',     name:'No Agency Representation',     desc:'Each party acts as principal, not agent',                            auto:false, mandatory:false, on:true}
   ]
-  c.innerHTML = `<div class="hd">Clause Builder</div><div class="sub">Configure Schedule elections and optional clauses · Changes affect contract generation</div>
+  c.innerHTML = `${crumb('Clause Builder')}<div class="hd">Clause Builder</div><div class="sub">Configure Schedule elections and optional clauses · Changes affect contract generation</div>
 <div class="card" style="padding:0;overflow:hidden">
 ${clauses.map(cl=>`<div class="clause">
   <div class="clause-l"><div class="clause-ref">${cl.ref}</div><div>
@@ -755,7 +872,7 @@ function rNet(c) {
     const det = S.details[x.id]
     return {id:x.id, jA:det?.party_a?.jurisdiction||'—', jB:det?.party_b?.jurisdiction||'—', status:x.netting_status}
   })
-  c.innerHTML = `<div class="hd">Netting Opinion Check</div><div class="sub">Pre-trade assessment of close-out netting enforceability — §1(c) / §6(e) ISDA 2002</div>
+  c.innerHTML = `${crumb('Netting Opinions')}<div class="hd">Netting Opinion Check</div><div class="sub">Pre-trade assessment of close-out netting enforceability — §1(c) / §6(e) ISDA 2002</div>
 ${nettingRows.map(r=>`
 <div class="card" style="margin-bottom:12px">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -816,7 +933,7 @@ function rOrc(c) {
   </div>
 </div>`).join('')
 
-  c.innerHTML = `<div class="hd">Oracle v3${updBadge()}</div>
+  c.innerHTML = `${crumb('Oracle v3')}<div class="hd">Oracle v3${updBadge()}</div>
 <div class="sub">Market Data (9 rates) · Event Monitor · Regulatory Watch · ISDA 2021 fallback waterfall</div>
 
 <div style="display:flex;gap:8px;margin-bottom:20px">
@@ -842,7 +959,7 @@ ${regRows||'<div class="card" style="text-align:center;color:var(--t3);padding:2
       S.orc3.rates = res.rates || {}
       S.orc3.lastFetch = new Date()
       rOrc(c)
-    } catch(e) { alert('Rate refresh failed: '+e.message) }
+    } catch(e) { toast('Rate refresh failed: '+e.message, 'err') }
     btn.disabled=false; btn.textContent='⟳ Refresh All Rates (Live ECB)'
   }
 }
@@ -869,8 +986,9 @@ async function rDd(c) {
     return '<span class="p p-gy">—</span>'
   }
   function docStatusPill(st) {
-    const map = { REQUIRED:'p-w', UPLOADED:'p-b', VALIDATED:'p-g', REJECTED:'p-r', EXPIRED:'p-r', NOT_REQUIRED:'p-gy' }
-    return `<span class="p ${map[st]||'p-b'}">${st}</span>`
+    const map = { REQUIRED:'p-r', UPLOADED:'p-b', VALIDATED:'p-g', REJECTED:'p-r', EXPIRED:'p-r', NOT_REQUIRED:'p-gy' }
+    const lbl = { REQUIRED:'MISSING', UPLOADED:'UPLOADED', VALIDATED:'VALIDATED', REJECTED:'REJECTED', EXPIRED:'EXPIRED', NOT_REQUIRED:'N/A' }
+    return `<span class="p ${map[st]||'p-b'}">${lbl[st]||st}</span>`
   }
   function wfBadge(state) {
     const map = {
@@ -1056,7 +1174,7 @@ ${overviewBlocks}
       delete S.comments[contractId]
       await refresh()
     } catch(e) {
-      alert('Error resolving comment: '+e.message)
+      toast('Error resolving comment: '+e.message, 'err')
       btn.disabled=false; btn.textContent='✓ Resolve'
     }
   }
@@ -1071,14 +1189,15 @@ ${overviewBlocks}
         notes: notes || (accepted ? 'Reviewed and accepted by advisor' : 'Rejected — see advisor notes')
       })
       delete S.dd[contractId]
+      toast(accepted ? 'Document accepted' : 'Document rejected', accepted ? 'ok' : 'wr')
       await refresh()
-    } catch(e) { alert('Validate error: '+e.message) }
+    } catch(e) { toast('Validate error: '+e.message, 'err') }
   }
 }
 
 // ── AUDIT TRAIL ───────────────────────────────────────────────────────────────
 async function rAud(c) {
-  c.innerHTML = `<div class="hd">Audit Trail${updBadge()}</div><div class="sub">SHA-256 chained · Tamper-evident · All contracts</div><div id="audit-body" style="color:var(--t3);font-size:11px;padding:20px 0">Loading…</div>`
+  c.innerHTML = `${crumb('Audit Trail')}<div class="hd">Audit Trail${updBadge()}</div><div class="sub">SHA-256 chained · Tamper-evident · All contracts</div><div id="audit-body" style="color:var(--t3);font-size:11px;padding:20px 0">Loading…</div>`
   try {
     const allAudits = await Promise.all(S.contracts.map(x => apiFetch(`/contracts/${x.id}/audit`)))
     const flat = allAudits.flat().sort((a,b)=>b.seq-a.seq)
@@ -1111,7 +1230,7 @@ ${flat.map(l => `<div class="log-item">
 // ── NOTICES §12 ───────────────────────────────────────────────────────────────
 function rNot(c) {
   const contractOptions = S.contracts.map(x=>`<option value="${x.id}">${x.id} · ${x.party_b}</option>`).join('')
-  c.innerHTML = `<div class="hd">Notices — §12 ISDA 2002</div><div class="sub">Generate and track contractual notices</div>
+  c.innerHTML = `${crumb('Notices §12')}<div class="hd">Notices — §12 ISDA 2002</div><div class="sub">Generate and track contractual notices</div>
 <div class="sh">Generate Notice</div>
 <div class="card">
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">

@@ -257,6 +257,42 @@ body{background:var(--bg);color:var(--t1);font-family:var(--ff);font-size:13px;d
   border-top:1px solid var(--b0);font-size:9px;color:var(--t3);
   letter-spacing:.04em;flex-shrink:0;
 }
+
+/* ── Toast notifications ── */
+#toast-container{position:fixed;bottom:36px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:380px}
+.toast{padding:11px 16px;border-radius:10px;font-size:11px;line-height:1.5;pointer-events:auto;animation:toastIn .2s ease;display:flex;align-items:flex-start;gap:10px;background:var(--s2);border:1px solid var(--b1);box-shadow:0 8px 32px rgba(0,0,0,.6);color:var(--t1);word-break:break-word}
+.toast.ok{border-left:3px solid var(--g)}.toast.err{border-left:3px solid var(--r)}.toast.inf{border-left:3px solid var(--bl)}.toast.wr{border-left:3px solid var(--warm)}
+@keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes toastOut{to{opacity:0;transform:translateY(8px)}}
+
+/* ── Mobile hamburger ── */
+.menu-btn{display:none;width:34px;height:34px;border-radius:7px;background:var(--b0);border:1px solid var(--b1);cursor:pointer;align-items:center;justify-content:center;flex-direction:column;gap:4px;padding:8px;flex-shrink:0}
+.menu-btn span{width:16px;height:1.5px;background:var(--t2);border-radius:1px;display:block}
+.side-overlay{display:none;position:fixed;inset:0;z-index:99;background:rgba(0,0,0,.45)}
+
+/* ── Breadcrumb ── */
+.bc{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--t3);margin-bottom:18px;font-family:var(--fm)}
+.bc a{cursor:pointer;text-decoration:underline;text-underline-offset:2px;transition:color .15s}.bc a:hover{color:var(--t1)}
+
+/* ── Responsive ── */
+@media(max-width:860px){
+  .side{position:fixed;left:0;top:54px;bottom:28px;z-index:100;transform:translateX(-100%);transition:transform .22s ease;background:var(--s1);border-right:1px solid var(--b1);box-shadow:4px 0 28px rgba(0,0,0,.5)}
+  .side.open{transform:translateX(0)}
+  .side-overlay{display:block}
+  .menu-btn{display:flex}
+  .ct{padding:22px 18px}
+  .kpi-row{grid-template-columns:repeat(2,1fr)}
+  .cg{grid-template-columns:1fr 1fr}
+  .dc-modal{width:96vw;padding:24px 18px}
+  .dc-grid{grid-template-columns:1fr}
+}
+@media(max-width:540px){
+  .kpi-row{grid-template-columns:1fr 1fr}
+  .cg{grid-template-columns:1fr}
+  .top-user{display:none}
+  .top-sep{display:none}
+  .orc{flex-direction:column;gap:16px}
+}
 </style></head><body>
 
 <div class="top">
@@ -271,6 +307,7 @@ body{background:var(--bg);color:var(--t1);font-family:var(--ff);font-size:13px;d
     <span id="api-status" class="status-dot"><span class="dot pulse"></span>Connecting…</span>
     <span class="top-clock" id="ck"></span>
     <span class="sign-out" onclick="logout()">Sign out</span>
+    <div class="menu-btn" id="menu-btn" onclick="_toggleSide()"><span></span><span></span><span></span></div>
   </div>
 </div>
 
@@ -290,6 +327,9 @@ body{background:var(--bg);color:var(--t1);font-family:var(--ff);font-size:13px;d
 <div class="ct" id="C"></div>
 </div>
 <div class="ft">§1(b) ISDA 2002 · Legal text prevails · Payment Instructions only · Live API ↻ 10s</div>
+
+<div id="toast-container"></div>
+<div class="side-overlay" id="side-overlay" onclick="_closeSide()"></div>
 
 <!-- ── Direct Contract Modal ── -->
 <div id="dc-bg" class="dc-modal-bg" style="display:none" onclick="if(event.target===this)closeDC()">
@@ -356,6 +396,44 @@ const API = '/api'
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 ;(function(){const r=localStorage.getItem('nomos_role');if(r&&r!=='client')window.location.href='/'})()
 function logout(){localStorage.removeItem('nomos_role');window.location.href='/'}
+
+// ── TOAST ─────────────────────────────────────────────────────────────────────
+function toast(msg, type='inf', dur=4000) {
+  const tc = document.getElementById('toast-container')
+  if (!tc) return
+  const icons = {ok:'✓',err:'✕',wr:'⚠',inf:'ℹ'}
+  const t = document.createElement('div')
+  t.className = 'toast '+type
+  t.innerHTML = `<span style="flex-shrink:0;font-size:13px">${icons[type]||'ℹ'}</span><span>${msg}</span>`
+  tc.appendChild(t)
+  setTimeout(()=>{ t.style.animation='toastOut .2s ease forwards'; setTimeout(()=>t.remove(), 220) }, dur)
+}
+
+// ── BREADCRUMB ────────────────────────────────────────────────────────────────
+function crumb(...parts) {
+  if (!parts.length) return ''
+  const items = parts.map((p,i) =>
+    i < parts.length-1
+      ? `<a onclick="N('${p.view||'d'}',document.querySelector('.si'))">${p.label||p}</a>`
+      : `<span style="color:var(--t2)">${p.label||p}</span>`
+  )
+  return `<div class="bc">${items.join('<span>/</span>')}</div>`
+}
+
+// ── MOBILE SIDEBAR ────────────────────────────────────────────────────────────
+function _toggleSide() {
+  const side = document.querySelector('.side')
+  const ov   = document.getElementById('side-overlay')
+  if (!side) return
+  const open = side.classList.toggle('open')
+  if (ov) ov.style.display = open ? 'block' : 'none'
+}
+function _closeSide() {
+  const side = document.querySelector('.side')
+  const ov   = document.getElementById('side-overlay')
+  if (side) side.classList.remove('open')
+  if (ov)   ov.style.display = 'none'
+}
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let S = {
@@ -433,7 +511,7 @@ function updateSidebar() {
 }
 
 // ── NAVIGATION ────────────────────────────────────────────────────────────────
-function N(v, el) { view=v; EX=null; document.querySelectorAll('.si').forEach(e=>e.classList.remove('on')); if(el) el.classList.add('on'); R() }
+function N(v, el) { view=v; EX=null; document.querySelectorAll('.si').forEach(e=>e.classList.remove('on')); if(el) el.classList.add('on'); _closeSide(); R() }
 function R() { const fn = ({d:rD,s:rS,p:rP,o:rO,dc:rDc,al:rAl,pr:rPr})[view]; const res=fn(document.getElementById('C')); if(res instanceof Promise) res.catch(console.error) }
 
 // ── DISPLAY HELPERS ───────────────────────────────────────────────────────────
@@ -580,7 +658,7 @@ async function signContractP(contractId, party) {
     const readiness = await apiFetch('/contracts/'+contractId+'/signing-readiness')
     if (!readiness.ready) {
       if (btn) { btn.disabled=false; btn.textContent=party==='A'?'✍ Countersign (Party A)':'They sign (Party B)' }
-      alert('Cannot sign yet: '+readiness.message)
+      toast('Cannot sign yet: '+readiness.message, 'err')
       return
     }
     if (btn) btn.textContent='Signing…'
@@ -592,15 +670,13 @@ async function signContractP(contractId, party) {
     delete S.comments[contractId]
     await refresh()
     if (result?.activated) {
-      setTimeout(()=>alert(
-        `✓ Both parties have signed. Contract ${contractId} is now ACTIVE.\n\nSignature Hash:\n${result.signature_hash}`
-      ),300)
+      toast(`✓ Both parties signed — contract ${contractId} is now ACTIVE`, 'ok')
     } else {
-      alert(`✓ Signed as Party ${party}. ${party==='B'?'The creator must now countersign to activate.':'Waiting for Party B to sign.'}`)
+      toast(`✓ Signed as Party ${party}. ${party==='B'?'Creator must countersign to activate.':'Waiting for Party B.'}`, 'ok')
     }
   } catch(e) {
     if (btn) { btn.disabled=false; btn.textContent=party==='A'?'✍ Countersign (Party A)':'They sign (Party B)' }
-    alert('Error: '+e.message)
+    toast('Error: '+e.message, 'err')
   }
 }
 
@@ -615,14 +691,12 @@ async function signContract(contractId) {
       if (btn) { btn.disabled=false; btn.textContent='✍ Sign & Activate' }
       const n = readiness.blocking_count || 0
       const oc = readiness.open_comments || 0
-      alert(
-        'Cannot sign: ' + readiness.message +
-        (n > 0 ? '\n\nMissing documents (' + n + '):\n' +
-          (readiness.missing||[]).map(d=>'• '+d.description+' ('+d.party+') — '+d.status).join('\n')
-        : '') +
-        (oc > 0 ? '\n\nOpen comments: ' + oc + ' comment(s) must be resolved by your advisor.' : '') +
-        '\n\nPlease complete the pre-signing checklist in the Documents tab.'
-      )
+      const details = [
+        readiness.message,
+        n > 0 ? `${n} document${n!==1?'s':''} required — check Documents tab` : '',
+        oc > 0 ? `${oc} open comment${oc!==1?'s':''} must be resolved first` : '',
+      ].filter(Boolean).join(' · ')
+      toast('Cannot sign: '+details, 'err', 7000)
       return
     }
     if (btn) btn.textContent='Signing…'
@@ -631,14 +705,11 @@ async function signContract(contractId) {
     delete S.comments[contractId]
     await refresh()
     if (result?.signature_hash) {
-      setTimeout(() => alert(
-        '✓ Contract signed and activated.\n\nSignature Hash (SHA-256):\n' + result.signature_hash +
-        '\n\nThis hash is stored in the immutable audit trail per §1(b) ISDA 2002.'
-      ), 300)
+      toast('✓ Contract signed and activated · Hash: '+result.signature_hash.slice(0,16)+'…', 'ok', 6000)
     }
   } catch(e) {
     if (btn) { btn.disabled=false; btn.textContent='✍ Sign & Activate' }
-    alert('Error signing contract: '+e.message)
+    toast('Error signing contract: '+e.message, 'err')
   }
 }
 
@@ -676,6 +747,7 @@ function rD(c) {
 
   c.innerHTML = `
 ${errBanner()}
+${crumb('Dashboard')}
 <div class="hd">Dashboard${updBadge()}</div>
 <div class="sub">${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</div>
 <div class="kpi-row">
@@ -790,7 +862,7 @@ function rS(c) {
   const G = {}
   D.forEach(x => { if(!G[x.party_b]) G[x.party_b]={cp:x.party_b,cs:[]}; G[x.party_b].cs.push(x) })
 
-  c.innerHTML = `<div class="hd">My Swaps</div><div class="sub">Grouped by counterparty</div>
+  c.innerHTML = `${crumb('My Swaps')}<div class="hd">My Swaps</div><div class="sub">Grouped by counterparty</div>
 ${Object.values(G).map(g => {
   const tn = g.cs.reduce((s,x)=>s+x.notional, 0)
   return `<div class="cpg">
@@ -879,7 +951,7 @@ async function rP(c) {
     if (det) det.periods.forEach(p => rows.push({...p, cid:x.id, cp:x.party_b}))
   })
   rows.sort((a,b) => (a.payment_date||'z').localeCompare(b.payment_date||'z'))
-  c.innerHTML = `<div class="hd">Payments</div><div class="sub">All scheduled payments across contracts</div>
+  c.innerHTML = `${crumb('Payments')}<div class="hd">Payments</div><div class="sub">All scheduled payments across contracts</div>
 <table class="tb"><thead><tr>
   <th>Pay Date</th><th>Contract</th><th>Counterparty</th><th>#</th>
   <th>Fixed</th><th>Floating</th><th>Net</th>
@@ -949,7 +1021,7 @@ function rO(c) {
     <td style="font-size:10px;color:var(--t3)">${(r.fetch_timestamp||'—').slice(0,16).replace('T',' ')}</td>
   </tr>`).join('')
 
-  c.innerHTML = `<div class="hd">Oracle</div>
+  c.innerHTML = `${crumb('Oracle')}<div class="hd">Oracle</div>
 <div class="sub">Reference rates for floating leg calculations · ISDA 2021 5-step fallback waterfall</div>
 
 <div class="card">
@@ -1011,7 +1083,7 @@ async function rDc(c) {
     return '<span class="p p-gy">—</span>'
   }
   function docStatusPill(st) {
-    const map={REQUIRED:'p-w',UPLOADED:'p-b',VALIDATED:'p-g',REJECTED:'p-r',EXPIRED:'p-r',NOT_REQUIRED:'p-gy'}
+    const map={REQUIRED:'p-r',UPLOADED:'p-b',VALIDATED:'p-g',REJECTED:'p-r',EXPIRED:'p-r',NOT_REQUIRED:'p-gy'}
     const labels={REQUIRED:'MISSING',UPLOADED:'UPLOADED',VALIDATED:'VALIDATED',REJECTED:'REJECTED',EXPIRED:'EXPIRED',NOT_REQUIRED:'N/A'}
     return `<span class="p ${map[st]||'p-b'}">${labels[st]||st}</span>`
   }
@@ -1153,15 +1225,14 @@ ${postDocs.length ? `<div style="font-size:11px;font-weight:600;color:var(--t2);
 </div>`
   }).join('')
 
-  c.innerHTML = `<div class="hd">Documents</div>
+  c.innerHTML = `${crumb('Documents')}<div class="hd">Documents</div>
 <div class="sub">Required deliveries under Schedule Part 3 · §4(a) ISDA 2002 · Pre-signing gate enforced</div>
 ${blocks || '<div class="card" style="text-align:center;color:var(--t3);padding:30px;font-size:11px">No contracts or documents found.</div>'}
 <div style="font-size:10px;color:var(--t3);margin-top:8px">Contact Linklaters LLP for questions about your document obligations.</div>
 <div id="dd-upload-msg" style="display:none;margin-top:12px"></div>`
 
   window._ddUpload = async (contractId, docId, docType, btn) => {
-    const fileData = prompt(`Upload "${docType}" for ${contractId}\n\nPaste file content or leave blank for stub:`)
-    if (fileData === null) return
+    if (!confirm(`Submit "${docType}" for ${contractId}?\n\nA stub document will be uploaded for advisor review.`)) return
     btn.disabled = true; btn.textContent = 'Uploading…'
     try {
       const payload = {
@@ -1169,18 +1240,17 @@ ${blocks || '<div class="card" style="text-align:center;color:var(--t3);padding:
         document_type:   docType,
         filename:        docType.toLowerCase().replace(/_/g,'-')+'.pdf',
         uploaded_by:     'Client — '+contractId,
-        file_content_b64: fileData ? btoa(unescape(encodeURIComponent(fileData))) : btoa('STUB_CONTENT'),
+        file_content_b64: btoa('STUB_CONTENT'),
       }
       await apiFetch('/contracts/'+contractId+'/due-diligence/upload', {
         method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
       })
       delete S.dd[contractId]
       delete S.ready[contractId]
-      const msg = document.getElementById('dd-upload-msg')
-      if (msg) { msg.style.display='block'; msg.innerHTML=`<div style="background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.2);border-radius:8px;padding:10px 14px;font-size:11px;color:var(--bl)">✓ Uploaded — advisor will be notified and must validate this document.</div>` }
+      toast(`✓ ${docType} uploaded — awaiting advisor review`, 'ok')
       await refresh()
     } catch(e) {
-      alert('Upload error: '+e.message)
+      toast('Upload error: '+e.message, 'err')
       btn.disabled=false; btn.textContent='↑ Upload'
     }
   }
@@ -1211,7 +1281,7 @@ ${blocks || '<div class="card" style="text-align:center;color:var(--t3);padding:
 // ── PROFILE ───────────────────────────────────────────────────────────────────
 function rPr(c) {
   const P = S.profile || {}
-  c.innerHTML = `<div class="hd">Profile</div>
+  c.innerHTML = `${crumb('Profile')}<div class="hd">Profile</div>
 <div class="sub">Your company information — shared with your legal advisor and used for compliance checks</div>
 <div class="card">
   <div style="font-size:12px;font-weight:600;margin-bottom:16px;color:var(--t2)">Company Details</div>
@@ -1280,7 +1350,7 @@ function rPr(c) {
 // ── ALERTS ────────────────────────────────────────────────────────────────────
 function rAl(c) {
   const al = buildAlerts()
-  c.innerHTML = `<div class="hd">Alerts</div><div class="sub">Items requiring your attention — live from API</div>
+  c.innerHTML = `${crumb('Alerts')}<div class="hd">Alerts</div><div class="sub">Items requiring your attention — live from API</div>
 ${al.length
   ? al.map(a=>`<div class="al ${a.t}">
   <div class="al-i">${a.i}</div>
