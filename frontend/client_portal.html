@@ -186,6 +186,29 @@ body{background:var(--bg);color:var(--t1);font-family:var(--ff);font-size:13px;d
 .cmt-ta:focus{outline:none;border-color:rgba(196,149,106,.4)}
 .pdf-frame{width:100%;height:420px;border:none;display:block;border-radius:0 0 6px 6px}
 
+/* ── Contract mode badges ── */
+.mode-p2p{font-size:9px;padding:2px 7px;border-radius:4px;background:rgba(167,139,250,.12);color:var(--vi);border:1px solid rgba(167,139,250,.25);font-family:var(--fm)}
+.mode-dual{font-size:9px;padding:2px 7px;border-radius:4px;background:rgba(96,165,250,.1);color:var(--bl);border:1px solid rgba(96,165,250,.2);font-family:var(--fm)}
+.mode-adv{font-size:9px;padding:2px 7px;border-radius:4px;background:var(--wBg);color:var(--warm);border:1px solid rgba(196,149,106,.2);font-family:var(--fm)}
+
+/* ── Direct contract modal ── */
+.dc-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.dc-modal{background:var(--s1);border:1px solid var(--b1);border-radius:16px;padding:32px;width:520px;max-width:96vw;max-height:90vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+.dc-modal-h{font-size:16px;font-weight:600;margin-bottom:4px}
+.dc-modal-sub{font-size:11px;color:var(--t3);margin-bottom:24px;line-height:1.6}
+.dc-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.dc-field label{font-size:10px;color:var(--t3);letter-spacing:.05em;text-transform:uppercase;display:block;margin-bottom:5px}
+.dc-field input,.dc-field select{width:100%;font-size:12px;padding:8px 10px;border:1px solid var(--b1);border-radius:6px;background:var(--s2);color:var(--t1);font-family:var(--ff);transition:border-color .15s}
+.dc-field input:focus,.dc-field select:focus{outline:none;border-color:rgba(167,139,250,.4)}
+.dc-field-full{grid-column:1/-1}
+.dc-btn-row{display:flex;gap:8px;margin-top:20px}
+.btn.dc-primary{color:#fff;background:rgba(167,139,250,.85);border-color:var(--vi);font-weight:500;padding:8px 20px;font-size:11px}
+.btn.dc-primary:hover{background:var(--vi)}
+.dc-result{margin-top:16px;padding:12px 14px;border-radius:8px;font-size:11px;line-height:1.8}
+.dc-result.ok{background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.2);color:var(--g)}
+.dc-result.err{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);color:var(--r)}
+.dc-result.loading{background:var(--s2);border:1px solid var(--b1);color:var(--t3)}
+
 /* ── Alert items ── */
 .al{
   border-radius:var(--rad);padding:16px 20px;margin-bottom:10px;
@@ -267,6 +290,64 @@ body{background:var(--bg);color:var(--t1);font-family:var(--ff);font-size:13px;d
 <div class="ct" id="C"></div>
 </div>
 <div class="ft">§1(b) ISDA 2002 · Legal text prevails · Payment Instructions only · Live API ↻ 10s</div>
+
+<!-- ── Direct Contract Modal ── -->
+<div id="dc-bg" class="dc-modal-bg" style="display:none" onclick="if(event.target===this)closeDC()">
+<div class="dc-modal" onclick="event.stopPropagation()">
+  <div class="dc-modal-h">New Direct Contract</div>
+  <div class="dc-modal-sub">
+    Create a peer-to-peer interest rate swap directly with your counterparty.<br>
+    Standard ISDA 2002 defaults apply. Both parties must sign to activate.
+  </div>
+  <div class="dc-grid">
+    <div class="dc-field">
+      <label>Your Company Name</label>
+      <input id="dc-myname" placeholder="Alpha Corp S.A." />
+    </div>
+    <div class="dc-field">
+      <label>Your Jurisdiction</label>
+      <input id="dc-myjuris" value="FR" placeholder="FR" maxlength="2" style="text-transform:uppercase" />
+    </div>
+    <div class="dc-field">
+      <label>Counterparty Name</label>
+      <input id="dc-cpname" placeholder="Beta Fund Ltd" />
+    </div>
+    <div class="dc-field">
+      <label>Counterparty Jurisdiction</label>
+      <input id="dc-cpjuris" value="GB" placeholder="GB" maxlength="2" style="text-transform:uppercase" />
+    </div>
+    <div class="dc-field dc-field-full">
+      <label>Counterparty Email (optional — for reference)</label>
+      <input id="dc-cpemail" type="email" placeholder="legal@betafund.com" />
+    </div>
+    <div class="dc-field">
+      <label>Notional (EUR)</label>
+      <input id="dc-notional" type="number" placeholder="10000000" min="1" />
+    </div>
+    <div class="dc-field">
+      <label>Fixed Rate (%)</label>
+      <input id="dc-rate" type="number" step="0.001" placeholder="3.200" min="0.001" max="49.999" />
+    </div>
+    <div class="dc-field">
+      <label>Effective Date</label>
+      <input id="dc-eff" type="date" />
+    </div>
+    <div class="dc-field">
+      <label>Termination Date</label>
+      <input id="dc-term" type="date" />
+    </div>
+  </div>
+  <div style="font-size:10px;color:var(--t3);line-height:2;margin-bottom:4px">
+    Defaults: EUR · EURIBOR 3M floating · Quarterly payments · English Law · MTPN elected
+  </div>
+  <div id="dc-result" style="display:none"></div>
+  <div class="dc-btn-row">
+    <button class="btn dc-primary" onclick="submitDC(this)">Create Contract</button>
+    <button class="btn" onclick="closeDC()">Cancel</button>
+    <span id="dc-err" style="font-size:10px;color:var(--r);padding:5px 0"></span>
+  </div>
+</div>
+</div>
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────────────
@@ -400,6 +481,129 @@ const updBadge  = () => S.lastUpdate ? `<span style="font-size:9px;color:var(--t
 const errBanner = () => S.error ? `<div style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.22);border-radius:8px;padding:10px 16px;margin-bottom:20px;font-size:11px;color:var(--r)">⚠ ${S.error}</div>` : ''
 const spinner   = () => `<div style="padding:60px;text-align:center;color:var(--t3);font-size:11px;letter-spacing:.04em">Loading from API…</div>`
 
+// ── DIRECT CONTRACT MODAL ─────────────────────────────────────────────────────
+function openDC() {
+  const bg = document.getElementById('dc-bg')
+  if (bg) {
+    bg.style.display = 'flex'
+    // Pre-fill My Name from profile
+    const nameEl = document.getElementById('dc-myname')
+    if (nameEl && S.profile?.company_name) nameEl.value = S.profile.company_name
+    const jurisEl = document.getElementById('dc-myjuris')
+    if (jurisEl && S.profile?.jurisdiction) jurisEl.value = S.profile.jurisdiction.toUpperCase()
+    // Pre-fill effective date with today + 2 days
+    const effEl = document.getElementById('dc-eff')
+    if (effEl && !effEl.value) {
+      const d = new Date(); d.setDate(d.getDate()+2)
+      effEl.value = d.toISOString().slice(0,10)
+    }
+    // Pre-fill termination with today + 2yr
+    const termEl = document.getElementById('dc-term')
+    if (termEl && !termEl.value) {
+      const d = new Date(); d.setFullYear(d.getFullYear()+2)
+      termEl.value = d.toISOString().slice(0,10)
+    }
+    document.getElementById('dc-result').style.display='none'
+    document.getElementById('dc-err').textContent=''
+  }
+}
+function closeDC() {
+  const bg = document.getElementById('dc-bg')
+  if (bg) bg.style.display='none'
+}
+async function submitDC(btn) {
+  const err = document.getElementById('dc-err')
+  const res = document.getElementById('dc-result')
+  err.textContent = ''
+  const myName   = document.getElementById('dc-myname').value.trim()
+  const myJuris  = document.getElementById('dc-myjuris').value.trim().toUpperCase()
+  const cpName   = document.getElementById('dc-cpname').value.trim()
+  const cpJuris  = document.getElementById('dc-cpjuris').value.trim().toUpperCase()
+  const cpEmail  = document.getElementById('dc-cpemail').value.trim()
+  const notional = parseFloat(document.getElementById('dc-notional').value)
+  const rateRaw  = parseFloat(document.getElementById('dc-rate').value)   // user enters %
+  const eff      = document.getElementById('dc-eff').value
+  const term     = document.getElementById('dc-term').value
+
+  if (!myName)  { err.textContent='Your company name is required'; return }
+  if (!cpName)  { err.textContent='Counterparty name is required'; return }
+  if (!notional || notional <= 0) { err.textContent='Enter a valid notional amount'; return }
+  if (!rateRaw  || rateRaw  <= 0) { err.textContent='Enter a valid fixed rate (e.g. 3.2 for 3.2%)'; return }
+  if (rateRaw >= 50) { err.textContent='Rate must be less than 50% (e.g. 3.2, not 320)'; return }
+  if (!eff || !term)  { err.textContent='Both dates are required'; return }
+  if (eff >= term)    { err.textContent='Termination date must be after effective date'; return }
+
+  btn.disabled = true; btn.textContent = 'Creating…'
+  res.style.display='block'
+  res.className='dc-result loading'
+  res.textContent='Generating contract, payment schedule, and Confirmation PDF…'
+  try {
+    const r = await apiPost('/contracts/direct', {
+      my_name: myName,
+      my_jurisdiction: myJuris,
+      counterparty_name: cpName,
+      counterparty_jurisdiction: cpJuris,
+      counterparty_email: cpEmail,
+      notional,
+      fixed_rate: rateRaw / 100,   // convert % → decimal
+      effective_date: eff,
+      termination_date: term,
+      currency: 'EUR',
+    })
+    res.className='dc-result ok'
+    res.innerHTML = `
+      <strong>✓ Contract created: ${r.contract_id}</strong><br>
+      Mode: Peer-to-Peer · ${r.periods} payment periods<br>
+      Status: Waiting for ${cpName} to sign first<br>
+      ${r.pdf_error ? '<span style="color:var(--r)">⚠ PDF generation failed</span>' : '✓ Confirmation PDF generated'}
+      <br><br>
+      <span style="font-size:10px;color:var(--g)">
+        The contract will appear in ${cpName}'s dashboard. Once they sign, you will countersign to activate.
+      </span>
+    `
+    btn.textContent = 'Created!'
+    // Refresh state after a short delay
+    await refresh()
+  } catch(e) {
+    res.className='dc-result err'
+    res.textContent='Error: '+e.message
+    btn.disabled=false; btn.textContent='Create Contract'
+  }
+}
+
+// ── SIGN CONTRACT (party-specific, for P2P) ────────────────────────────────────
+async function signContractP(contractId, party) {
+  const key = `sign-btn-p-${contractId}-${party}`
+  const btn = document.getElementById(key) || document.querySelector(`[onclick*="signContractP('${contractId}','${party}')"]`)
+  if (btn) { btn.disabled=true; btn.textContent='Checking…' }
+  try {
+    const readiness = await apiFetch('/contracts/'+contractId+'/signing-readiness')
+    if (!readiness.ready) {
+      if (btn) { btn.disabled=false; btn.textContent=party==='A'?'✍ Countersign (Party A)':'They sign (Party B)' }
+      alert('Cannot sign yet: '+readiness.message)
+      return
+    }
+    if (btn) btn.textContent='Signing…'
+    const partyLabel = party==='A'?'Creator — '+contractId:'Counterparty — '+contractId
+    const result = await apiPost(
+      `/contracts/${contractId}/sign?signed_by=${encodeURIComponent(partyLabel)}&party=${party}`
+    )
+    delete S.details[contractId]
+    delete S.comments[contractId]
+    await refresh()
+    if (result?.activated) {
+      setTimeout(()=>alert(
+        `✓ Both parties have signed. Contract ${contractId} is now ACTIVE.\n\nSignature Hash:\n${result.signature_hash}`
+      ),300)
+    } else {
+      alert(`✓ Signed as Party ${party}. ${party==='B'?'The creator must now countersign to activate.':'Waiting for Party B to sign.'}`)
+    }
+  } catch(e) {
+    if (btn) { btn.disabled=false; btn.textContent=party==='A'?'✍ Countersign (Party A)':'They sign (Party B)' }
+    alert('Error: '+e.message)
+  }
+}
+
 // ── SIGN CONTRACT ─────────────────────────────────────────────────────────────
 async function signContract(contractId) {
   const btn = document.getElementById('sign-btn-'+contractId)
@@ -497,7 +701,10 @@ ${errBanner()}
   </div>
 </div>
 
-<div class="sh">Alerts <span class="tag ${alerts.length?'tag-r':'tag-g'}">${alerts.length}</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+  <div class="sh" style="margin-bottom:0">Alerts <span class="tag ${alerts.length?'tag-r':'tag-g'}">${alerts.length}</span></div>
+  <button class="btn" style="color:var(--vi);border-color:rgba(167,139,250,.3);font-size:11px;padding:6px 14px" onclick="openDC()">+ New Direct Contract</button>
+</div>
 ${alerts.length
   ? alerts.map(a=>`<div class="al ${a.t}">
   <div class="al-i">${a.i}</div>
@@ -522,19 +729,45 @@ ${alerts.length
 </div></div>
 
 <div class="sh" style="margin-top:28px">Positions</div>
-<table class="tb"><thead><tr><th>Contract</th><th>Counterparty</th><th>Notional</th><th>Fixed Rate</th><th>Next Net</th><th>Status</th><th>Netting</th></tr></thead><tbody>
+<table class="tb"><thead><tr><th>Contract</th><th>Counterparty</th><th>Notional</th><th>Fixed Rate</th><th>Next Net</th><th>Status / Action</th><th>Mode</th></tr></thead><tbody>
 ${D.map(x => {
   const n = x.next_payment
+  const wf = x.workflow_status || x.status
+  const modeTag = x.contract_mode==='peer_to_peer'
+    ? '<span class="mode-p2p">P2P</span>'
+    : x.contract_mode==='dual_advisor'
+      ? '<span class="mode-dual">Dual Adv</span>'
+      : '<span class="mode-adv">Managed</span>'
+
+  let statusCell = ''
+  if (x.contract_mode==='peer_to_peer') {
+    if (wf==='PENDING_COUNTERPARTY') {
+      statusCell = `<div style="display:flex;flex-direction:column;gap:4px">
+        <span class="p p-gy" style="font-size:9px">⏳ Waiting for ${x.party_b} to sign</span>
+        <button class="btn sign-btn" style="font-size:9px;padding:4px 10px" onclick="signContractP('${x.id}','B')">They sign (Party B)</button>
+      </div>`
+    } else if (wf==='PENDING_INITIATOR') {
+      statusCell = `<div style="display:flex;flex-direction:column;gap:4px">
+        <span class="p p-w" style="font-size:9px">✓ ${x.party_b} signed — your turn</span>
+        <button id="sign-btn-${x.id}" class="btn sign-btn" onclick="signContractP('${x.id}','A')">✍ Countersign (Party A)</button>
+      </div>`
+    } else {
+      statusCell = `<span class="p ${statusCls(x.status)}">${statusLbl(wf||x.status)}</span>`
+    }
+  } else if (x.status==='PENDING_SIGNATURE') {
+    statusCell = `<button id="sign-btn-${x.id}" class="btn sign-btn" onclick="signContract('${x.id}')">✍ Sign &amp; Activate</button>`
+  } else {
+    statusCell = `<span class="p ${statusCls(x.status)}">${statusLbl(x.status)}</span>`
+  }
+
   return `<tr>
     <td class="id" onclick="N('s',null);setTimeout(()=>{EX='${x.id}';rS(document.getElementById('C'))},30)">${x.id}</td>
     <td>${x.party_b}</td>
     <td class="m">€${(x.notional/1e6).toFixed(0)}M</td>
     <td class="m">${pct(x.fixed_rate)}</td>
     <td class="m" style="color:var(--warm)">${n ? eur(n.amount) : '—'}</td>
-    <td>${x.status==='PENDING_SIGNATURE'
-      ? `<button id="sign-btn-${x.id}" class="btn sign-btn" onclick="signContract('${x.id}')">✍ Sign &amp; Activate</button>`
-      : `<span class="p ${statusCls(x.status)}">${statusLbl(x.status)}</span>`}</td>
-    <td><span class="p ${x.netting_status==='GREEN'?'p-g':x.netting_status==='AMBER'?'p-w':'p-b'}">${x.netting_status||'—'}</span></td>
+    <td>${statusCell}</td>
+    <td>${modeTag}</td>
   </tr>`
 }).join('')}
 </tbody></table>

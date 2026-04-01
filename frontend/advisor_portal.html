@@ -467,11 +467,30 @@ function statusLbl(st) {
   return st
 }
 
+// ── MODE HELPERS ──────────────────────────────────────────────────────────────
+function modeTag(m) {
+  if (m==='peer_to_peer') return '<span style="font-size:9px;padding:2px 7px;border-radius:4px;background:rgba(167,139,250,.12);color:#a78bfa;border:1px solid rgba(167,139,250,.25);font-family:var(--fm)">P2P</span>'
+  if (m==='dual_advisor') return '<span style="font-size:9px;padding:2px 7px;border-radius:4px;background:rgba(96,165,250,.1);color:#60a5fa;border:1px solid rgba(96,165,250,.2);font-family:var(--fm)">Dual Adv</span>'
+  return '<span style="font-size:9px;padding:2px 7px;border-radius:4px;background:rgba(196,149,106,.07);color:var(--warm);border:1px solid rgba(196,149,106,.2);font-family:var(--fm)">Managed</span>'
+}
+
 // ── ACTIONS ───────────────────────────────────────────────────────────────────
 function buildActions() {
   const acts = []
   S.contracts.forEach(x => {
-    if (x.status === 'PENDING_SIGNATURE') {
+    if (x.contract_mode === 'dual_advisor' && !x.advisor_b_approved && x.status === 'PENDING_SIGNATURE') {
+      acts.push({type:'approve_advisor_b',sev:'warn',contract:x.id,
+        desc:`Dual Advisor contract ${x.id} — counterparty advisor approval required before clients can sign.`,
+        ref:'§1(b) ISDA 2002 · Dual Advisor workflow'})
+    }
+    if (x.contract_mode === 'peer_to_peer') {
+      const wf = x.workflow_status || x.status
+      acts.push({type:'p2p_info',sev:'info',contract:x.id,
+        desc:`Peer-to-peer contract ${x.id} — status: ${wf.replace(/_/g,' ')}. No advisor action needed; clients sign directly.`,
+        ref:'Nomos Standard v1 · P2P workflow'})
+      return
+    }
+    if (x.status === 'PENDING_SIGNATURE' && x.contract_mode !== 'peer_to_peer') {
       acts.push({type:'sign_pending',sev:'warn',contract:x.id,desc:`Awaiting client signature — ${x.id}. Share Confirmation PDF with ${x.party_b} for execution.`,ref:'§1(b) ISDA 2002'})
       return
     }
@@ -563,6 +582,21 @@ async function generateNotice(contractId, noticeType) {
   }
 }
 
+// ── ACTION: Approve as Advisor B (dual_advisor) ───────────────────────────────
+async function _approveAdvisorB(contractId, btn) {
+  if (btn) { btn.disabled=true; btn.textContent='Approving…' }
+  try {
+    const r = await apiPost(`/contracts/${contractId}/approve-advisor`, {
+      approved_by: 'J.Smith (Linklaters) — Advisor B'
+    })
+    alert(`✓ Approved: ${r.note}`)
+    await refresh()
+  } catch(e) {
+    alert('Error: '+e.message)
+    if (btn) { btn.disabled=false; btn.textContent='Approve B' }
+  }
+}
+
 // ── RENDER ACTIONS HTML ───────────────────────────────────────────────────────
 function actionsHtml(acts) {
   if (!acts.length) return '<div class="card" style="text-align:center;color:var(--t3);padding:30px;font-size:11px">No pending actions.</div>'
@@ -579,6 +613,7 @@ function actionsHtml(acts) {
       ${a.type==='docs' ? `<button class="btn approve" onclick="generateNotice('${a.contract}','DELIVERY_REMINDER');return false">Send §12 Reminder</button><button class="btn" onclick="N('mon',null)">Review §4</button>` : ''}
       ${a.type==='compliance' ? `<button class="btn act" onclick="N('mon',null)">Review §3/§4</button>` : ''}
       ${a.type==='netting_review' ? `<button class="btn" onclick="N('net',null)">View Netting Opinion</button>` : ''}
+      ${a.type==='approve_advisor_b' ? `<button class="btn approve" onclick="_approveAdvisorB('${a.contract}',this)">✓ Approve as Advisor B</button>` : ''}
     </div>
   </div>
 </div>`).join('')
@@ -609,22 +644,21 @@ ${errBanner()}
 ${actionsHtml(acts.slice(0,6))}
 
 <div class="sh" style="margin-top:28px">Contracts Overview</div>
-<table class="tb"><thead><tr><th>Contract</th><th>Client</th><th>Counterparty</th><th>Type</th><th>Notional</th><th>Gov. Law</th><th>Netting</th><th>Periods</th><th>EoDs</th><th>Status</th></tr></thead><tbody>
+<table class="tb"><thead><tr><th>Contract</th><th>Mode</th><th>Client</th><th>Counterparty</th><th>Notional</th><th>Gov. Law</th><th>Netting</th><th>Periods</th><th>Workflow Status</th></tr></thead><tbody>
 ${D.map(x => {
   const det = S.details[x.id]
-  const eods = det?.eods?.length||0
   const calc = x.periods_calculated||0
+  const wf = x.workflow_status || x.status
   return `<tr>
     <td class="id">${x.id}</td>
+    <td>${modeTag(x.contract_mode)}</td>
     <td>${x.party_a}</td>
     <td>${x.party_b}</td>
-    <td>${x.type}</td>
     <td class="m">€${(x.notional/1e6).toFixed(0)}M</td>
     <td class="m">${x.governing_law}</td>
     <td><span class="p ${x.netting_status==='GREEN'?'p-g':'p-w'}">${x.netting_status||'—'}</span></td>
     <td class="m">${calc}/${x.periods_total||'—'}</td>
-    <td>${eods?`<span class="p p-r">${eods}</span>`:'<span class="p p-g">0</span>'}</td>
-    <td><span class="p ${statusCls(x.status)}">${statusLbl(x.status)}</span></td>
+    <td><span class="p ${statusCls(x.status)}" style="font-size:9px">${wf.replace(/_/g,' ')}</span>${x.contract_mode==='dual_advisor'&&!x.advisor_b_approved?` <button style="font-size:9px;padding:2px 8px" class="btn approve" onclick="_approveAdvisorB('${x.id}',this)">Approve B</button>`:''}</td>
   </tr>`
 }).join('')}
 </tbody></table>`
@@ -1189,7 +1223,9 @@ async function ncSubmit(){
       governing_law:d.governing_law, mtpn:d.mtpn, aet:d.aet,
       csa:d.csa, csa_threshold_a:d.csa?Number(d.csa_threshold_a):undefined,
       csa_threshold_b:d.csa?Number(d.csa_threshold_b):undefined,
-      csa_mta:d.csa?Number(d.csa_mta):undefined
+      csa_mta:d.csa?Number(d.csa_mta):undefined,
+      contract_mode: d.contract_mode||'advisor_managed',
+      created_by_role: 'advisor',
     })
     NC.loading=false; NC.result=r; NC.step=4; renderNC()
     await refresh()

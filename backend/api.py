@@ -69,10 +69,12 @@ import re
 import json
 import hashlib
 import logging
+import random
+import string
 import traceback
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 from pathlib import Path
 
 _FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
@@ -192,6 +194,15 @@ _engines: Dict[str, "IRSExecutionEngine"] = {}
 _schedules: Dict[str, "ScheduleElections"] = {}
 _comments: Dict[str, list] = {}     # contract_id → list of comment dicts
 _contract_pdfs: Dict[str, str] = {} # contract_id → PDF filesystem path
+_contract_meta: Dict[str, dict] = {} # contract_id → mode metadata
+# meta shape: {
+#   "mode": "advisor_managed" | "peer_to_peer" | "dual_advisor",
+#   "party_a_signed": bool,
+#   "party_b_signed": bool,
+#   "advisor_b_approved": bool,       # dual_advisor only
+#   "counterparty_email": str,        # informational
+#   "created_by_role": "advisor" | "client",
+# }
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -324,6 +335,59 @@ def _validate_create(data: dict) -> list[str]:
     return errors
 
 
+# ─── Contract mode helpers ────────────────────────────────────────────────────
+
+def _gen_p2p_id() -> str:
+    """Generate a unique P2P- prefixed contract ID."""
+    for _ in range(50):
+        suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+        cid = f"P2P-{date.today().strftime('%Y%m%d')}-{suffix}"
+        if cid not in _engines:
+            return cid
+    raise RuntimeError("Could not generate a unique P2P contract ID after 50 attempts")
+
+
+def _get_workflow_status(contract_id: str, eng) -> str:
+    """
+    Return a human-readable workflow status string for the given contract.
+    Extends ContractState with mode-specific sub-states.
+    """
+    meta = _contract_meta.get(contract_id, {})
+    mode = meta.get("mode", "advisor_managed")
+    state = eng.state.value
+
+    # Terminal / non-PENDING states are the same for all modes
+    if state in ("ACTIVE", "TERMINATED", "SUSPENDED", "EARLY_TERM_NOTIFIED"):
+        return state
+
+    if mode == "peer_to_peer":
+        if meta.get("party_b_signed") and not meta.get("party_a_signed"):
+            return "PENDING_INITIATOR"      # B signed, A must countersign
+        return "PENDING_COUNTERPARTY"       # waiting for B to sign first
+
+    if mode == "dual_advisor":
+        if not meta.get("advisor_b_approved"):
+            return "PENDING_ADVISOR_B"      # counterparty's advisor hasn't approved
+        pa = meta.get("party_a_signed", False)
+        pb = meta.get("party_b_signed", False)
+        if pa and pb:
+            return "ACTIVE"
+        if pa or pb:
+            return "PARTIAL_SIGNATURES"     # one party signed, waiting for the other
+        return "PENDING_SIGNATURES"         # both advisors approved, awaiting client sigs
+
+    # advisor_managed (default)
+    return "PENDING_SIGNATURE"
+
+
+def _mode_label(mode: str) -> str:
+    return {
+        "advisor_managed": "Advisor Managed",
+        "peer_to_peer":    "Peer-to-Peer",
+        "dual_advisor":    "Dual Advisor",
+    }.get(mode, mode)
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # CORE API FUNCTIONS (framework-agnostic — all return plain dicts/lists)
 # ═══════════════════════════════════════════════════════════════════════════
@@ -454,6 +518,12 @@ def api_list_contracts(role: str = "client") -> list:
                 eng.netting_assessment.overall_risk_level
                 if eng.netting_assessment else "NOT_ASSESSED"
             ),
+            "contract_mode": _contract_meta.get(cid, {}).get("mode", "advisor_managed"),
+            "mode_label":    _mode_label(_contract_meta.get(cid, {}).get("mode", "advisor_managed")),
+            "workflow_status": _get_workflow_status(cid, eng),
+            "party_a_signed": _contract_meta.get(cid, {}).get("party_a_signed", False),
+            "party_b_signed": _contract_meta.get(cid, {}).get("party_b_signed", False),
+            "advisor_b_approved": _contract_meta.get(cid, {}).get("advisor_b_approved", False),
         })
     return results
 
@@ -473,6 +543,12 @@ def api_contract_detail(contract_id: str, role: str = "client") -> dict:
         "termination_date": str(p.termination_date),
         "governing_law": p.governing_law,
         "status": eng.state.value,
+        "contract_mode": _contract_meta.get(contract_id, {}).get("mode", "advisor_managed"),
+        "mode_label":    _mode_label(_contract_meta.get(contract_id, {}).get("mode", "advisor_managed")),
+        "workflow_status": _get_workflow_status(contract_id, eng),
+        "party_a_signed": _contract_meta.get(contract_id, {}).get("party_a_signed", False),
+        "party_b_signed": _contract_meta.get(contract_id, {}).get("party_b_signed", False),
+        "advisor_b_approved": _contract_meta.get(contract_id, {}).get("advisor_b_approved", False),
         "periods": [
             {
                 "number": per.period_number,
@@ -634,7 +710,20 @@ def api_create_contract(data: dict) -> dict:
 
     # Register before PDF generation (so contract exists even if PDF fails)
     _engines[cid] = engine
-    logger.info(f"[{cid}] Engine registered — state: PENDING_SIGNATURE")
+
+    # Store mode metadata
+    mode = str(data.get("contract_mode", "advisor_managed"))
+    if mode not in ("advisor_managed", "peer_to_peer", "dual_advisor"):
+        mode = "advisor_managed"
+    _contract_meta[cid] = {
+        "mode": mode,
+        "party_a_signed": False,
+        "party_b_signed": False,
+        "advisor_b_approved": False,
+        "created_by_role": str(data.get("created_by_role", "advisor")),
+        "counterparty_email": str(data.get("counterparty_email", "")),
+    }
+    logger.info(f"[{cid}] Engine registered — state: PENDING_SIGNATURE, mode: {mode}")
 
     # Generate Confirmation PDF
     pdf_path = conf_hash = None
@@ -659,6 +748,8 @@ def api_create_contract(data: dict) -> dict:
     return {
         "contract_id": cid,
         "status": "PENDING_SIGNATURE",
+        "workflow_status": _get_workflow_status(cid, engine),
+        "contract_mode": _contract_meta[cid]["mode"],
         "periods": len(engine.periods),
         "confirmation_pdf": pdf_path,
         "confirmation_hash": conf_hash,
@@ -672,9 +763,14 @@ def api_create_contract(data: dict) -> dict:
     }
 
 
-def api_sign_contract(contract_id: str, signed_by: str = "PARTY_B") -> dict:
+def api_sign_contract(contract_id: str, signed_by: str = "PARTY_B",
+                      party: str = "B") -> dict:
     """
-    Client executes the Confirmation — contract transitions to ACTIVE.
+    Execute (sign) a Confirmation.
+
+    party="B" (default) — existing advisor_managed behavior; B signs → ACTIVE.
+    party="A" or "B"   — for peer_to_peer / dual_advisor: tracked individually;
+                          contract activates only when both parties have signed.
 
     §1(b) ISDA 2002: the Confirmation is binding upon execution.
     Only PENDING_SIGNATURE contracts can be signed.
@@ -683,6 +779,11 @@ def api_sign_contract(contract_id: str, signed_by: str = "PARTY_B") -> dict:
         _http_error(503, "MODULE_UNAVAILABLE", "Engine modules unavailable")
 
     eng = _get_engine(contract_id)
+    meta = _contract_meta.get(contract_id, {})
+    mode = meta.get("mode", "advisor_managed")
+    party = str(party).upper().strip()
+    if party not in ("A", "B"):
+        party = "B"
 
     if eng.state == ContractState.ACTIVE:
         _http_error(
@@ -701,8 +802,18 @@ def api_sign_contract(contract_id: str, signed_by: str = "PARTY_B") -> dict:
         _http_error(400, "MISSING_SIGNATORY",
                     "signed_by must identify the executing party")
 
-    # DD gate: block signing until all pre-signing documents are validated
-    if _DD_OK and eng.dd_checker:
+    # dual_advisor: advisor B must approve before clients can sign
+    if mode == "dual_advisor" and not meta.get("advisor_b_approved"):
+        _http_error(
+            409, "ADVISOR_B_NOT_APPROVED",
+            f"Contract '{contract_id}' is in dual_advisor mode — "
+            "the counterparty's advisor must approve before clients can sign.",
+            isda_ref="§1(b) ISDA 2002"
+        )
+
+    # DD gate (applied once, before the first signature)
+    first_sig = not meta.get("party_a_signed") and not meta.get("party_b_signed")
+    if first_sig and _DD_OK and eng.dd_checker:
         readiness = eng.dd_checker.workflow.signing_readiness(eng.dd_checker.documents)
         if not readiness["ready"]:
             _http_error(
@@ -711,20 +822,27 @@ def api_sign_contract(contract_id: str, signed_by: str = "PARTY_B") -> dict:
                 isda_ref="§4 ISDA 2002 — Agreement to Deliver",
             )
 
-    # Open comments gate: all comments must be RESOLVED before signing
+    # Open comments gate
     open_comments = [c for c in _comments.get(contract_id, []) if c["status"] == "OPEN"]
     if open_comments:
         _http_error(
             409, "OPEN_COMMENTS",
             f"Contract '{contract_id}' has {len(open_comments)} open comment(s). "
-            "All comments must be resolved by the advisor before signing.",
+            "All comments must be resolved before signing.",
             isda_ref="§1(b) ISDA 2002 — pre-signing conditions not met",
         )
 
-    # Compute SHA-256 signature hash over key contract params + timestamp
+    # Guard: same party signing twice
+    if party == "A" and meta.get("party_a_signed"):
+        _http_error(409, "ALREADY_SIGNED", "Party A has already signed this contract.")
+    if party == "B" and meta.get("party_b_signed"):
+        _http_error(409, "ALREADY_SIGNED", "Party B has already signed this contract.")
+
+    # Compute SHA-256 signature hash
     _signed_ts = datetime.utcnow().isoformat() + "Z"
     _sig_payload = json.dumps({
         "contract_id": contract_id,
+        "party": party,
         "notional": float(eng.params.notional),
         "fixed_rate": float(eng.params.fixed_rate),
         "effective_date": str(eng.params.effective_date),
@@ -734,29 +852,59 @@ def api_sign_contract(contract_id: str, signed_by: str = "PARTY_B") -> dict:
     }, sort_keys=True)
     signature_hash = hashlib.sha256(_sig_payload.encode()).hexdigest()
 
-    eng.state = ContractState.ACTIVE
-    eng.initiation.signed_party_b = True
-    eng.initiation.signed_party_b_date = date.today()
-    eng.initiation.status = "SIGNED"
+    # Record signature in meta
+    if party == "A":
+        meta["party_a_signed"] = True
+        meta["party_a_signed_by"] = str(signed_by).strip()
+        meta["party_a_signed_at"] = _signed_ts
+        meta["party_a_signature_hash"] = signature_hash
+    else:
+        meta["party_b_signed"] = True
+        meta["party_b_signed_by"] = str(signed_by).strip()
+        meta["party_b_signed_at"] = _signed_ts
+        meta["party_b_signature_hash"] = signature_hash
+
+    # Determine whether to activate the contract
+    should_activate = False
+    if mode == "advisor_managed":
+        # Legacy: single signature (party B) → ACTIVE immediately
+        should_activate = True
+    elif mode in ("peer_to_peer", "dual_advisor"):
+        # Both parties must sign
+        should_activate = meta.get("party_a_signed", False) and meta.get("party_b_signed", False)
+
+    if should_activate:
+        eng.state = ContractState.ACTIVE
+        eng.initiation.signed_party_b = True
+        eng.initiation.signed_party_b_date = date.today()
+        eng.initiation.status = "SIGNED"
 
     eng.audit.log("CONTRACT_SIGNED", {
         "signed_by": str(signed_by).strip(),
-        "party": "PARTY_B",
+        "party": f"PARTY_{party}",
+        "mode": mode,
         "date": str(date.today()),
-        "new_state": "ACTIVE",
         "signature_hash": signature_hash,
-        "note": "Confirmation executed — contract now ACTIVE per §1(b) ISDA 2002",
+        "activated": should_activate,
         "isda_reference": "§1(b) ISDA 2002 — Confirmation binding upon execution",
     }, actor=str(signed_by).strip())
 
-    logger.info(f"[{contract_id}] CONTRACT_SIGNED by '{signed_by}' → ACTIVE")
+    new_state = "ACTIVE" if should_activate else _get_workflow_status(contract_id, eng)
+    logger.info(
+        f"[{contract_id}] SIGNED (party={party}, mode={mode}) by '{signed_by}' "
+        f"→ {new_state}"
+    )
 
     return {
         "contract_id": contract_id,
-        "status": "ACTIVE",
+        "status": new_state,
+        "party_signed": party,
         "signed_by": str(signed_by).strip(),
         "signed_date": str(date.today()),
         "signature_hash": signature_hash,
+        "party_a_signed": meta.get("party_a_signed", False),
+        "party_b_signed": meta.get("party_b_signed", False),
+        "activated": should_activate,
         "isda_ref": "§1(b) ISDA 2002 — Confirmation prevails over Schedule and MA",
     }
 
@@ -1450,6 +1598,222 @@ def api_audit_trail(contract_id: str) -> list:
     return list(eng.audit._entries)
 
 
+# ─── Direct (peer-to-peer) contract creation ─────────────────────────────────
+
+def api_create_direct_contract(data: dict) -> dict:
+    """
+    POST /api/contracts/direct — Client-initiated peer-to-peer contract.
+
+    Simplified input (no ISDA jargon, no advisor involvement):
+      my_name, my_jurisdiction, counterparty_name, counterparty_jurisdiction,
+      notional, fixed_rate, effective_date, termination_date,
+      currency (default EUR), counterparty_email (optional)
+
+    Uses nomos_standard_v1 template with default Schedule elections.
+    Generates a P2P- prefixed contract ID automatically.
+    """
+    if not _MODULES_OK:
+        _http_error(503, "MODULE_UNAVAILABLE",
+                    "Engine modules failed to load — check server logs")
+
+    # Resolve party names
+    my_name = str(data.get("my_name", "") or data.get("party_a_name", "")).strip()
+    cp_name = str(data.get("counterparty_name", "") or data.get("party_b_name", "")).strip()
+    my_juris = str(data.get("my_jurisdiction", "GB")).upper().strip()
+    cp_juris = str(data.get("counterparty_jurisdiction", "FR")).upper().strip()
+
+    if not my_name:
+        _http_error(400, "MISSING_PARTY_A", "Your company name is required")
+    if not cp_name:
+        _http_error(400, "MISSING_PARTY_B", "Counterparty name is required")
+    if my_name.lower() == cp_name.lower():
+        _http_error(400, "SAME_PARTIES", "You and the counterparty must be different entities")
+
+    # Reuse existing validation for numeric fields
+    errors = []
+    try:
+        notional = Decimal(str(data.get("notional", 0)))
+        if notional <= 0:
+            errors.append("notional must be a positive number")
+        elif notional > _MAX_NOTIONAL:
+            errors.append(f"notional exceeds maximum ({_MAX_NOTIONAL:,.0f})")
+    except (InvalidOperation, TypeError):
+        errors.append("notional must be a valid number")
+
+    try:
+        rate = Decimal(str(data.get("fixed_rate", 0)))
+        if rate <= 0:
+            errors.append("fixed_rate must be positive (e.g. 0.032 for 3.2%)")
+        elif rate >= Decimal("0.50"):
+            errors.append("fixed_rate must be a decimal, not a percentage (e.g. 0.032 not 3.2)")
+    except (InvalidOperation, TypeError):
+        errors.append("fixed_rate must be a valid decimal")
+
+    eff_date = term_date = None
+    try:
+        eff_date = date.fromisoformat(str(data.get("effective_date", "")))
+    except (ValueError, TypeError):
+        errors.append("effective_date must be YYYY-MM-DD")
+    try:
+        term_date = date.fromisoformat(str(data.get("termination_date", "")))
+    except (ValueError, TypeError):
+        errors.append("termination_date must be YYYY-MM-DD")
+    if eff_date and term_date:
+        delta = (term_date - eff_date).days
+        if delta < 30:
+            errors.append(f"Contract duration ({delta}d) is too short — minimum 30 days")
+        elif delta > 365 * 51:
+            errors.append("Contract duration exceeds 50-year maximum")
+
+    if errors:
+        _http_error(400, "VALIDATION_ERROR", "; ".join(errors))
+
+    _ensure_outputs()
+
+    cid = _gen_p2p_id()
+
+    try:
+        params = SwapParameters(
+            contract_id=cid,
+            party_a=PartyDetails(
+                my_name,
+                my_name.split()[0],
+                "fixed_payer",
+                jurisdiction_code=my_juris,
+            ),
+            party_b=PartyDetails(
+                cp_name,
+                cp_name.split()[0],
+                "floating_payer",
+                jurisdiction_code=cp_juris,
+            ),
+            notional=notional,
+            fixed_rate=rate,
+            effective_date=eff_date,
+            termination_date=term_date,
+            currency=str(data.get("currency", "EUR")).upper(),
+        )
+    except Exception as e:
+        _http_error(400, "PARAMETER_ERROR", f"Could not build contract parameters: {e}")
+
+    schedule = ScheduleElections(
+        governing_law="English Law",
+        mtpn_elected=True,
+        csa_elected=False,
+    )
+
+    initiation = ContractInitiation(
+        initiated_by=my_name,
+        initiated_date=date.today(),
+        status="INITIATED",
+    )
+
+    try:
+        engine = IRSExecutionEngine(params, schedule=schedule, initiation=initiation)
+        engine.initialise()
+    except Exception as e:
+        logger.error(f"[{cid}] P2P engine init failed: {e}\n{traceback.format_exc()}")
+        _http_error(500, "ENGINE_ERROR", f"Engine initialisation failed: {e}")
+
+    engine.state = ContractState.PENDING_SIGNATURE
+    initiation.status = "PENDING_SIGNATURE"
+    _engines[cid] = engine
+
+    _contract_meta[cid] = {
+        "mode": "peer_to_peer",
+        "party_a_signed": False,
+        "party_b_signed": False,
+        "advisor_b_approved": False,
+        "created_by_role": "client",
+        "counterparty_email": str(data.get("counterparty_email", "")),
+    }
+
+    pdf_path = conf_hash = None
+    pdf_error = None
+    try:
+        pdf_path, conf_hash = generate_confirmation_pdf(
+            params, schedule=schedule, initiation=initiation,
+            payment_schedule=engine.periods,
+        )
+        initiation.confirmation_hash = conf_hash
+        _contract_pdfs[cid] = pdf_path
+        engine.audit.log("CONFIRMATION_PDF_GENERATED", {"path": pdf_path, "hash": conf_hash})
+        logger.info(f"[{cid}] P2P Confirmation PDF generated: {pdf_path}")
+    except Exception as e:
+        pdf_error = str(e)
+        logger.error(f"[{cid}] P2P PDF generation failed: {e}")
+        engine.audit.log("CONFIRMATION_PDF_ERROR", {"error": pdf_error})
+
+    engine.audit.log("PEER_TO_PEER_CONTRACT_CREATED", {
+        "party_a": my_name,
+        "party_b": cp_name,
+        "counterparty_email": data.get("counterparty_email", ""),
+        "notional": float(notional),
+        "fixed_rate": float(rate),
+    }, actor=my_name)
+
+    logger.info(f"[{cid}] P2P contract created by '{my_name}' → counterparty '{cp_name}'")
+
+    return {
+        "contract_id": cid,
+        "status": "PENDING_SIGNATURE",
+        "workflow_status": "PENDING_COUNTERPARTY",
+        "contract_mode": "peer_to_peer",
+        "party_a": my_name,
+        "party_b": cp_name,
+        "periods": len(engine.periods),
+        "confirmation_pdf": pdf_path,
+        "confirmation_hash": conf_hash,
+        "pdf_error": pdf_error,
+        "note": (
+            f"Peer-to-peer contract created. "
+            f"'{cp_name}' must sign first, then you countersign to activate."
+        ),
+    }
+
+
+def api_approve_advisor_b(contract_id: str, data: dict) -> dict:
+    """
+    POST /api/contracts/{id}/approve-advisor
+    Counterparty's advisor approves a dual_advisor contract.
+    HUMAN GATE — explicit advisor action required.
+    """
+    _get_engine(contract_id)
+    meta = _contract_meta.get(contract_id, {})
+    if meta.get("mode") != "dual_advisor":
+        _http_error(
+            409, "NOT_DUAL_ADVISOR",
+            f"Contract '{contract_id}' is not in dual_advisor mode "
+            f"(current mode: {meta.get('mode', 'unknown')})"
+        )
+    if meta.get("advisor_b_approved"):
+        _http_error(409, "ALREADY_APPROVED",
+                    "Counterparty advisor has already approved this contract.")
+
+    approved_by = str(data.get("approved_by", "")).strip()
+    if not approved_by:
+        _http_error(400, "MISSING_APPROVER", "approved_by is required")
+
+    meta["advisor_b_approved"] = True
+    meta["advisor_b_approved_by"] = approved_by
+    meta["advisor_b_approved_at"] = datetime.utcnow().isoformat() + "Z"
+
+    eng = _engines[contract_id]
+    eng.audit.log("ADVISOR_B_APPROVED", {
+        "approved_by": approved_by,
+        "note": "Counterparty advisor approved — clients may now sign",
+    }, actor=approved_by)
+
+    logger.info(f"[{contract_id}] ADVISOR_B_APPROVED by '{approved_by}'")
+    return {
+        "status": "ok",
+        "contract_id": contract_id,
+        "approved_by": approved_by,
+        "workflow_status": "PENDING_SIGNATURES",
+        "note": "Both clients may now sign the contract to activate it.",
+    }
+
+
 # ─── PDF serving ──────────────────────────────────────────────────────────────
 
 def api_contract_pdf(contract_id: str) -> str:
@@ -1588,6 +1952,9 @@ if HAS_FASTAPI:
         csa_threshold_a: Optional[float] = None
         csa_threshold_b: Optional[float] = None
         csa_mta: Optional[float] = None
+        contract_mode: str = "advisor_managed"   # "advisor_managed"|"dual_advisor"
+        created_by_role: str = "advisor"
+        counterparty_email: str = ""
 
     class NoticeRequest(BaseModel):
         notice_type: str
@@ -1638,6 +2005,23 @@ if HAS_FASTAPI:
     class ResolveCommentRequest(BaseModel):
         """Body for POST /api/contracts/{id}/comments/{comment_id}/resolve"""
         resolved_by: str
+
+    class DirectContractRequest(BaseModel):
+        """Body for POST /api/contracts/direct (peer-to-peer, client-initiated)"""
+        my_name: str
+        my_jurisdiction: str = "GB"
+        counterparty_name: str
+        counterparty_jurisdiction: str = "FR"
+        notional: float
+        fixed_rate: float
+        effective_date: str
+        termination_date: str
+        currency: str = "EUR"
+        counterparty_email: str = ""
+
+    class AdvisorBApprovalRequest(BaseModel):
+        """Body for POST /api/contracts/{id}/approve-advisor (dual_advisor mode)"""
+        approved_by: str
 
     # ── App ──────────────────────────────────────────────────────────────────
 
@@ -1753,10 +2137,29 @@ if HAS_FASTAPI:
             raise HTTPException(500, detail={
                 "code": "INTERNAL_ERROR", "message": str(e)})
 
-    @app.post("/api/contracts/{contract_id}/sign", tags=["Contracts"])
-    def sign_contract(contract_id: str, signed_by: str = "PARTY_B"):
+    @app.post("/api/contracts/direct", tags=["Contracts"])
+    def create_direct_contract(req: DirectContractRequest):
+        """
+        Client-initiated peer-to-peer contract using nomos_standard_v1 defaults.
+        No advisor involvement. Both parties must sign to activate.
+        """
         try:
-            return api_sign_contract(contract_id, signed_by)
+            return api_create_direct_contract(req.dict())
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"direct_contract error: {e}\n{traceback.format_exc()}")
+            raise HTTPException(500, detail={
+                "code": "INTERNAL_ERROR", "message": str(e)})
+
+    @app.post("/api/contracts/{contract_id}/sign", tags=["Contracts"])
+    def sign_contract(contract_id: str, signed_by: str = "PARTY_B", party: str = "B"):
+        """
+        Sign the contract.  party='A' or 'B' (default 'B').
+        For peer_to_peer / dual_advisor contracts, both parties must sign.
+        """
+        try:
+            return api_sign_contract(contract_id, signed_by, party)
         except KeyError:
             raise HTTPException(404, detail={
                 "code": "CONTRACT_NOT_FOUND",
@@ -1765,6 +2168,24 @@ if HAS_FASTAPI:
             raise
         except Exception as e:
             logger.error(f"[{contract_id}] sign error: {e}")
+            raise HTTPException(500, detail={
+                "code": "INTERNAL_ERROR", "message": str(e)})
+
+    @app.post("/api/contracts/{contract_id}/approve-advisor", tags=["Contracts"])
+    def approve_advisor_b(contract_id: str, req: AdvisorBApprovalRequest):
+        """
+        Counterparty's advisor approves a dual_advisor contract. HUMAN GATE.
+        """
+        try:
+            return api_approve_advisor_b(contract_id, req.dict())
+        except KeyError:
+            raise HTTPException(404, detail={
+                "code": "CONTRACT_NOT_FOUND",
+                "message": f"Contract '{contract_id}' not found"})
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"[{contract_id}] approve-advisor error: {e}")
             raise HTTPException(500, detail={
                 "code": "INTERNAL_ERROR", "message": str(e)})
 
