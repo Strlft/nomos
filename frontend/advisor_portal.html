@@ -316,6 +316,18 @@ select.fi option{background:var(--s2)}
 .menu-btn span{width:16px;height:1.5px;background:var(--t2);border-radius:1px;display:block;transition:all .2s}
 .side-overlay{display:none;position:fixed;inset:0;z-index:99;background:rgba(0,0,0,.45)}
 
+/* ── Contract detail timeline ── */
+.tl{display:flex;align-items:flex-start;overflow-x:auto;padding:8px 0 4px;gap:0}
+.tl-item{display:flex;flex-direction:column;align-items:center;flex:1;min-width:70px;position:relative}
+.tl-item:not(:last-child)::after{content:'';position:absolute;top:10px;left:50%;width:100%;height:2px;background:var(--b1);z-index:0}
+.tl-dot{width:20px;height:20px;border-radius:50%;border:2px solid var(--b1);background:var(--s2);z-index:1;position:relative;display:flex;align-items:center;justify-content:center;font-size:8px;flex-shrink:0}
+.tl-dot.done{border-color:var(--g);background:rgba(74,222,128,.12);color:var(--g)}
+.tl-dot.cur{border-color:var(--vi);background:rgba(167,139,250,.15);color:var(--vi);box-shadow:0 0 0 4px rgba(167,139,250,.08)}
+.tl-item:not(:last-child).done::after{background:var(--g);opacity:.35}
+.tl-lbl{font-size:9px;color:var(--t3);margin-top:6px;text-align:center;max-width:68px;line-height:1.3;font-family:var(--fm)}
+.tl-lbl.done{color:var(--t2)}.tl-lbl.cur{color:var(--vi);font-weight:600}
+.tl-sub{font-size:8px;color:var(--t3);text-align:center;margin-top:2px;max-width:68px;line-height:1.3}
+
 /* ── Search / sort bar ── */
 .search-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
 .search-input{background:var(--s2);border:1px solid var(--b1);border-radius:7px;padding:7px 12px;color:var(--t1);font-family:var(--ff);font-size:11px;outline:none;transition:border-color var(--trans);width:220px}
@@ -467,7 +479,7 @@ let S = {
   comments: {}, // keyed by contract_id
   loading:true, error:null, lastUpdate:null
 }
-let view = 'd'
+let view = 'd', _detId = null
 
 // ── CLOCK ─────────────────────────────────────────────────────────────────────
 function tk(){const n=new Date();document.getElementById('ck').textContent=n.toUTCString().slice(5,16)+' '+n.toUTCString().slice(17,22)+' UTC'}
@@ -546,7 +558,7 @@ function updateSidebar() {
 
 // ── NAVIGATION ────────────────────────────────────────────────────────────────
 function N(v, el) { view=v; document.querySelectorAll('.si').forEach(e=>e.classList.remove('on')); if(el) el.classList.add('on'); _closeSide(); R() }
-function R() { const fn=({d:rD,act:rAct,mon:rMon,cb:rCb,net:rNet,orc:rOrc,dd:rDd,aud:rAud,not:rNot})[view]; const res=fn(document.getElementById('C')); if(res instanceof Promise) res.catch(console.error) }
+function R() { const fn=({d:rD,act:rAct,mon:rMon,cb:rCb,net:rNet,orc:rOrc,dd:rDd,aud:rAud,not:rNot,det:rDet})[view]; const res=fn(document.getElementById('C')); if(res instanceof Promise) res.catch(console.error) }
 
 // ── DISPLAY HELPERS ───────────────────────────────────────────────────────────
 const eur = (v,d=2) => v!=null ? '€'+Number(v).toLocaleString('en-GB',{minimumFractionDigits:d,maximumFractionDigits:d}) : '—'
@@ -785,11 +797,10 @@ ${actionsHtml(acts.slice(0,6))}
 </div>
 <table class="tb"><thead><tr><th>Contract</th><th>Mode</th><th>Client</th><th>Counterparty</th><th>Notional</th><th>Gov. Law</th><th>Netting</th><th>Periods</th><th>Workflow Status</th></tr></thead><tbody>
 ${SD.map(x => {
-  const det = S.details[x.id]
   const calc = x.periods_calculated||0
   const wf = x.workflow_status || x.status
-  return `<tr>
-    <td class="id">${x.id}</td>
+  return `<tr onclick="openContract('${x.id}')" style="cursor:pointer" onmouseover="this.style.background='rgba(167,139,250,.04)'" onmouseout="this.style.background=''">
+    <td class="id" style="color:var(--vi)">${x.id}</td>
     <td>${modeTag(x.contract_mode)}</td>
     <td>${x.party_a}</td>
     <td>${x.party_b}</td>
@@ -797,7 +808,7 @@ ${SD.map(x => {
     <td class="m">${x.governing_law}</td>
     <td><span class="p ${x.netting_status==='GREEN'?'p-g':'p-w'}">${x.netting_status||'—'}</span></td>
     <td class="m">${calc}/${x.periods_total||'—'}</td>
-    <td><span class="p ${statusCls(x.status)}" style="font-size:9px">${wf.replace(/_/g,' ')}</span>${x.contract_mode==='dual_advisor'&&!x.advisor_b_approved?` <button style="font-size:9px;padding:2px 8px" class="btn approve" onclick="_approveAdvisorB('${x.id}',this)">Approve B</button>`:''}</td>
+    <td><span class="p ${statusCls(x.status)}" style="font-size:9px">${wf.replace(/_/g,' ')}</span>${x.contract_mode==='dual_advisor'&&!x.advisor_b_approved?` <button style="font-size:9px;padding:2px 8px" class="btn approve" onclick="event.stopPropagation();_approveAdvisorB('${x.id}',this)">Approve B</button>`:''}</td>
   </tr>`
 }).join('')}
 </tbody></table>`
@@ -1397,6 +1408,286 @@ function rNot(c) {
 <div id="notice-history">
   <div style="color:var(--t3);font-size:11px;padding:16px 0">No notices generated yet. Use the form above to generate a §12 notice.</div>
 </div>`
+}
+
+// ── CONTRACT DETAIL ───────────────────────────────────────────────────────────
+function openContract(id) {
+  _detId = id
+  if (!S.details[id]) apiFetch(`/contracts/${id}?role=advisor`).then(d=>{S.details[id]=d;if(view==='det')R()}).catch(()=>{})
+  if (!S.dd[id])      apiFetch(`/contracts/${id}/due-diligence`).then(d=>{S.dd[id]=d}).catch(()=>{})
+  if (!S.comments[id]) apiFetch(`/contracts/${id}/comments`).then(d=>{S.comments[id]=d}).catch(()=>{})
+  N('det', null)
+}
+
+async function rDet(c) {
+  if (!_detId) { N('d',null); return }
+  const x = S.contracts.find(ct=>ct.id===_detId)
+  if (!x) { c.innerHTML=`${crumb('Dashboard','Not found')}<div class="hd">Contract not found</div>`; return }
+
+  // Ensure all data is loaded
+  c.innerHTML = spinner()
+  await Promise.all([
+    !S.details[_detId]  ? apiFetch(`/contracts/${_detId}?role=advisor`).then(d=>S.details[_detId]=d).catch(()=>{}) : Promise.resolve(),
+    !S.dd[_detId]       ? apiFetch(`/contracts/${_detId}/due-diligence`).then(d=>S.dd[_detId]=d).catch(()=>{}) : Promise.resolve(),
+    !S.comments[_detId] ? apiFetch(`/contracts/${_detId}/comments`).then(d=>S.comments[_detId]=d).catch(()=>{}) : Promise.resolve(),
+  ])
+
+  const det  = S.details[_detId]
+  if (!det) { c.innerHTML=`<div class="hd" style="color:var(--r)">Failed to load contract</div>`; return }
+  const dd   = S.dd[_detId] || {}
+  const cmtData = S.comments[_detId] || {comments:[],open_count:0}
+  const periods = det.periods || []
+  const O = S.oracle
+
+  // ── State analysis ─────────────────────────────────────────────────────────
+  const today = new Date().toISOString().slice(0,10)
+  const pendingApproval = periods.find(p=>p.payment_instruction_issued&&!p.payment_confirmed)
+  const nextCalc = periods.find(p=>!p.fixed_amount)
+  const canExecuteNext = !pendingApproval && !!nextCalc
+  const completedCount = periods.filter(p=>p.payment_confirmed).length
+  const signed = ['ACTIVE','TERMINATED','EARLY_TERM_NOTIFIED'].includes(x.status)
+  const ddDone = dd.rag_status==='GREEN' || ['READY_TO_SIGN','DOCS_VALIDATED'].includes(dd.workflow?.state)
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  function tlItem(state, label, sub) {
+    const d=state==='done', k=state==='cur'
+    return `<div class="tl-item ${d?'done':''}">
+      <div class="tl-dot ${d?'done':k?'cur':''}">${d?'✓':k?'●':'○'}</div>
+      <div class="tl-lbl ${d?'done':k?'cur':''}">${label}</div>
+      ${sub?`<div class="tl-sub">${sub}</div>`:''}
+    </div>`
+  }
+  function pStatus(p) {
+    if (p.payment_confirmed)           return '<span class="p p-g"  style="font-size:9px">✓ Approved</span>'
+    if (p.payment_instruction_issued)  return '<span class="p p-w"  style="font-size:9px">◐ PI Pending</span>'
+    if (p.fixed_amount!==null)         return '<span class="p p-b"  style="font-size:9px">Calculated</span>'
+    if (p.payment_date < today)        return '<span class="p p-r"  style="font-size:9px">Not executed</span>'
+    return '<span class="p p-gy" style="font-size:9px">Scheduled</span>'
+  }
+  function docPill(st) {
+    const m={REQUIRED:'p-r',UPLOADED:'p-b',VALIDATED:'p-g',REJECTED:'p-r',EXPIRED:'p-r',NOT_REQUIRED:'p-gy'}
+    const l={REQUIRED:'Missing',UPLOADED:'Uploaded',VALIDATED:'✓ OK',REJECTED:'Rejected',EXPIRED:'Expired',NOT_REQUIRED:'N/A'}
+    return `<span class="p ${m[st]||'p-b'}" style="font-size:9px">${l[st]||st}</span>`
+  }
+
+  // ── Timeline ───────────────────────────────────────────────────────────────
+  const tlPeriods = periods.map(p => {
+    const st = p.payment_confirmed ? 'done' : p.payment_instruction_issued ? 'cur' : 'fut'
+    const sub = p.payment_confirmed ? p.payment_date : p.payment_instruction_issued ? 'Awaiting ✓' : p.payment_date
+    return tlItem(st, `P${p.number}`, sub)
+  })
+  const tlHtml = [
+    tlItem('done',  'Created',    x.effective_date),
+    tlItem(ddDone?'done':signed?'done':'cur', 'DD', ddDone?'✓ Complete':'In progress'),
+    tlItem(signed?'done':'cur',   'Signed',  signed?'● Active':'Pending'),
+    ...tlPeriods,
+    tlItem(x.status==='TERMINATED'?'done':'fut', 'Termination', x.termination_date),
+  ].join('')
+
+  // ── DD data ────────────────────────────────────────────────────────────────
+  const ddDocs   = dd.documents || []
+  const preDocs  = ddDocs.filter(d=>d.is_pre_signing)
+  const postDocs = ddDocs.filter(d=>!d.is_pre_signing)
+  const preVal   = preDocs.filter(d=>d.status==='VALIDATED').length
+  const pctDD    = preDocs.length ? Math.round(100*preVal/preDocs.length) : 100
+
+  // ── Audit trail ────────────────────────────────────────────────────────────
+  let auditEntries = []
+  try { auditEntries = await apiFetch(`/contracts/${_detId}/audit`) } catch(e) {}
+
+  c.innerHTML = `
+${crumb('Dashboard', _detId)}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <div class="hd" style="margin-bottom:0">${_detId}</div>
+    <span class="p ${statusCls(x.status)}">${x.status.replace(/_/g,' ')}</span>
+    ${modeTag(x.contract_mode)}
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="btn" onclick="_detId=null;N('d',null)" style="font-size:10px">← All Contracts</button>
+    <button class="btn act" onclick="openContract('${_detId}')" style="font-size:10px">⟳ Refresh</button>
+  </div>
+</div>
+
+<!-- §1 — Summary -->
+<div class="sh">Summary</div>
+<div class="card" style="margin-bottom:16px">
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-bottom:16px">
+    <div>
+      <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Parties</div>
+      <div style="font-size:12px;font-weight:600">${det.party_a?.name||'—'} <span class="p p-gy" style="font-size:9px">${det.party_a?.jurisdiction||'—'}</span></div>
+      <div style="font-size:10px;color:var(--t3);margin:3px 0">pays fixed / receives floating</div>
+      <div style="font-size:12px;font-weight:600">${det.party_b?.name||'—'} <span class="p p-gy" style="font-size:9px">${det.party_b?.jurisdiction||'—'}</span></div>
+    </div>
+    <div>
+      <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Key Terms</div>
+      <div style="font-size:11px;color:var(--t2);line-height:2.3">
+        Notional <span style="color:var(--warm);font-weight:600;font-family:var(--fm)">€${(x.notional/1e6).toFixed(0)}M</span><br>
+        Fixed <span style="font-family:var(--fm)">${pct(x.fixed_rate)}</span> · Floating <span style="font-family:var(--fm)">EURIBOR 3M + spread</span><br>
+        <span style="font-family:var(--fm)">${x.effective_date}</span> → <span style="font-family:var(--fm)">${x.termination_date}</span><br>
+        Gov. Law <strong>${x.governing_law}</strong> · Netting <span class="p ${x.netting_status==='GREEN'?'p-g':'p-w'}" style="font-size:9px">${x.netting_status||'—'}</span>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Oracle &amp; Next Payment</div>
+      <div style="font-size:26px;font-weight:300;color:var(--warm);font-family:var(--fm);letter-spacing:-1px">${O.current_rate?(Number(O.current_rate)*100).toFixed(3)+'%':'—'}</div>
+      <div style="font-size:10px;color:var(--t3);margin-bottom:8px">EURIBOR 3M · ${O.status||'—'} · ${O.source||'—'}</div>
+      ${pendingApproval
+        ? `<div style="font-size:11px;color:var(--warm)">PI pending: ${eur(pendingApproval.net_amount,2)} · ${pendingApproval.payment_date}</div>`
+        : nextCalc
+          ? `<div style="font-size:11px;color:var(--t3)">P${nextCalc.number} reset: ${nextCalc.start}</div>`
+          : `<div style="font-size:11px;color:var(--g)">All periods complete</div>`}
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;padding-top:14px;border-top:1px solid var(--b0)">
+    <span style="font-family:var(--fm);font-size:9px;color:var(--t3);padding:3px 10px;border:1px solid var(--b0);border-radius:6px">30/360 · Act/360</span>
+    <span style="font-family:var(--fm);font-size:9px;color:var(--t3);padding:3px 10px;border:1px solid var(--b0);border-radius:6px">Quarterly</span>
+    <span style="font-family:var(--fm);font-size:9px;color:var(--t3);padding:3px 10px;border:1px solid var(--b0);border-radius:6px">§2(c) MTPN</span>
+    <span style="font-family:var(--fm);font-size:9px;color:var(--t3);padding:3px 10px;border:1px solid var(--b0);border-radius:6px">${completedCount}/${periods.length} periods approved</span>
+    <span style="font-family:var(--fm);font-size:9px;color:var(--t3);padding:3px 10px;border:1px solid var(--b0);border-radius:6px">§1(b) ISDA 2002 · Confirmation prevails</span>
+  </div>
+</div>
+
+<!-- §2 — Timeline -->
+<div class="sh">Timeline</div>
+<div class="card" style="overflow-x:auto;margin-bottom:16px;padding:16px 20px 12px">
+  <div class="tl">${tlHtml}</div>
+</div>
+
+<!-- §3 — Due Diligence -->
+<div class="sh">Due Diligence <span class="tag tag-${dd.rag_status==='GREEN'?'g':dd.rag_status==='AMBER'?'w':'r'}">${dd.rag_status||'—'}</span></div>
+<div class="card" style="margin-bottom:16px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <span style="font-size:11px;color:var(--t2)">${preVal} of ${preDocs.length} pre-signing documents validated</span>
+    <span style="font-size:10px;color:${pctDD===100?'var(--g)':'var(--warm)'}">
+      ${pctDD===100?'✓ Complete':pctDD+'%'}
+    </span>
+  </div>
+  <div style="background:rgba(255,255,255,.05);border-radius:4px;height:5px;overflow:hidden;margin-bottom:16px">
+    <div style="width:${pctDD}%;background:${pctDD===100?'var(--g)':'var(--warm)'};height:5px;border-radius:4px;transition:width .4s"></div>
+  </div>
+  ${preDocs.length?`<div style="font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Pre-Signing Checklist</div>
+  <table class="tb" style="margin-bottom:${postDocs.length?'14px':'0'}"><thead><tr><th>Document</th><th>Status</th><th>Due Date</th></tr></thead><tbody>
+  ${preDocs.map(d=>`<tr>
+    <td style="font-size:11px">${d.description||d.doc_type}${d.linked_obligation?`<div style="font-size:9px;color:var(--t3)">${d.linked_obligation}</div>`:''}</td>
+    <td>${docPill(d.status)}</td>
+    <td style="font-size:10px;color:var(--t3)">${d.due_date_obligation||'—'}</td>
+  </tr>`).join('')}
+  </tbody></table>`:'<div style="font-size:11px;color:var(--t3)">No pre-signing documents configured.</div>'}
+  ${postDocs.length?`<div style="font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Post-Signing Obligations</div>
+  <table class="tb" style="margin-bottom:0"><thead><tr><th>Document</th><th>Status</th><th>Due Date</th></tr></thead><tbody>
+  ${postDocs.map(d=>`<tr>
+    <td style="font-size:11px">${d.description||d.doc_type}</td>
+    <td>${docPill(d.status)}</td>
+    <td style="font-size:10px;color:${d.due_date_obligation&&d.due_date_obligation<today?'var(--r)':'var(--t3)'}">${d.due_date_obligation||'—'}</td>
+  </tr>`).join('')}
+  </tbody></table>`:''}
+</div>
+
+<!-- §4 — Payment Schedule -->
+<div class="sh">Payment Schedule <span class="tag tag-v">${periods.length} periods</span></div>
+<div style="border:1px solid var(--b0);border-radius:var(--rad);overflow:hidden;margin-bottom:16px">
+  <table class="tb" style="margin-bottom:0"><thead><tr>
+    <th>#</th><th>Reset Date</th><th>End</th><th>Pay Date</th>
+    <th>Fixed</th><th>Floating</th><th>Net</th><th>Payer</th><th>EURIBOR</th><th>Status</th><th>Fingerprint</th>
+  </tr></thead><tbody>
+  ${periods.map(p=>`<tr>
+    <td class="m">P${p.number}</td>
+    <td class="m">${p.start}</td>
+    <td class="m">${p.end}</td>
+    <td class="m">${p.payment_date}</td>
+    <td class="m">${eur(p.fixed_amount)}</td>
+    <td class="m">${eur(p.floating_amount)}</td>
+    <td class="m" style="${p.net_amount?'color:var(--warm);font-weight:500':''}">${eur(p.net_amount)}</td>
+    <td><span class="p p-gy" style="font-size:9px">${p.net_payer||'—'}</span></td>
+    <td class="m" style="color:var(--t3)">${p.oracle_rate!=null?(p.oracle_rate*100).toFixed(4)+'%':'—'}</td>
+    <td>${pStatus(p)}</td>
+    <td class="m" style="font-size:9px;color:var(--t3)">${p.fingerprint?p.fingerprint.slice(0,10)+'…':'—'}</td>
+  </tr>`).join('')}
+  </tbody></table>
+</div>
+
+<!-- §5 — Actions -->
+<div class="sh">Actions</div>
+<div class="card" style="margin-bottom:16px">
+  ${periodLifecycleHtml(x)}
+  <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b0);display:flex;gap:8px;flex-wrap:wrap">
+    <select id="det-notice-type" class="fi" style="width:auto;font-size:10px;padding:5px 10px">
+      <option value="FAILURE_TO_PAY">§5(a)(i) Failure to Pay</option>
+      <option value="BREACH_OF_AGREEMENT">§5(a)(ii) Breach</option>
+      <option value="ETD_DESIGNATION">§6(a) ETD</option>
+      <option value="DELIVERY_REMINDER">§4(a) Delivery Reminder</option>
+    </select>
+    <button class="btn" onclick="generateNotice('${_detId}',document.getElementById('det-notice-type').value)">Generate §12 Notice</button>
+    <button class="btn" onclick="N('aud',null)">Full Audit Trail</button>
+    <button class="btn" onclick="N('dd',null)">DD Module</button>
+    <button class="btn" onclick="N('mon',null)">§3/§4/§5</button>
+  </div>
+</div>
+
+<!-- §6 — Comments -->
+<div class="sh">Comments <span class="tag ${cmtData.open_count?'tag-r':'tag-g'}">${cmtData.open_count||0} open</span></div>
+<div class="card" style="margin-bottom:16px">
+  <div id="det-cmts">
+    ${cmtData.comments?.length
+      ? cmtData.comments.map(cm=>`<div class="cmt ${cm.status==='OPEN'?'cmt-open':'cmt-resolved'}">
+          <div class="cmt-meta">
+            <span>${cm.author}</span>
+            <span>${(cm.timestamp||'').slice(0,16).replace('T',' ')} UTC</span>
+            <span class="p ${cm.status==='OPEN'?'p-w':'p-g'}" style="font-size:8px">${cm.status}</span>
+            ${cm.status==='RESOLVED'?`<span style="color:var(--g)">✓ ${cm.resolved_by}</span>`:''}
+          </div>
+          <div class="cmt-text">${cm.text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+          ${cm.status==='OPEN'?`<div style="margin-top:8px">
+            <button class="btn" style="color:var(--vi);border-color:rgba(167,139,250,.3);font-size:10px" onclick="_detResolveComment('${_detId}','${cm.comment_id}',this)">✓ Resolve</button>
+          </div>`:''}
+        </div>`).join('')
+      : '<div style="font-size:11px;color:var(--t3);padding:4px 0">No comments yet.</div>'}
+  </div>
+  <div style="margin-top:12px;border-top:1px solid var(--b0);padding-top:12px">
+    <textarea id="det-cmt-ta" style="width:100%;font-size:11px;padding:9px 12px;border:1px solid var(--b1);border-radius:7px;background:var(--s2);color:var(--t1);resize:vertical;min-height:64px;font-family:var(--ff);outline:none;transition:border-color var(--trans)" placeholder="Add a comment for the client…" onfocus="this.style.borderColor='rgba(167,139,250,.5)'" onblur="this.style.borderColor='var(--b1)'"></textarea>
+    <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+      <button class="btn approve" onclick="_detAddComment('${_detId}',this)">Submit Comment</button>
+      <span id="det-cmt-msg" style="font-size:10px;color:var(--t3)"></span>
+    </div>
+  </div>
+</div>
+
+<!-- §7 — Audit Trail -->
+<div class="sh">Audit Trail <span class="tag tag-v">${auditEntries.length} entries</span></div>
+<div class="card" style="margin-bottom:32px;padding:16px 20px;max-height:420px;overflow-y:auto">
+  ${auditEntries.length
+    ? [...auditEntries].reverse().map(l=>`<div class="log-item">
+        <div class="log-time">${(l.timestamp||'').slice(0,19).replace('T',' ')}</div>
+        <div class="log-ev">
+          <span style="color:var(--vi);font-weight:600">${l.event_type}</span>
+          <span style="color:var(--t3)"> · ${l.actor||'ENGINE'}</span>
+          <span style="color:var(--t2)"> · ${JSON.stringify(l.data||{}).slice(0,140)}${JSON.stringify(l.data||{}).length>140?'…':''}</span>
+        </div>
+      </div>`).join('')
+    : '<div style="font-size:11px;color:var(--t3)">No audit entries yet.</div>'}
+</div>`
+
+  window._detResolveComment = async (contractId, commentId, btn) => {
+    btn.disabled=true; btn.textContent='Resolving…'
+    try {
+      await apiPost(`/contracts/${contractId}/comments/${commentId}/resolve`,{resolved_by:'J.Smith (Linklaters)'})
+      delete S.comments[contractId]
+      await refresh(); openContract(contractId)
+    } catch(e) { toast('Error: '+e.message,'err'); btn.disabled=false; btn.textContent='✓ Resolve' }
+  }
+  window._detAddComment = async (contractId, btn) => {
+    const ta  = document.getElementById('det-cmt-ta')
+    const msg = document.getElementById('det-cmt-msg')
+    const text = ta?.value.trim()
+    if (!text) { if(msg){msg.style.color='var(--r)';msg.textContent='Enter a comment first.'} return }
+    btn.disabled=true; btn.textContent='Submitting…'
+    try {
+      await apiPost(`/contracts/${contractId}/comments`,{author:'J.Smith (Linklaters)',role:'advisor',text})
+      delete S.comments[contractId]
+      await refresh(); openContract(contractId)
+    } catch(e) { toast('Error: '+e.message,'err'); btn.disabled=false; btn.textContent='Submit Comment' }
+  }
 }
 
 R()
