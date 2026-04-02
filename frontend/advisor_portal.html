@@ -600,19 +600,26 @@ function buildActions() {
     }
     const det = S.details[x.id]
     if (det) {
-      det.periods.filter(p=>p.fixed_amount!==null && !p.payment_confirmed).forEach(p => {
+      // Current period: calculated (PI issued) but not yet approved — show ONE approve action
+      const pendingApproval = det.periods.find(p => p.payment_instruction_issued && !p.payment_confirmed)
+      if (pendingApproval) {
         acts.push({
-          type:'approve_pi', sev:'normal', contract:x.id, period:p.number,
-          amt:p.net_amount, date:p.payment_date, payer:p.net_payer,
-          desc:`Approve Payment Instruction P${p.number} — ${eur(p.net_amount)} · Pay Date: ${p.payment_date}`,
+          type:'approve_pi', sev:'normal', contract:x.id, period:pendingApproval.number,
+          amt:pendingApproval.net_amount, date:pendingApproval.payment_date, payer:pendingApproval.net_payer,
+          desc:`Approve Payment Instruction P${pendingApproval.number} — ${eur(pendingApproval.net_amount)} · Pay Date: ${pendingApproval.payment_date}`,
           ref:'§2(a)(i) ISDA 2002'
         })
-      })
-      const nextCalc = det.periods.find(p=>p.fixed_amount===null)
+      }
+      // Next period: first uncalculated — greyed out if current PI is still pending
+      const nextCalc = det.periods.find(p => p.fixed_amount === null)
       if (nextCalc) {
+        const blocked = !!pendingApproval
         acts.push({
           type:'execute_period', sev:'info', contract:x.id, period:nextCalc.number,
-          desc:`Run calculation P${nextCalc.number} · ${x.id} · Reset Date: ${nextCalc.start}`,
+          disabled: blocked,
+          desc: blocked
+            ? `P${nextCalc.number} locked — approve P${pendingApproval.number} first · Reset: ${nextCalc.start}`
+            : `Simulate Period P${nextCalc.number} · ${x.id} · Reset Date: ${nextCalc.start}`,
           ref:'§2(a)(i) · Oracle fetch'
         })
       }
@@ -662,6 +669,21 @@ async function executePeriod(contractId, period) {
   } catch(e) {
     if (btn) { btn.disabled=false; btn.textContent='⟳ Run' }
     toast('Error executing period: '+e.message, 'err')
+  }
+}
+
+// ── ACTION: Simulate next period (demo) ───────────────────────────────────────
+async function simulateNextPeriod(contractId, btn) {
+  const origText = btn ? btn.textContent : ''
+  if (btn) { btn.disabled=true; btn.textContent='Simulating…' }
+  try {
+    const res = await apiPost(`/contracts/${contractId}/simulate-next-period`)
+    delete S.details[contractId]
+    await refresh()
+    toast(`P${res.period||'?'} simulated — ${eur(res.net_amount)} · ${contractId}`, 'ok')
+  } catch(e) {
+    if (btn) { btn.disabled=false; btn.textContent=origText||'⟳ Execute' }
+    toast('Simulation error: '+e.message, 'err')
   }
 }
 
@@ -715,7 +737,7 @@ function actionsHtml(acts) {
     <div class="al-r">${a.contract} · ${a.ref}</div>
     <div class="al-a">
       ${a.type==='approve_pi' ? `<button id="pi-${a.contract}-${a.period}" class="btn approve" onclick="approvePi('${a.contract}',${a.period})">✓ Approve PI</button>` : ''}
-      ${a.type==='execute_period' ? `<button id="exec-${a.contract}-${a.period}" class="btn" onclick="executePeriod('${a.contract}',${a.period})">⟳ Run Calculation P${a.period}</button>` : ''}
+      ${a.type==='execute_period' ? `<button id="exec-${a.contract}-${a.period}" class="btn${a.disabled?'':' act'}" ${a.disabled?'disabled title="Approve current PI first"':''} onclick="simulateNextPeriod('${a.contract}',this)">⚡ Simulate P${a.period}${a.disabled?' (locked)':''}</button>` : ''}
       ${a.type==='eod_review' ? `<button class="btn danger">Declare EoD §5(a)(i)</button><button class="btn">Bona Fide Dispute (15d)</button>` : ''}
       ${a.type==='docs' ? `<button class="btn approve" onclick="generateNotice('${a.contract}','DELIVERY_REMINDER');return false">Send §12 Reminder</button><button class="btn" onclick="N('mon',null)">Review §4</button>` : ''}
       ${a.type==='compliance' ? `<button class="btn act" onclick="N('mon',null)">Review §3/§4</button>` : ''}
@@ -781,13 +803,127 @@ ${SD.map(x => {
 </tbody></table>`
 }
 
+// ── PERIOD LIFECYCLE TABLE (per contract) ─────────────────────────────────────
+function periodLifecycleHtml(x) {
+  const det = S.details[x.id]
+  if (!det || !det.periods || !det.periods.length) return ''
+
+  const periods = det.periods
+  const completedPeriods = periods.filter(p => p.payment_instruction_issued && p.payment_confirmed)
+  const currentPeriod = periods.find(p => p.payment_instruction_issued && !p.payment_confirmed)
+  const uncalculated = periods.filter(p => !p.fixed_amount)
+  const nextPeriod = uncalculated[0] || null
+  const laterPeriods = uncalculated.slice(1)
+  const canExecuteNext = !currentPeriod && !!nextPeriod
+
+  let html = `<div class="card" style="margin-bottom:16px;padding:18px 22px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+  <div>
+    <span style="font-size:13px;font-weight:600">${x.id}</span>
+    <span style="font-size:11px;color:var(--t3);margin-left:10px">${x.party_a} ↔ ${x.party_b}</span>
+  </div>
+  <button class="btn${canExecuteNext?'':''}" style="font-size:10px;padding:5px 14px;${canExecuteNext?'color:var(--vi);border-color:rgba(167,139,250,.3);background:var(--viBg)':'opacity:.35;cursor:not-allowed'}"
+    ${canExecuteNext ? `onclick="simulateNextPeriod('${x.id}',this)"` : 'disabled'}
+    title="${currentPeriod ? `Approve P${currentPeriod.number} PI before executing next period` : nextPeriod ? 'Simulate next reset date → run calculation' : 'All periods complete'}">
+    ⚡ Simulate Next Period
+  </button>
+</div>`
+
+  // ── Completed periods ─────────────────────────────────────────────────────
+  if (completedPeriods.length > 0) {
+    html += `<div style="font-size:10px;font-weight:600;color:var(--g);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">✓ Completed Periods</div>
+<table class="tb" style="margin-bottom:16px"><thead><tr>
+  <th>Period</th><th>Reset Date</th><th>Payment Date</th><th>Fixed</th><th>Floating</th><th>Net</th><th>Payer</th><th>EURIBOR 3M</th><th>Fingerprint</th>
+</tr></thead><tbody>
+${completedPeriods.map(p => `<tr>
+  <td class="m">P${p.number}</td>
+  <td class="m">${p.start}</td>
+  <td class="m">${p.payment_date}</td>
+  <td class="m">${eur(p.fixed_amount)}</td>
+  <td class="m">${eur(p.floating_amount)}</td>
+  <td class="m" style="color:var(--g);font-weight:600">${eur(p.net_amount)}</td>
+  <td><span class="p p-gy" style="font-size:9px">${p.net_payer||'—'}</span></td>
+  <td class="m">${p.oracle_rate!=null?(p.oracle_rate*100).toFixed(4)+'%':'—'}</td>
+  <td class="m" style="font-size:9px;color:var(--t3)">${(p.fingerprint||'—').slice(0,12)}…</td>
+</tr>`).join('')}
+</tbody></table>`
+  }
+
+  // ── Current period (PI issued, awaiting approval) ─────────────────────────
+  if (currentPeriod) {
+    html += `<div style="font-size:10px;font-weight:600;color:var(--warm);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">◐ Current Period — PI Pending Approval</div>
+<div style="background:rgba(196,149,106,.05);border:1px solid rgba(196,149,106,.28);border-radius:8px;padding:14px 18px;margin-bottom:16px">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+    <div>
+      <div style="font-size:12px;font-weight:600;margin-bottom:8px">P${currentPeriod.number} · Payment Instruction Issued</div>
+      <div style="display:flex;flex-wrap:wrap;gap:20px;font-size:11px;color:var(--t2)">
+        <div><div style="color:var(--t3);font-size:9px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Reset Date</div><span style="font-family:var(--fm)">${currentPeriod.start}</span></div>
+        <div><div style="color:var(--t3);font-size:9px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Payment Date</div><span style="font-family:var(--fm)">${currentPeriod.payment_date}</span></div>
+        <div><div style="color:var(--t3);font-size:9px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Fixed</div>${eur(currentPeriod.fixed_amount)}</div>
+        <div><div style="color:var(--t3);font-size:9px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Floating</div>${eur(currentPeriod.floating_amount)}</div>
+        <div><div style="color:var(--t3);font-size:9px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Net Amount</div><span style="color:var(--warm);font-weight:600">${eur(currentPeriod.net_amount)}</span></div>
+        <div><div style="color:var(--t3);font-size:9px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Payer</div><span class="p p-w" style="font-size:9px">${currentPeriod.net_payer||'—'}</span></div>
+        <div><div style="color:var(--t3);font-size:9px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">EURIBOR 3M</div>${currentPeriod.oracle_rate!=null?(currentPeriod.oracle_rate*100).toFixed(4)+'%':'—'}</div>
+      </div>
+      <div style="margin-top:6px;font-size:9px;color:var(--t3)">Fingerprint: ${currentPeriod.fingerprint||'—'}</div>
+    </div>
+    <button id="pi-${x.id}-${currentPeriod.number}" class="btn approve" style="padding:9px 20px;font-size:11px;font-weight:500;flex-shrink:0"
+      onclick="approvePi('${x.id}',${currentPeriod.number})">✓ Approve PI</button>
+  </div>
+</div>`
+  }
+
+  // ── Next period (not yet calculated) ─────────────────────────────────────
+  if (nextPeriod) {
+    const blocked = !!currentPeriod
+    html += `<div style="font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">→ Next Period${blocked?' · Locked':''}
+    </div>
+<div style="background:var(--s2);border:1px solid ${blocked?'rgba(248,113,113,.2)':'var(--b0)'};border-radius:8px;padding:12px 18px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:12px">
+  <div style="font-size:11px;color:var(--t2)">
+    <span style="font-family:var(--fm);font-weight:600">P${nextPeriod.number}</span>
+    <span style="color:var(--t3);margin-left:14px">Reset Date: <span style="font-family:var(--fm)">${nextPeriod.start}</span></span>
+    <span style="color:var(--t3);margin-left:14px">Payment Date: <span style="font-family:var(--fm)">${nextPeriod.payment_date}</span></span>
+    ${blocked ? `<span style="color:var(--r);margin-left:14px;font-size:10px">⚠ Approve P${currentPeriod.number} before executing</span>` : ''}
+  </div>
+  <button id="exec-${x.id}-${nextPeriod.number}"
+    class="btn${blocked?'':' act'}" style="flex-shrink:0;${blocked?'opacity:.35;cursor:not-allowed':''}"
+    ${blocked?'disabled':''} onclick="simulateNextPeriod('${x.id}',this)">
+    ⟳ Execute P${nextPeriod.number}
+  </button>
+</div>`
+  }
+
+  // ── Future periods (2+ steps ahead) ──────────────────────────────────────
+  if (laterPeriods.length > 0) {
+    html += `<div style="font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Future Periods</div>
+<table class="tb" style="margin-bottom:0"><thead><tr><th>Period</th><th>Reset Date</th><th>End Date</th><th>Payment Date</th><th>Status</th></tr></thead><tbody>
+${laterPeriods.map(p=>`<tr>
+  <td class="m">P${p.number}</td>
+  <td class="m">${p.start}</td>
+  <td class="m">${p.end}</td>
+  <td class="m">${p.payment_date}</td>
+  <td><span class="p p-gy" style="font-size:9px">Not yet due</span></td>
+</tr>`).join('')}
+</tbody></table>`
+  }
+
+  html += '</div>'
+  return html
+}
+
 // ── PENDING ACTIONS ───────────────────────────────────────────────────────────
 function rAct(c) {
   if (S.loading && !S.contracts.length) { c.innerHTML=spinner(); return }
   const acts = buildActions()
+  const activeContracts = S.contracts.filter(x => x.status === 'ACTIVE' && x.contract_mode !== 'peer_to_peer')
+  const lifecycleHtml = activeContracts.map(x => periodLifecycleHtml(x)).join('')
+
   c.innerHTML = `${crumb('Pending Actions')}<div class="hd">Pending Actions${updBadge()}</div>
-<div class="sub">${acts.length} item${acts.length!==1?'s':''} requiring advisor decision</div>
-${actionsHtml(acts)}`
+<div class="sub">${acts.filter(a=>!['p2p_info'].includes(a.type)).length} item${acts.length!==1?'s':''} requiring advisor decision</div>
+${actionsHtml(acts)}
+<div class="sh" style="margin-top:32px">Period Lifecycle <span class="tag tag-v">${activeContracts.length} active contract${activeContracts.length!==1?'s':''}</span></div>
+<div style="font-size:11px;color:var(--t3);margin-bottom:16px">Sequential execution enforced — each period must be approved before the next can be calculated (§2(a)(i) ISDA 2002)</div>
+${lifecycleHtml || '<div class="card" style="text-align:center;color:var(--t3);padding:30px;font-size:11px">No active contracts.</div>'}`
 }
 
 // ── COMPLIANCE MONITORING ─────────────────────────────────────────────────────

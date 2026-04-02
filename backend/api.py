@@ -561,6 +561,7 @@ def api_contract_detail(contract_id: str, role: str = "client") -> dict:
                 "net_payer": per.net_payer.value if per.net_payer else None,
                 "oracle_rate": float(per.oracle_reading.rate) if per.oracle_reading else None,
                 "oracle_status": per.oracle_reading.status.value if per.oracle_reading else None,
+                "payment_instruction_issued": per.payment_instruction_issued,
                 "payment_confirmed": per.payment_confirmed,
                 "suspended": per.suspended,
                 "fingerprint": per.calculation_fingerprint,
@@ -943,22 +944,50 @@ def api_execute_period(contract_id: str, period: int = None) -> dict:
         _http_error(500, "NO_PERIODS",
                     "Contract has no calculation periods — engine may not be initialised")
 
-    # Auto-select next uncalculated period if not specified
-    if period is None:
-        nxt = next((p.period_number for p in eng.periods if not p.fixed_amount), None)
-        if nxt is None:
-            return {"status": "ALL_PERIODS_CALCULATED",
-                    "periods_total": len(eng.periods),
-                    "message": "All periods have been calculated"}
-        period = nxt
+    # Find the next uncalculated period (sequential enforcement)
+    next_uncalculated = next((p for p in eng.periods if not p.fixed_amount), None)
+    if next_uncalculated is None:
+        return {"status": "ALL_PERIODS_CALCULATED",
+                "periods_total": len(eng.periods),
+                "message": "All periods have been calculated"}
 
-    # Validate period number
-    if not isinstance(period, int) or period < 1 or period > len(eng.periods):
-        _http_error(
-            400, "INVALID_PERIOD",
-            f"Period {period} is out of range — "
-            f"contract has {len(eng.periods)} periods (1–{len(eng.periods)})"
-        )
+    # If a specific period was requested, it must be the next uncalculated one
+    if period is not None:
+        if not isinstance(period, int) or period < 1 or period > len(eng.periods):
+            _http_error(
+                400, "INVALID_PERIOD",
+                f"Period {period} is out of range — "
+                f"contract has {len(eng.periods)} periods (1–{len(eng.periods)})"
+            )
+        if period < next_uncalculated.period_number:
+            _http_error(
+                409, "ALREADY_CALCULATED",
+                f"Period {period} has already been calculated. "
+                f"The next period to calculate is {next_uncalculated.period_number}.",
+                isda_ref="§2(a)(i) ISDA 2002"
+            )
+        if period > next_uncalculated.period_number:
+            _http_error(
+                409, "CANNOT_SKIP_PERIOD",
+                f"Cannot skip ahead to period {period} — "
+                f"period {next_uncalculated.period_number} must be calculated first.",
+                isda_ref="§2(a)(i) ISDA 2002"
+            )
+
+    # Always execute the next sequential period
+    period = next_uncalculated.period_number
+
+    # Sequential gate: the previous period's PI must be approved before calculating the next
+    if period > 1:
+        prev = eng.periods[period - 2]  # 0-indexed
+        if prev.payment_instruction_issued and not prev.payment_confirmed:
+            _http_error(
+                409, "PREVIOUS_PI_PENDING",
+                f"Period {prev.period_number} has a Payment Instruction pending advisor approval "
+                f"(EUR {float(prev.net_amount):.2f} due {prev.payment_date}). "
+                f"Approve P{prev.period_number} before calculating P{period}.",
+                isda_ref="§2(a)(i) ISDA 2002 — sequential execution required"
+            )
 
     # Run calculation
     try:
@@ -980,6 +1009,19 @@ def api_execute_period(contract_id: str, period: int = None) -> dict:
     logger.info(f"[{contract_id}] Period {period} calculated — "
                 f"net EUR {result.get('net_amount', 'N/A')}")
     return result
+
+
+def api_simulate_next_period(contract_id: str) -> dict:
+    """
+    Demo: simulate advancing to the next reset date and running the calculation.
+    Identical to api_execute_period for the next sequential period — the engine
+    does not enforce calendar dates, so this allows demoing the full lifecycle
+    without waiting for real reset dates to arrive.
+
+    Sequential gate still applies: the previous period's PI must be approved
+    before the next period can be simulated.
+    """
+    return api_execute_period(contract_id, period=None)
 
 
 def api_approve_pi(contract_id: str, period_number: int, approver: str) -> dict:
@@ -2201,6 +2243,26 @@ if HAS_FASTAPI:
             raise
         except Exception as e:
             logger.error(f"[{contract_id}] execute error: {e}\n{traceback.format_exc()}")
+            raise HTTPException(500, detail={
+                "code": "INTERNAL_ERROR", "message": str(e)})
+
+    @app.post("/api/contracts/{contract_id}/simulate-next-period", tags=["Contracts"])
+    def simulate_next_period(contract_id: str):
+        """
+        Demo endpoint: simulate the next reset date arriving and run the calculation.
+        Equivalent to execute for the next sequential period — bypasses calendar-date
+        waiting while still enforcing the sequential approval gate.
+        """
+        try:
+            return api_simulate_next_period(contract_id)
+        except KeyError:
+            raise HTTPException(404, detail={
+                "code": "CONTRACT_NOT_FOUND",
+                "message": f"Contract '{contract_id}' not found"})
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"[{contract_id}] simulate error: {e}\n{traceback.format_exc()}")
             raise HTTPException(500, detail={
                 "code": "INTERNAL_ERROR", "message": str(e)})
 
