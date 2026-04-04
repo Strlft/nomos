@@ -1083,11 +1083,18 @@ class DayCountModule:
     @staticmethod
     def dcf_30_360(start: date, end: date) -> Decimal:
         """
-        30/360 Bond Basis day count fraction.
+        30/360 Bond Basis day count fraction per ISDA 2006 Definitions §4.16(f).
         Maps to §3 SLC (Fixed Leg day count convention).
+
+        ISDA rules:
+          D1 = 31        → D1 = 30
+          D2 = 31 AND D1 > 29 (after D1 adjustment) → D2 = 30
+          D2 = 31 AND D1 ≤ 29 → D2 stays 31   ← differs from 30E/360 (Eurobond Basis)
         """
-        y1, m1, d1 = start.year, start.month, min(start.day, 30)
-        y2, m2, d2 = end.year, end.month, min(end.day, 30)
+        y1, m1 = start.year, start.month
+        y2, m2 = end.year,   end.month
+        d1 = 30 if start.day == 31 else start.day
+        d2 = 30 if (end.day == 31 and d1 > 29) else end.day
         days = 360*(y2-y1) + 30*(m2-m1) + (d2-d1)
         return Decimal(str(days)) / Decimal("360")
 
