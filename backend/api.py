@@ -1358,6 +1358,19 @@ def api_validate_document(doc_id: str, data: dict) -> dict:
         "isda_reference": f"{rec.linked_obligation} ISDA 2002",
     }, actor=advisor)
 
+    # Log overall DD status change so global audit reflects RAG transitions
+    try:
+        summary = eng.dd_checker.due_diligence_summary(date.today())
+        eng.audit.log("DD_STATUS_CHANGED", {
+            "triggered_by_doc": doc_id,
+            "rag_status": summary.get("rag_status", "UNKNOWN"),
+            "pre_signing_complete": summary.get("workflow", {}).get("pre_signing_complete", False),
+            "human_gates_pending": summary.get("human_gates_pending", 0),
+            "advisor": advisor,
+        }, actor=advisor)
+    except Exception:
+        pass  # DD summary failure must never block the response
+
     logger.info(
         f"[{contract_id}] DOC {action}: {doc_id} by '{advisor}'"
     )
@@ -1638,6 +1651,83 @@ def api_audit_trail(contract_id: str) -> list:
     eng = _get_engine(contract_id)
     # Return a shallow copy — never expose the live list directly
     return list(eng.audit._entries)
+
+
+def api_audit_global(
+    contract_id: Optional[str] = None,
+    client: Optional[str] = None,
+    action_type: Optional[str] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    search: Optional[str] = None,
+) -> dict:
+    """
+    Aggregate audit entries across all contracts with optional filtering.
+
+    Filters:
+      contract_id — exact match on contract ID
+      client      — substring match on party_a.name or party_b.name
+      action_type — exact match on event_type
+      from_date   — ISO date string YYYY-MM-DD (inclusive)
+      to_date     — ISO date string YYYY-MM-DD (inclusive)
+      search      — substring search across event_type, actor, contract_id, data
+    """
+    entries: list = []
+
+    for cid, eng in _engines.items():
+        # Filter by contract
+        if contract_id and cid != contract_id:
+            continue
+        # Filter by client name (party_a or party_b substring)
+        if client:
+            p = eng.params
+            cl = client.lower()
+            if cl not in p.party_a.name.lower() and cl not in p.party_b.name.lower():
+                continue
+        entries.extend(eng.audit._entries)
+
+    # Action type filter
+    if action_type:
+        entries = [e for e in entries if e.get("event_type") == action_type]
+
+    # Date range filter (timestamp prefix YYYY-MM-DD)
+    if from_date:
+        entries = [e for e in entries if e.get("timestamp", "")[:10] >= from_date]
+    if to_date:
+        entries = [e for e in entries if e.get("timestamp", "")[:10] <= to_date]
+
+    # Free-text search across event_type, actor, contract_id, JSON-serialised data
+    if search:
+        sl = search.lower()
+        def _matches(e: dict) -> bool:
+            return (
+                sl in e.get("event_type", "").lower()
+                or sl in e.get("actor", "").lower()
+                or sl in e.get("contract_id", "").lower()
+                or sl in json.dumps(e.get("data", {}), default=str).lower()
+            )
+        entries = [e for e in entries if _matches(e)]
+
+    # Sort newest first
+    entries.sort(key=lambda e: e.get("timestamp", ""), reverse=True)
+
+    return {
+        "entries": entries,
+        "total": len(entries),
+        "filters_applied": {
+            "contract_id": contract_id,
+            "client": client,
+            "action_type": action_type,
+            "from_date": from_date,
+            "to_date": to_date,
+            "search": search,
+        },
+        "export_metadata": {
+            "generated_at": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+            "isda_reference": "ISDA 2002 Master Agreement",
+            "chain_integrity": "SHA-256 per entry, prev_hash chained within contract",
+        },
+    }
 
 
 # ─── Direct (peer-to-peer) contract creation ─────────────────────────────────
@@ -2319,6 +2409,39 @@ if HAS_FASTAPI:
             raise HTTPException(404, detail={
                 "code": "CONTRACT_NOT_FOUND",
                 "message": f"Contract '{contract_id}' not found"})
+        except Exception as e:
+            raise HTTPException(500, detail={
+                "code": "INTERNAL_ERROR", "message": str(e)})
+
+    @app.get("/api/audit", tags=["Audit"])
+    def global_audit(
+        contract_id: Optional[str] = None,
+        client: Optional[str] = None,
+        action_type: Optional[str] = None,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        search: Optional[str] = None,
+    ):
+        """
+        Global audit trail across all contracts.
+
+        Query params (all optional):
+          contract_id  — filter to a single contract
+          client       — filter by party name substring
+          action_type  — filter by event_type (e.g. CALCULATION_COMPLETE)
+          from_date    — YYYY-MM-DD inclusive lower bound
+          to_date      — YYYY-MM-DD inclusive upper bound
+          search       — free-text search across all fields
+        """
+        try:
+            return api_audit_global(
+                contract_id=contract_id,
+                client=client,
+                action_type=action_type,
+                from_date=from_date,
+                to_date=to_date,
+                search=search,
+            )
         except Exception as e:
             raise HTTPException(500, detail={
                 "code": "INTERNAL_ERROR", "message": str(e)})

@@ -479,7 +479,7 @@ let S = {
   comments: {}, // keyed by contract_id
   loading:true, error:null, lastUpdate:null
 }
-let view = 'd', _detId = null
+let view = 'd', _detId = null, _cliId = null
 
 // ── CLOCK ─────────────────────────────────────────────────────────────────────
 function tk(){const n=new Date();document.getElementById('ck').textContent=n.toUTCString().slice(5,16)+' '+n.toUTCString().slice(17,22)+' UTC'}
@@ -558,7 +558,7 @@ function updateSidebar() {
 
 // ── NAVIGATION ────────────────────────────────────────────────────────────────
 function N(v, el) { view=v; document.querySelectorAll('.si').forEach(e=>e.classList.remove('on')); if(el) el.classList.add('on'); _closeSide(); R() }
-function R() { const fn=({d:rD,act:rAct,mon:rMon,cb:rCb,net:rNet,orc:rOrc,dd:rDd,aud:rAud,not:rNot,det:rDet})[view]; const res=fn(document.getElementById('C')); if(res instanceof Promise) res.catch(console.error) }
+function R() { const fn=({d:rD,act:rAct,mon:rMon,cb:rCb,net:rNet,orc:rOrc,dd:rDd,aud:rAud,not:rNot,det:rDet,cli:rCli})[view]; const res=fn(document.getElementById('C')); if(res instanceof Promise) res.catch(console.error) }
 
 // ── DISPLAY HELPERS ───────────────────────────────────────────────────────────
 const eur = (v,d=2) => v!=null ? '€'+Number(v).toLocaleString('en-GB',{minimumFractionDigits:d,maximumFractionDigits:d}) : '—'
@@ -802,8 +802,8 @@ ${SD.map(x => {
   return `<tr onclick="openContract('${x.id}')" style="cursor:pointer" onmouseover="this.style.background='rgba(167,139,250,.04)'" onmouseout="this.style.background=''">
     <td class="id" style="color:var(--vi)">${x.id}</td>
     <td>${modeTag(x.contract_mode)}</td>
-    <td>${x.party_a}</td>
-    <td>${x.party_b}</td>
+    <td><span onclick="event.stopPropagation();openClientAudit('${x.party_a}')" style="cursor:pointer;color:var(--t1)" onmouseover="this.style.color='var(--vi)'" onmouseout="this.style.color='var(--t1)'" title="View audit trail for ${x.party_a}">${x.party_a}</span></td>
+    <td><span onclick="event.stopPropagation();openClientAudit('${x.party_b}')" style="cursor:pointer;color:var(--t1)" onmouseover="this.style.color='var(--vi)'" onmouseout="this.style.color='var(--t1)'" title="View audit trail for ${x.party_b}">${x.party_b}</span></td>
     <td class="m">€${(x.notional/1e6).toFixed(0)}M</td>
     <td class="m">${x.governing_law}</td>
     <td><span class="p ${x.netting_status==='GREEN'?'p-g':'p-w'}">${x.netting_status||'—'}</span></td>
@@ -1343,35 +1343,176 @@ ${overviewBlocks}
 }
 
 // ── AUDIT TRAIL ───────────────────────────────────────────────────────────────
-async function rAud(c) {
-  c.innerHTML = `${crumb('Audit Trail')}<div class="hd">Audit Trail${updBadge()}</div><div class="sub">SHA-256 chained · Tamper-evident · All contracts</div><div id="audit-body" style="color:var(--t3);font-size:11px;padding:20px 0">Loading…</div>`
-  try {
-    const allAudits = await Promise.all(S.contracts.map(x => apiFetch(`/contracts/${x.id}/audit`)))
-    const flat = allAudits.flat().sort((a,b)=>b.seq-a.seq)
-    const body = document.getElementById('audit-body')
-    if (!body) return
-    body.innerHTML = `<div class="card" style="padding:16px 20px;max-height:520px;overflow-y:auto">
-${flat.map(l => `<div class="log-item">
-  <div class="log-time">${(l.timestamp||'').slice(0,19).replace('T',' ')}</div>
-  <div class="log-ev">
-    <span style="color:var(--vi);font-weight:600">${l.event_type}</span>
-    <span style="color:var(--t3)"> · ${l.actor}</span>
-    <span style="color:var(--t2)"> · ${JSON.stringify(l.data||{}).slice(0,100)}${JSON.stringify(l.data||{}).length>100?'…':''}</span>
-  </div>
-</div>`).join('')}
-</div>
-<div style="margin-top:12px;display:flex;gap:8px">
-  <button class="btn" onclick="_exportAudit(${JSON.stringify(flat).replace(/"/g,'&quot;')})">↓ Export JSON</button>
-  <span style="font-size:10px;color:var(--t3);padding:6px 0">${flat.length} entries · Head: ${flat[0]?.entry_hash?.slice(0,16)||'—'}…</span>
-</div>`
-    window._exportAudit = (data) => {
-      const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'})
-      const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='audit_trail.json'; a.click()
-    }
-  } catch(e) {
-    const body = document.getElementById('audit-body')
-    if (body) body.textContent = 'Error loading audit trail: '+e.message
+// ── SHARED AUDIT HELPERS ──────────────────────────────────────────────────────
+
+const AUDIT_EVENT_TYPES = [
+  'CALCULATION_COMPLETE','PAYMENT_INSTRUCTION_ISSUED','PI_APPROVED',
+  'DOCUMENT_UPLOADED','DOCUMENT_VALIDATED','DOCUMENT_REJECTED','DD_STATUS_CHANGED',
+  'COMMENT_ADDED','COMMENT_RESOLVED',
+  'CONTRACT_SIGNED','CONTRACT_CREATED','PEER_TO_PEER_CONTRACT_CREATED',
+  'NOTICE_GENERATED','EOD_DETECTED','PAYMENT_SUSPENDED','PAYMENT_CONFIRMED',
+  'COMPLIANCE_CHECK','ADVISOR_B_APPROVED','OBLIGATION_DELIVERED',
+  'CONFIRMATION_PDF_GENERATED',
+]
+
+function _auditExport(entries, filename) {
+  const payload = {
+    export_timestamp: new Date().toISOString(),
+    total_entries: entries.length,
+    isda_reference: 'ISDA 2002 Master Agreement',
+    chain_integrity: 'SHA-256 per entry, prev_hash chained within contract',
+    entries
   }
+  const blob = new Blob([JSON.stringify(payload,null,2)],{type:'application/json'})
+  const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename||'audit_trail.json'; a.click()
+}
+
+function _auditEventPill(t) {
+  const colour = {
+    CALCULATION_COMPLETE:'vi', PI_APPROVED:'g', PAYMENT_CONFIRMED:'g',
+    DOCUMENT_VALIDATED:'g', CONTRACT_SIGNED:'g', ADVISOR_B_APPROVED:'g',
+    DOCUMENT_UPLOADED:'bl', COMMENT_ADDED:'bl', OBLIGATION_DELIVERED:'bl',
+    PAYMENT_INSTRUCTION_ISSUED:'warm', DD_STATUS_CHANGED:'warm', COMPLIANCE_CHECK:'warm',
+    DOCUMENT_REJECTED:'r', EOD_DETECTED:'r', PAYMENT_SUSPENDED:'r',
+    NOTICE_GENERATED:'warm',
+  }[t] || 'gy'
+  return `<span class="p p-${colour}" style="font-size:9px;vertical-align:middle">${t.replace(/_/g,' ')}</span>`
+}
+
+// Render filter toolbar + list into container element `id`.
+// `allEntries` is the full unfiltered array; `scope` is a label string.
+// `exportFilename` is used for the JSON download.
+// NOTE: storage key uses bracket notation (window['_aud_'+id]) so hyphens in id are safe.
+function _renderAuditBlock(id, allEntries, scope, exportFilename) {
+  const cont = document.getElementById(id)
+  if (!cont) return
+
+  // Persist entries on window so onchange handlers can retrieve them
+  window['_aud_'+id] = allEntries
+
+  // Read current filter values from the toolbar (if it exists)
+  const qFrom    = document.getElementById(id+'-from')?.value    || ''
+  const qTo      = document.getElementById(id+'-to')?.value      || ''
+  const qType    = document.getElementById(id+'-type')?.value    || ''
+  const qSearch  = (document.getElementById(id+'-search')?.value || '').toLowerCase()
+
+  let entries = allEntries
+  if (qFrom)   entries = entries.filter(e=>(e.timestamp||'').slice(0,10)>=qFrom)
+  if (qTo)     entries = entries.filter(e=>(e.timestamp||'').slice(0,10)<=qTo)
+  if (qType)   entries = entries.filter(e=>e.event_type===qType)
+  if (qSearch) entries = entries.filter(e=>{
+    const s = (e.event_type||'')+' '+(e.actor||'')+' '+(e.contract_id||'')+' '+JSON.stringify(e.data||{})
+    return s.toLowerCase().includes(qSearch)
+  })
+
+  const typeOpts = ['<option value="">All event types</option>',
+    ...AUDIT_EVENT_TYPES.map(t=>`<option value="${t}"${qType===t?' selected':''}>${t}</option>`)
+  ].join('')
+
+  // Inline onclick refs use window['_aud_'+id] via bracket notation — safe with hyphenated ids
+  const scopeJ = JSON.stringify(scope)
+  const fnameJ = JSON.stringify(exportFilename||'audit_trail.json')
+  const rerender = `_renderAuditBlock('${id}',window['_aud_'+'${id}'],${scopeJ},${fnameJ})`
+  const doExport = `_auditExport(window['_aud_'+'${id}'],${fnameJ})`
+
+  cont.innerHTML = `
+<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
+  <input id="${id}-from" type="date" class="fi" style="width:130px;font-size:10px;padding:5px 8px" value="${qFrom}" onchange="${rerender}">
+  <input id="${id}-to"   type="date" class="fi" style="width:130px;font-size:10px;padding:5px 8px" value="${qTo}"   onchange="${rerender}">
+  <select id="${id}-type" class="fi" style="width:200px;font-size:10px;padding:5px 8px" onchange="${rerender}">${typeOpts}</select>
+  <input id="${id}-search" type="search" class="fi" placeholder="Search…" style="flex:1;min-width:140px;font-size:10px;padding:5px 8px" value="${qSearch}" oninput="${rerender}">
+  <button class="btn" style="font-size:10px;white-space:nowrap" onclick="${doExport}">↓ Export JSON</button>
+  <span style="font-size:10px;color:var(--t3);white-space:nowrap">${entries.length} / ${allEntries.length} entries</span>
+</div>
+<div style="max-height:540px;overflow-y:auto">
+${entries.length ? entries.map(l=>`<div class="log-item">
+  <div class="log-time">${(l.timestamp||'').slice(0,19).replace('T',' ')}</div>
+  <div class="log-ev" style="display:flex;flex-wrap:wrap;align-items:center;gap:6px">
+    ${_auditEventPill(l.event_type||'')}
+    ${l.contract_id&&l.contract_id!==scope?`<span style="font-family:var(--fm);font-size:9px;color:var(--vi)">${l.contract_id}</span>`:''}
+    <span style="color:var(--t3);font-size:10px">${l.actor||'ENGINE'}</span>
+    <span style="color:var(--t2);font-size:10px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${JSON.stringify(l.data||{}).slice(0,160)}${JSON.stringify(l.data||{}).length>160?'…':''}</span>
+    <span style="font-family:var(--fm);font-size:8px;color:var(--t3)">${(l.entry_hash||'').slice(0,10)}…</span>
+  </div>
+</div>`).join('') : '<div style="font-size:11px;color:var(--t3);padding:12px 0">No entries match the current filters.</div>'}
+</div>`
+}
+
+// Global access so onchange handlers (in innerHTML strings) can reach it
+window._renderAuditBlock = _renderAuditBlock
+
+// ── AUDIT TRAIL — GLOBAL ──────────────────────────────────────────────────────
+
+async function rAud(c) {
+  c.innerHTML = `
+${crumb('Audit Trail')}
+<div class="hd">Audit Trail — Global${updBadge()}</div>
+<div class="sub">SHA-256 chained · Tamper-evident · All contracts · All clients</div>
+<div class="card" style="margin-bottom:16px;padding:16px 20px">
+  <div id="aud-block" style="color:var(--t3);font-size:11px;padding:8px 0">Loading…</div>
+</div>`
+  try {
+    const res = await apiFetch('/audit')
+    const entries = res.entries || []
+    _renderAuditBlock('aud-block', entries, 'global', 'audit_global.json')
+  } catch(e) {
+    const el = document.getElementById('aud-block')
+    if (el) el.textContent = 'Error loading audit trail: '+e.message
+  }
+}
+
+// ── AUDIT TRAIL — BY CLIENT ───────────────────────────────────────────────────
+
+async function rCli(c) {
+  // Build unique client list from all contracts (both parties)
+  const parties = new Map()
+  S.contracts.forEach(x=>{
+    if (x.party_a) parties.set(x.party_a, (parties.get(x.party_a)||0)+1)
+    if (x.party_b) parties.set(x.party_b, (parties.get(x.party_b)||0)+1)
+  })
+
+  if (!_cliId) {
+    // Show client picker
+    c.innerHTML = `
+${crumb('Audit Trail', 'By Client')}
+<div class="hd">Audit Trail — By Client</div>
+<div class="sub">Select a client to view their full audit history across all contracts</div>
+<div class="card" style="padding:20px">
+  ${[...parties.entries()].map(([name, count])=>`
+  <div onclick="openClientAudit('${name.replace(/'/g,"\\'")}',this)" style="padding:10px 14px;border:1px solid var(--b0);border-radius:8px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:background var(--trans)" onmouseover="this.style.background='rgba(167,139,250,.05)'" onmouseout="this.style.background=''">
+    <span style="font-weight:500;font-size:13px">${name}</span>
+    <span style="font-size:10px;color:var(--t3)">${count} contract${count>1?'s':''}</span>
+  </div>`).join('') || '<div style="color:var(--t3);font-size:12px">No clients yet.</div>'}
+</div>`
+    return
+  }
+
+  // Show audit for selected client
+  c.innerHTML = `
+${crumb('Audit Trail', 'By Client', _cliId)}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+  <div>
+    <div class="hd" style="margin-bottom:2px">Audit Trail — ${_cliId}</div>
+    <div class="sub">All events for this party across all contracts</div>
+  </div>
+  <button class="btn" onclick="_cliId=null;N('cli',null)" style="font-size:10px">← All Clients</button>
+</div>
+<div class="card" style="margin-bottom:16px;padding:16px 20px">
+  <div id="cli-block" style="color:var(--t3);font-size:11px">Loading…</div>
+</div>`
+  try {
+    const res = await apiFetch('/audit?client='+encodeURIComponent(_cliId))
+    const entries = res.entries || []
+    _renderAuditBlock('cli-block', entries, _cliId, `audit_${_cliId.replace(/\s+/g,'_')}.json`)
+  } catch(e) {
+    const el = document.getElementById('cli-block')
+    if (el) el.textContent = 'Error: '+e.message
+  }
+}
+
+function openClientAudit(name) {
+  _cliId = name
+  N('cli', null)
 }
 
 // ── NOTICES §12 ───────────────────────────────────────────────────────────────
@@ -1505,6 +1646,7 @@ ${crumb('Dashboard', _detId)}
   </div>
   <div style="display:flex;gap:8px">
     <button class="btn" onclick="_detId=null;N('d',null)" style="font-size:10px">← All Contracts</button>
+    <button class="btn" onclick="openClientAudit('${x.party_b}')" style="font-size:10px">Client Audit</button>
     <button class="btn act" onclick="openContract('${_detId}')" style="font-size:10px">⟳ Refresh</button>
   </div>
 </div>
@@ -1655,18 +1797,11 @@ ${crumb('Dashboard', _detId)}
 
 <!-- §7 — Audit Trail -->
 <div class="sh">Audit Trail <span class="tag tag-v">${auditEntries.length} entries</span></div>
-<div class="card" style="margin-bottom:32px;padding:16px 20px;max-height:420px;overflow-y:auto">
-  ${auditEntries.length
-    ? [...auditEntries].reverse().map(l=>`<div class="log-item">
-        <div class="log-time">${(l.timestamp||'').slice(0,19).replace('T',' ')}</div>
-        <div class="log-ev">
-          <span style="color:var(--vi);font-weight:600">${l.event_type}</span>
-          <span style="color:var(--t3)"> · ${l.actor||'ENGINE'}</span>
-          <span style="color:var(--t2)"> · ${JSON.stringify(l.data||{}).slice(0,140)}${JSON.stringify(l.data||{}).length>140?'…':''}</span>
-        </div>
-      </div>`).join('')
-    : '<div style="font-size:11px;color:var(--t3)">No audit entries yet.</div>'}
+<div class="card" style="margin-bottom:32px;padding:16px 20px">
+  <div id="det-aud-block"></div>
 </div>`
+  // Render audit block after innerHTML is set (DOM must exist first)
+  _renderAuditBlock('det-aud-block', [...auditEntries].reverse(), _detId, `audit_${_detId}.json`)
 
   window._detResolveComment = async (contractId, commentId, btn) => {
     btn.disabled=true; btn.textContent='Resolving…'
