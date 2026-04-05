@@ -1149,6 +1149,8 @@ async function rDd(c) {
   // Priority: human_gate (0) > overdue (1) > regular (2)
   const today = new Date().toISOString().slice(0,10)
   const allPending = []
+  // Track entity docs already added (to avoid duplicates across contracts sharing an entity)
+  const _seenEntityDocs = new Set()
   S.contracts.forEach(x => {
     const dd = S.dd[x.id]
     if (!dd || dd.error) return
@@ -1157,6 +1159,11 @@ async function rDd(c) {
     const overdueIds = new Set((dd.overdue_docs||[]))
     const gateDocIds = new Set(pendingGates.map(g=>g.doc_id).filter(Boolean))
     docs.filter(d=>d.status==='UPLOADED').forEach(d => {
+      // Deduplicate entity docs that appear in multiple contracts
+      if (d.category === 'GENERAL' || (d.doc_id && d.doc_id.startsWith('GD-'))) {
+        if (_seenEntityDocs.has(d.doc_id)) return
+        _seenEntityDocs.add(d.doc_id)
+      }
       const isGate = gateDocIds.has(d.doc_id)
       const isOverdue = overdueIds.has(d.description) || (d.due_date_obligation && d.due_date_obligation < today)
       allPending.push({ d, contractId: x.id, contractLabel: `${x.id} — ${x.party_b||''}`, priority: isGate?0:isOverdue?1:2, dd })
@@ -1179,21 +1186,27 @@ async function rDd(c) {
     const wfState = dd.workflow?.state || ''
     const isGate = priority===0
     const isOverdue = priority===1
+    const isEntity = d.category === 'GENERAL' || (d.doc_id && d.doc_id.startsWith('GD-'))
     const urgencyLabel = isGate
       ? '<span style="font-size:9px;font-weight:700;color:var(--r)">HUMAN GATE</span>'
       : isOverdue ? '<span style="font-size:9px;font-weight:600;color:var(--warm)">OVERDUE</span>'
+      : isEntity ? '<span style="font-size:9px;font-weight:600;color:var(--vi)">ENTITY</span>'
       : '<span style="font-size:9px;color:var(--t3)">PENDING</span>'
+    const entityName = d.entity_name || ''
+    const scopeLabel = isEntity
+      ? `<span style="font-size:9px;color:var(--vi)">${entityName||'entity'} — all contracts</span>`
+      : `${contractLabel} ${wfBadge(wfState)}`
     return `<tr id="dd-row-${d.doc_id}">
   <td style="font-size:11px">${urgencyLabel}</td>
-  <td style="font-size:11px">${contractLabel} ${wfBadge(wfState)}</td>
+  <td style="font-size:11px">${scopeLabel}</td>
   <td style="font-size:11px">${d.description||d.doc_type}</td>
   <td style="font-size:10px;color:var(--t3)">${d.party||'—'}</td>
   <td>${docStatusPill(d.status)}</td>
   <td style="font-size:10px;color:var(--t3)">${d.due_date_obligation||'—'}</td>
   <td><input id="note-${d.doc_id}" type="text" placeholder="Notes…" style="font-size:10px;padding:3px 6px;border:1px solid var(--bd);border-radius:4px;background:var(--bg2);color:var(--t1);width:130px"></td>
   <td style="white-space:nowrap">
-    <button class="btn approve" onclick="_ddValidate('${d.doc_id}','${contractId}',true)">✓ Accept</button>
-    <button class="btn danger" style="margin-left:4px" onclick="_ddValidate('${d.doc_id}','${contractId}',false)">✕ Reject</button>
+    <button class="btn approve" onclick="_ddValidate('${d.doc_id}','${contractId}','${entityName}',true)">✓ Accept</button>
+    <button class="btn danger" style="margin-left:4px" onclick="_ddValidate('${d.doc_id}','${contractId}','${entityName}',false)">✕ Reject</button>
   </td>
 </tr>`
   }).join('')
@@ -1220,11 +1233,12 @@ async function rDd(c) {
   const overviewBlocks = S.contracts.map(x => {
     const dd = S.dd[x.id]
     if (!dd || dd.error) return `<div class="card" style="margin-bottom:8px"><div style="font-size:12px;font-weight:600">${x.id}</div><div style="color:var(--t3);font-size:11px">${dd?.error||'DD module not available'}</div></div>`
-    const docs = dd.documents || []
+    const tiers = dd.document_tiers || {}
+    const genDocs = [...(tiers.general_party_a||[]), ...(tiers.general_party_b||[])]
+    const csDocs = tiers.contract_specific || []
     const wfState = dd.workflow?.state || '—'
-    const sr = dd.signing_readiness || {}
-    const preDocs = docs.filter(d=>d.is_pre_signing)
-    const preVal = preDocs.filter(d=>d.status==='VALIDATED').length
+    const genVal = genDocs.filter(d=>d.status==='VALIDATED').length
+    const csVal = csDocs.filter(d=>d.status==='VALIDATED').length
     return `<div class="card" style="margin-bottom:8px;padding:10px 16px">
 <div style="display:flex;justify-content:space-between;align-items:center">
   <div>
@@ -1234,8 +1248,8 @@ async function rDd(c) {
   <div style="display:flex;gap:8px;align-items:center">
     ${ragPill(dd.rag_status)}
     ${wfBadge(wfState)}
-    <span style="font-size:10px;color:var(--t3)">${preVal}/${preDocs.length} pre-signing</span>
-    <span style="font-size:10px;color:var(--t3)">${docs.filter(d=>d.status==='VALIDATED').length}/${docs.length} total</span>
+    ${genDocs.length ? `<span style="font-size:10px;color:var(--vi)">${genVal}/${genDocs.length} entity</span>` : ''}
+    <span style="font-size:10px;color:var(--t3)">${csVal}/${csDocs.length} contract</span>
   </div>
 </div>
 </div>`
@@ -1326,16 +1340,24 @@ ${overviewBlocks}
     }
   }
 
-  window._ddValidate = async (docId, contractId, accepted) => {
+  window._ddValidate = async (docId, contractId, entityName, accepted) => {
     const notesEl = document.getElementById('note-'+docId)
     const notes = notesEl ? notesEl.value.trim() : ''
     try {
-      await apiPost(`/contracts/${contractId}/due-diligence/${docId}/validate`, {
+      const payload = {
         advisor: 'J.Smith (Linklaters)',
         accepted,
         notes: notes || (accepted ? 'Reviewed and accepted by advisor' : 'Rejected — see advisor notes')
-      })
-      delete S.dd[contractId]
+      }
+      if (entityName) {
+        // General entity document — use entity endpoint
+        await apiPost(`/entities/${encodeURIComponent(entityName)}/documents/${docId}/validate`, payload)
+        // Invalidate DD cache for all contracts (entity docs affect all)
+        S.contracts.forEach(x => { delete S.dd[x.id] })
+      } else {
+        await apiPost(`/contracts/${contractId}/due-diligence/${docId}/validate`, payload)
+        delete S.dd[contractId]
+      }
       toast(accepted ? 'Document accepted' : 'Document rejected', accepted ? 'ok' : 'wr')
       await refresh()
     } catch(e) { toast('Validate error: '+e.message, 'err') }
@@ -1348,6 +1370,7 @@ ${overviewBlocks}
 const AUDIT_EVENT_TYPES = [
   'CALCULATION_COMPLETE','PAYMENT_INSTRUCTION_ISSUED','PI_APPROVED',
   'DOCUMENT_UPLOADED','DOCUMENT_VALIDATED','DOCUMENT_REJECTED','DD_STATUS_CHANGED',
+  'ENTITY_DOCUMENT_UPLOADED','ENTITY_DOCUMENT_VALIDATED','ENTITY_DOCUMENT_REJECTED',
   'COMMENT_ADDED','COMMENT_RESOLVED',
   'CONTRACT_SIGNED','CONTRACT_CREATED','PEER_TO_PEER_CONTRACT_CREATED',
   'NOTICE_GENERATED','EOD_DETECTED','PAYMENT_SUSPENDED','PAYMENT_CONFIRMED',
@@ -1626,11 +1649,15 @@ async function rDet(c) {
   ].join('')
 
   // ── DD data ────────────────────────────────────────────────────────────────
-  const ddDocs   = dd.documents || []
-  const preDocs  = ddDocs.filter(d=>d.is_pre_signing)
-  const postDocs = ddDocs.filter(d=>!d.is_pre_signing)
-  const preVal   = preDocs.filter(d=>d.status==='VALIDATED').length
-  const pctDD    = preDocs.length ? Math.round(100*preVal/preDocs.length) : 100
+  const ddTiers   = dd.document_tiers || {}
+  const ddGenA    = ddTiers.general_party_a || []
+  const ddGenB    = ddTiers.general_party_b || []
+  const ddCS      = ddTiers.contract_specific || []
+  const ddDocs    = dd.documents || []
+  const preDocs   = ddDocs.filter(d=>d.is_pre_signing)
+  const postDocs  = ddDocs.filter(d=>!d.is_pre_signing)
+  const preVal    = preDocs.filter(d=>d.status==='VALIDATED').length
+  const pctDD     = preDocs.length ? Math.round(100*preVal/preDocs.length) : 100
 
   // ── Audit trail ────────────────────────────────────────────────────────────
   let auditEntries = []
@@ -1708,17 +1735,27 @@ ${crumb('Dashboard', _detId)}
   <div style="background:rgba(255,255,255,.05);border-radius:4px;height:5px;overflow:hidden;margin-bottom:16px">
     <div style="width:${pctDD}%;background:${pctDD===100?'var(--g)':'var(--warm)'};height:5px;border-radius:4px;transition:width .4s"></div>
   </div>
-  ${preDocs.length?`<div style="font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Pre-Signing Checklist</div>
-  <table class="tb" style="margin-bottom:${postDocs.length?'14px':'0'}"><thead><tr><th>Document</th><th>Status</th><th>Due Date</th></tr></thead><tbody>
-  ${preDocs.map(d=>`<tr>
+  ${(ddGenA.length||ddGenB.length)?`
+  <div style="font-size:10px;font-weight:600;color:var(--vi);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Section 1 — Entity Documents <span style="color:var(--t3);font-weight:400;text-transform:none">(upload once · applies to all contracts)</span></div>
+  ${[...ddGenA,...ddGenB].length?`<table class="tb" style="margin-bottom:14px"><thead><tr><th>Document</th><th>Entity</th><th>Status</th></tr></thead><tbody>
+  ${[...ddGenA,...ddGenB].map(d=>`<tr>
+    <td style="font-size:11px">${d.description||d.doc_type}</td>
+    <td style="font-size:10px;color:var(--vi)">${d.entity_name||'—'}</td>
+    <td>${docPill(d.status)}</td>
+  </tr>`).join('')}
+  </tbody></table>`:''}
+  <div style="font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Section 2 — Contract-Specific Documents</div>`:''}
+  ${ddCS.filter(d=>d.is_pre_signing).length?`<div style="font-size:9px;color:var(--t3);margin-bottom:4px">Phase 1 — Pre-Signing</div>
+  <table class="tb" style="margin-bottom:${ddCS.filter(d=>!d.is_pre_signing).length?'14px':'0'}"><thead><tr><th>Document</th><th>Status</th><th>Due Date</th></tr></thead><tbody>
+  ${ddCS.filter(d=>d.is_pre_signing).map(d=>`<tr>
     <td style="font-size:11px">${d.description||d.doc_type}${d.linked_obligation?`<div style="font-size:9px;color:var(--t3)">${d.linked_obligation}</div>`:''}</td>
     <td>${docPill(d.status)}</td>
     <td style="font-size:10px;color:var(--t3)">${d.due_date_obligation||'—'}</td>
   </tr>`).join('')}
-  </tbody></table>`:'<div style="font-size:11px;color:var(--t3)">No pre-signing documents configured.</div>'}
-  ${postDocs.length?`<div style="font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Post-Signing Obligations</div>
+  </tbody></table>`:((!ddGenA.length&&!ddGenB.length)?'<div style="font-size:11px;color:var(--t3)">No pre-signing documents configured.</div>':'')}
+  ${ddCS.filter(d=>!d.is_pre_signing).length?`<div style="font-size:9px;color:var(--t3);margin-bottom:4px">Phase 2 — Post-Signing Obligations</div>
   <table class="tb" style="margin-bottom:0"><thead><tr><th>Document</th><th>Status</th><th>Due Date</th></tr></thead><tbody>
-  ${postDocs.map(d=>`<tr>
+  ${ddCS.filter(d=>!d.is_pre_signing).map(d=>`<tr>
     <td style="font-size:11px">${d.description||d.doc_type}</td>
     <td>${docPill(d.status)}</td>
     <td style="font-size:10px;color:${d.due_date_obligation&&d.due_date_obligation<today?'var(--r)':'var(--t3)'}">${d.due_date_obligation||'—'}</td>

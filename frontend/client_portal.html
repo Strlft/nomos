@@ -1108,17 +1108,57 @@ async function rDc(c) {
     `</div>`
   }
 
+  // ── Two-tier document rendering ──────────────────────────────────────────────
+  function docRow(d, contractId) {
+    const isGeneral = d.category === 'GENERAL' || (d.doc_id && d.doc_id.startsWith('GD-'))
+    const entityName = d.entity_name || ''
+    const uploadCell = (d.status==='REQUIRED'||d.status==='REJECTED'||d.status==='EXPIRED')
+      ? `<button class="btn pr" onclick="_ddUpload('${contractId}','${d.doc_id}','${d.doc_type}','${isGeneral?entityName:''}',this)">↑ Upload</button>`
+      : d.status==='UPLOADED' ? '<span style="font-size:10px;color:var(--bl)">⏳ Awaiting review</span>'
+      : d.status==='VALIDATED' ? '<span style="font-size:10px;color:var(--g)">✓ Accepted</span>'
+      : '—'
+    return `<tr${d.status==='REQUIRED'?' style="background:rgba(248,113,113,.025)"':''}>
+  <td><div style="font-size:11px">${d.description||d.doc_type}</div><div style="font-size:9px;color:var(--t3)">${d.linked_obligation||''}</div></td>
+  <td>${docStatusPill(d.status)}</td>
+  <td style="font-size:10px;color:var(--t3)">${d.due_date_obligation||'—'}</td>
+  <td>${uploadCell}</td>
+</tr>`
+  }
+
+  function entityDocsSection(docs, partyLabel, partyName) {
+    if (!docs || !docs.length) return ''
+    const val = docs.filter(d=>d.status==='VALIDATED').length
+    const total = docs.length
+    const allOk = val === total
+    return `
+<div style="margin-bottom:14px;border:1px solid ${allOk?'rgba(74,222,128,.2)':'rgba(248,113,113,.2)'};border-radius:8px;overflow:hidden">
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;background:${allOk?'rgba(74,222,128,.06)':'rgba(248,113,113,.04)'};border-bottom:1px solid var(--b0)">
+    <div>
+      <span style="font-size:11px;font-weight:600;color:var(--t2)">${partyLabel}</span>
+      <span style="font-size:10px;color:var(--t3);margin-left:8px">${partyName}</span>
+    </div>
+    <span style="font-size:10px;color:${allOk?'var(--g)':'var(--r)'}">${val}/${total} validated${allOk?' ✓':''}</span>
+  </div>
+  <table class="tb" style="margin:0"><thead><tr>
+    <th>Document</th><th>Status</th><th>Due</th><th>Upload</th>
+  </tr></thead><tbody>${docs.map(d=>docRow(d, '')).join('')}</tbody></table>
+</div>`
+  }
+
   const blocks = S.contracts.map(x => {
     const dd       = S.dd[x.id]
     if (!dd || dd.error) return `<div class="card"><strong>${x.id}</strong> — <span style="color:var(--t3);font-size:11px">${dd?.error||'Due diligence module not available'}</span></div>`
 
-    const allDocs  = dd.documents || []
-    const preDocs  = allDocs.filter(d=>d.is_pre_signing)
-    const postDocs = allDocs.filter(d=>!d.is_pre_signing)
-    const preVal   = preDocs.filter(d=>d.status==='VALIDATED').length
-    const overdue  = dd.overdue_docs || []
-    const expiring = dd.expiring_soon || []
-    const wfState  = dd.workflow?.state || 'KYC_PENDING'
+    const tiers        = dd.document_tiers || {}
+    const genA         = tiers.general_party_a || []
+    const genB         = tiers.general_party_b || []
+    const contractDocs = tiers.contract_specific || dd.documents || []
+    const allDocs      = dd.documents || []
+    const preDocs      = allDocs.filter(d=>d.is_pre_signing)
+    const preVal       = preDocs.filter(d=>d.status==='VALIDATED').length
+    const overdue      = dd.overdue_docs || []
+    const expiring     = dd.expiring_soon || []
+    const wfState      = dd.workflow?.state || 'KYC_PENDING'
     const ready        = S.ready[x.id]
     const cmtData      = S.comments[x.id] || {comments:[], open_count:0}
     const openComments = cmtData.open_count || 0
@@ -1143,19 +1183,8 @@ async function rDc(c) {
         ? `<span class="p p-g">● Active</span>`
         : `<span class="p p-gy">${x.status}</span>`
 
-    function docRow(d) {
-      const uploadCell = (d.status==='REQUIRED'||d.status==='REJECTED'||d.status==='EXPIRED')
-        ? `<button class="btn pr" onclick="_ddUpload('${x.id}','${d.doc_id}','${d.doc_type}',this)">↑ Upload</button>`
-        : d.status==='UPLOADED' ? '<span style="font-size:10px;color:var(--bl)">⏳ Awaiting review</span>'
-        : d.status==='VALIDATED' ? '<span style="font-size:10px;color:var(--g)">✓ Accepted</span>'
-        : '—'
-      return `<tr${d.status==='REQUIRED'?' style="background:rgba(248,113,113,.025)"':''}>
-  <td><div style="font-size:11px">${d.description||d.doc_type}</div><div style="font-size:9px;color:var(--t3)">${d.linked_obligation||''}</div></td>
-  <td>${docStatusPill(d.status)}</td>
-  <td style="font-size:10px;color:var(--t3)">${d.due_date_obligation||'—'}</td>
-  <td>${uploadCell}</td>
-</tr>`
-    }
+    const csPreDocs  = contractDocs.filter(d=>d.is_pre_signing)
+    const csPostDocs = contractDocs.filter(d=>!d.is_pre_signing)
 
     return `<div class="card" style="margin-bottom:16px">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -1181,9 +1210,33 @@ ${workflowBar(wfState)}
 ${overdue.length ? `<div style="background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.2);border-radius:8px;padding:8px 14px;margin-bottom:10px;font-size:10px;color:var(--r)">⚠ Overdue: ${overdue.join(' · ')}</div>` : ''}
 ${expiring.length ? `<div style="background:rgba(196,149,106,.06);border:1px solid rgba(196,149,106,.15);border-radius:8px;padding:8px 14px;margin-bottom:10px;font-size:10px;color:var(--warm)">Expiring soon: ${expiring.join(' · ')}</div>` : ''}
 
+<!-- ── SECTION 1: Entity Documents ── -->
+${(genA.length || genB.length) ? `
+<div style="font-size:11px;font-weight:600;color:var(--t2);margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--b0)">
+  Section 1 — Entity Documents <span style="font-size:9px;font-weight:400;color:var(--t3);margin-left:4px">Uploaded once · Applies to all contracts for this entity</span>
+</div>
+${entityDocsSection(genA, 'Party A', x.party_a)}
+${entityDocsSection(genB, 'Party B', x.party_b)}` : ''}
+
+<!-- ── SECTION 2: Contract-Specific Documents ── -->
+<div style="font-size:11px;font-weight:600;color:var(--t2);margin-bottom:6px;${(genA.length||genB.length)?'margin-top:14px;padding-top:14px;border-top:1px solid var(--b0)':''}">
+  Section 2 — Contract-Specific Documents
+</div>
+${csPreDocs.length ? `
+<div style="font-size:10px;color:var(--t3);margin-bottom:6px">Phase 1 — Pre-Signing</div>
+<table class="tb" style="margin-bottom:${csPostDocs.length?'14px':'0'}"><thead><tr>
+  <th>Document</th><th>Status</th><th>Due</th><th>Upload</th>
+</tr></thead><tbody>${csPreDocs.map(d=>docRow(d, x.id)).join('')}</tbody></table>` : ''}
+
+${csPostDocs.length ? `
+<div style="font-size:10px;color:var(--t3);margin-bottom:6px;margin-top:12px">Phase 2 — Post-Signing (Ongoing)</div>
+<table class="tb" style="margin-bottom:0"><thead><tr>
+  <th>Document</th><th>Status</th><th>Due</th><th>Upload</th>
+</tr></thead><tbody>${csPostDocs.map(d=>docRow(d, x.id)).join('')}</tbody></table>` : ''}
+
 <!-- ── PDF Preview ── -->
 ${x.status === 'PENDING_SIGNATURE' || x.status === 'ACTIVE' ? `
-<div style="margin-bottom:16px;border:1px solid var(--b1);border-radius:8px;overflow:hidden">
+<div style="margin-top:14px;margin-bottom:10px;border:1px solid var(--b1);border-radius:8px;overflow:hidden">
   <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;background:var(--s2);border-bottom:1px solid var(--b0)">
     <div style="font-size:11px;font-weight:600;color:var(--t2)">Confirmation PDF</div>
     <a href="/api/contracts/${x.id}/pdf" download="confirmation-${x.id}.pdf"
@@ -1225,15 +1278,6 @@ ${x.status === 'PENDING_SIGNATURE' || x.status === 'ACTIVE' ? `
   </div>` : ''}
 </div>
 
-<div style="font-size:11px;font-weight:600;color:var(--t2);margin-bottom:6px">Phase 1 — Pre-Signing Checklist</div>
-<table class="tb" style="margin-bottom:${postDocs.length?'14px':'0'}"><thead><tr>
-  <th>Document</th><th>Status</th><th>Due</th><th>Upload</th>
-</tr></thead><tbody>${preDocs.map(docRow).join('')}</tbody></table>
-
-${postDocs.length ? `<div style="font-size:11px;font-weight:600;color:var(--t2);margin-bottom:6px">Phase 2 — Post-Signing (Ongoing)</div>
-<table class="tb" style="margin-bottom:0"><thead><tr>
-  <th>Document</th><th>Status</th><th>Due</th><th>Upload</th>
-</tr></thead><tbody>${postDocs.map(docRow).join('')}</tbody></table>` : ''}
 </div>`
   }).join('')
 
@@ -1243,20 +1287,29 @@ ${blocks || '<div class="card" style="text-align:center;color:var(--t3);padding:
 <div style="font-size:10px;color:var(--t3);margin-top:8px">Contact Linklaters LLP for questions about your document obligations.</div>
 <div id="dd-upload-msg" style="display:none;margin-top:12px"></div>`
 
-  window._ddUpload = async (contractId, docId, docType, btn) => {
-    if (!confirm(`Submit "${docType}" for ${contractId}?\n\nA stub document will be uploaded for advisor review.`)) return
+  // _ddUpload: entityName='' means contract-specific (uses contract endpoint)
+  // entityName non-empty means general doc (uses entity endpoint)
+  window._ddUpload = async (contractId, docId, docType, entityName, btn) => {
+    const label = entityName ? `"${docType}" for ${entityName}` : `"${docType}" for ${contractId}`
+    if (!confirm(`Submit ${label}?\n\nA stub document will be uploaded for advisor review.`)) return
     btn.disabled = true; btn.textContent = 'Uploading…'
     try {
       const payload = {
-        doc_id:          docId,
-        document_type:   docType,
-        filename:        docType.toLowerCase().replace(/_/g,'-')+'.pdf',
-        uploaded_by:     'Client — '+contractId,
+        doc_id:           docId,
+        document_type:    docType,
+        filename:         docType.toLowerCase().replace(/_/g,'-')+'.pdf',
+        uploaded_by:      entityName || ('Client — '+contractId),
         file_content_b64: btoa('STUB_CONTENT'),
       }
-      await apiFetch('/contracts/'+contractId+'/due-diligence/upload', {
-        method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
-      })
+      if (entityName) {
+        await apiFetch('/entities/'+encodeURIComponent(entityName)+'/documents/upload', {
+          method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
+        })
+      } else {
+        await apiFetch('/contracts/'+contractId+'/due-diligence/upload', {
+          method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
+        })
+      }
       delete S.dd[contractId]
       delete S.ready[contractId]
       toast(`✓ ${docType} uploaded — awaiting advisor review`, 'ok')

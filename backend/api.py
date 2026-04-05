@@ -31,6 +31,12 @@
   POST /api/documents/{doc_id}/validate         → advisor validates/rejects
   GET  /api/contracts/{id}/due-diligence        → full DD status (RAG + gates)
 
+  ENTITY DOCUMENTS (GENERAL — upload once per entity):
+  ──────────────
+  GET  /api/entities/{name}/documents               → entity general doc summary
+  POST /api/entities/{name}/documents/upload        → upload general doc
+  POST /api/entities/{name}/documents/{id}/validate → advisor validates general doc
+
   ORACLE v3 (market data + events + regulatory):
   ──────────────
   GET  /api/oracle/rates                        → cached readings for all 9 rates
@@ -119,7 +125,9 @@ except Exception as _e:
 # Due diligence module — optional (graceful degradation if missing)
 _DD_OK = False
 try:
-    from due_diligence import DocumentType, DocumentStatus, CovenantChecker
+    from due_diligence import (
+        DocumentType, DocumentStatus, CovenantChecker, EntityDocumentStore,
+    )
     _DD_OK = True
     logger.info("Due diligence module loaded OK")
 except ImportError as _dd_e:
@@ -195,6 +203,7 @@ _schedules: Dict[str, "ScheduleElections"] = {}
 _comments: Dict[str, list] = {}     # contract_id → list of comment dicts
 _contract_pdfs: Dict[str, str] = {} # contract_id → PDF filesystem path
 _contract_meta: Dict[str, dict] = {} # contract_id → mode metadata
+_entity_stores: Dict[str, "EntityDocumentStore"] = {}  # entity_name → store
 # meta shape: {
 #   "mode": "advisor_managed" | "peer_to_peer" | "dual_advisor",
 #   "party_a_signed": bool,
@@ -221,6 +230,33 @@ def _get_engine(contract_id: str) -> "IRSExecutionEngine":
     if contract_id not in _engines:
         raise KeyError(f"Contract '{contract_id}' not found")
     return _engines[contract_id]
+
+
+def _get_or_create_entity_store(entity_name: str) -> "EntityDocumentStore":
+    """Return existing EntityDocumentStore for entity_name, or create one."""
+    if entity_name not in _entity_stores:
+        if _DD_OK:
+            _entity_stores[entity_name] = EntityDocumentStore(entity_name)
+        else:
+            return None  # type: ignore[return-value]
+    return _entity_stores[entity_name]
+
+
+def _merged_docs_for_contract(contract_id: str, eng: "IRSExecutionEngine"):
+    """
+    Return (entity_docs_a, entity_docs_b) for a contract's two parties.
+    Returns ([], []) if DD module is not available.
+    """
+    if not _DD_OK or not eng.dd_checker:
+        return [], []
+    pa_name = eng.dd_checker.params.party_a.name
+    pb_name = eng.dd_checker.params.party_b.name
+    store_a = _entity_stores.get(pa_name)
+    store_b = _entity_stores.get(pb_name)
+    return (
+        store_a.documents if store_a else [],
+        store_b.documents if store_b else [],
+    )
 
 
 def _http_error(status: int, code: str, message: str,
@@ -711,6 +747,11 @@ def api_create_contract(data: dict) -> dict:
 
     # Register before PDF generation (so contract exists even if PDF fails)
     _engines[cid] = engine
+
+    # Initialise entity stores for both parties (idempotent — no-op if already exist)
+    if _DD_OK:
+        _get_or_create_entity_store(params.party_a.name)
+        _get_or_create_entity_store(params.party_b.name)
 
     # Store mode metadata
     mode = str(data.get("contract_mode", "advisor_managed"))
@@ -1244,6 +1285,59 @@ def api_upload_document(contract_id: str, data: dict) -> dict:
     if not uploaded_by:
         _http_error(400, "MISSING_UPLOADER", "uploaded_by is required")
 
+    # GD- prefix → general (entity-level) document; everything else → contract-specific
+    if doc_id.startswith("GD-"):
+        # Find which entity store owns this doc_id
+        store = None
+        for es in _entity_stores.values():
+            try:
+                es._find(doc_id)
+                store = es
+                break
+            except KeyError:
+                pass
+        if store is None:
+            _http_error(404, "DOCUMENT_NOT_FOUND",
+                        f"General document '{doc_id}' not found in any entity store",
+                        isda_ref="§4 ISDA 2002")
+        try:
+            rec, alerts = store.upload_document(
+                doc_id=doc_id,
+                filename=filename,
+                uploaded_by=uploaded_by,
+                file_hash=data.get("file_hash"),
+                file_content_b64=data.get("file_content_b64"),
+                today=date.today(),
+            )
+        except KeyError as e:
+            _http_error(404, "DOCUMENT_NOT_FOUND", str(e), isda_ref="§4 ISDA 2002")
+        except ValueError as e:
+            _http_error(409, "UPLOAD_CONFLICT", str(e), isda_ref="§4 ISDA 2002")
+        # Log to every contract where this entity is a party
+        for cid, eng in _engines.items():
+            if (eng.dd_checker and
+                    eng.dd_checker.params.party_a.name == store.entity_name or
+                    eng.dd_checker and
+                    eng.dd_checker.params.party_b.name == store.entity_name):
+                eng.audit.log("ENTITY_DOCUMENT_UPLOADED", {
+                    "doc_id": rec.doc_id,
+                    "doc_type": rec.doc_type.value,
+                    "entity": store.entity_name,
+                    "filename": rec.filename,
+                    "uploaded_by": uploaded_by,
+                }, actor=uploaded_by)
+        return {
+            "status": "UPLOADED",
+            "document": rec.to_dict(),
+            "alerts": alerts,
+            "requires_advisor_review": rec.requires_human_review,
+            "advisor_action": (
+                rec.human_gate_reason if rec.requires_human_review
+                else "No immediate action — document queued for validation."
+            ),
+            "isda_ref": f"{rec.linked_obligation} ISDA 2002",
+        }
+
     eng = _get_engine(contract_id)
     if not eng.dd_checker:
         _http_error(503, "DD_NOT_INITIALISED",
@@ -1322,12 +1416,65 @@ def api_validate_document(doc_id: str, data: dict) -> dict:
     notes = str(data.get("notes", "")).strip()
     accepted = bool(data.get("accepted", True))
 
-    if not contract_id:
-        _http_error(400, "MISSING_CONTRACT_ID", "contract_id is required")
     if not advisor:
         _http_error(400, "MISSING_ADVISOR",
                     "advisor must identify the validating Calculation Agent",
                     isda_ref="§14 ISDA 2002")
+
+    # GD- prefix → general (entity-level) document
+    if doc_id.startswith("GD-"):
+        store = None
+        for es in _entity_stores.values():
+            try:
+                es._find(doc_id)
+                store = es
+                break
+            except KeyError:
+                pass
+        if store is None:
+            _http_error(404, "DOCUMENT_NOT_FOUND",
+                        f"General document '{doc_id}' not found in any entity store",
+                        isda_ref="§4 ISDA 2002")
+        try:
+            rec = store.validate_document(
+                doc_id=doc_id,
+                advisor=advisor,
+                notes=notes,
+                accepted=accepted,
+                today=date.today(),
+            )
+        except KeyError as e:
+            _http_error(404, "DOCUMENT_NOT_FOUND", str(e), isda_ref="§4 ISDA 2002")
+        except ValueError as e:
+            _http_error(409, "VALIDATION_CONFLICT", str(e), isda_ref="§4 ISDA 2002")
+        action = "VALIDATED" if accepted else "REJECTED"
+        # Propagate to audit trails of all contracts involving this entity
+        for cid, eng in _engines.items():
+            if (eng.dd_checker and (
+                    eng.dd_checker.params.party_a.name == store.entity_name or
+                    eng.dd_checker.params.party_b.name == store.entity_name)):
+                eng.audit.log(f"ENTITY_DOCUMENT_{action}", {
+                    "doc_id": rec.doc_id,
+                    "doc_type": rec.doc_type.value,
+                    "entity": store.entity_name,
+                    "advisor": advisor,
+                    "notes": notes,
+                }, actor=advisor)
+        logger.info(f"[ENTITY:{store.entity_name}] DOC {action}: {doc_id} by '{advisor}'")
+        return {
+            "status": action,
+            "document": rec.to_dict(),
+            "obligation_satisfied": accepted,
+            "isda_ref": f"{rec.linked_obligation} ISDA 2002",
+            "note": (
+                "General document validated — applies to all contracts for this entity."
+                if accepted
+                else "Document rejected — client must re-upload."
+            ),
+        }
+
+    if not contract_id:
+        _http_error(400, "MISSING_CONTRACT_ID", "contract_id is required")
 
     eng = _get_engine(contract_id)
     if not eng.dd_checker:
@@ -1360,7 +1507,12 @@ def api_validate_document(doc_id: str, data: dict) -> dict:
 
     # Log overall DD status change so global audit reflects RAG transitions
     try:
-        summary = eng.dd_checker.due_diligence_summary(date.today())
+        entity_docs_a, entity_docs_b = _merged_docs_for_contract(contract_id, eng)
+        summary = eng.dd_checker.due_diligence_summary(
+            date.today(),
+            entity_docs_a=entity_docs_a,
+            entity_docs_b=entity_docs_b,
+        )
         eng.audit.log("DD_STATUS_CHANGED", {
             "triggered_by_doc": doc_id,
             "rag_status": summary.get("rag_status", "UNKNOWN"),
@@ -1410,7 +1562,12 @@ def api_due_diligence(contract_id: str) -> dict:
         _http_error(503, "DD_NOT_INITIALISED",
                     "Due diligence checker not initialised for this contract")
 
-    return eng.dd_checker.due_diligence_summary(date.today())
+    entity_docs_a, entity_docs_b = _merged_docs_for_contract(contract_id, eng)
+    return eng.dd_checker.due_diligence_summary(
+        date.today(),
+        entity_docs_a=entity_docs_a,
+        entity_docs_b=entity_docs_b,
+    )
 
 
 def api_signing_readiness(contract_id: str) -> dict:
@@ -1447,7 +1604,9 @@ def api_signing_readiness(contract_id: str) -> dict:
             ),
         }
 
-    result = dict(eng.dd_checker.workflow.signing_readiness(eng.dd_checker.documents))
+    entity_docs_a, entity_docs_b = _merged_docs_for_contract(contract_id, eng)
+    merged_docs = eng.dd_checker.documents + list(entity_docs_a) + list(entity_docs_b)
+    result = dict(eng.dd_checker.workflow.signing_readiness(merged_docs))
     result["open_comments"] = open_count
     if open_count and result.get("ready"):
         result["ready"] = False
@@ -1482,6 +1641,149 @@ def api_validate_dd_doc(contract_id: str, doc_id: str, data: dict) -> dict:
     enriched = dict(data)
     enriched["contract_id"] = contract_id
     return api_validate_document(doc_id, enriched)
+
+
+# ─── Entity document store endpoints ─────────────────────────────────────────
+
+def api_entity_documents(entity_name: str) -> dict:
+    """
+    GET /api/entities/{name}/documents
+    Return the general document summary for an entity.
+    """
+    if not _DD_OK:
+        _http_error(503, "DD_UNAVAILABLE", "Due diligence module not available")
+    store = _get_or_create_entity_store(entity_name)
+    if store is None:
+        _http_error(503, "DD_UNAVAILABLE", "Due diligence module not available")
+    return store.summary()
+
+
+def api_entity_upload_document(entity_name: str, data: dict) -> dict:
+    """
+    POST /api/entities/{name}/documents/upload
+    Client uploads a general (entity-level) document.
+    """
+    if not _DD_OK:
+        _http_error(503, "DD_UNAVAILABLE", "Due diligence module not available")
+
+    doc_id = str(data.get("doc_id", "")).strip()
+    filename = str(data.get("filename", "")).strip()
+    uploaded_by = str(data.get("uploaded_by", "")).strip()
+
+    if not doc_id:
+        _http_error(400, "MISSING_DOC_ID", "doc_id is required")
+    if not filename:
+        _http_error(400, "MISSING_FILENAME", "filename is required")
+    if not uploaded_by:
+        _http_error(400, "MISSING_UPLOADER", "uploaded_by is required")
+
+    store = _get_or_create_entity_store(entity_name)
+    if store is None:
+        _http_error(503, "DD_UNAVAILABLE", "Due diligence module not available")
+
+    try:
+        rec, alerts = store.upload_document(
+            doc_id=doc_id,
+            filename=filename,
+            uploaded_by=uploaded_by,
+            file_hash=data.get("file_hash"),
+            file_content_b64=data.get("file_content_b64"),
+            today=date.today(),
+        )
+    except KeyError as e:
+        _http_error(404, "DOCUMENT_NOT_FOUND", str(e), isda_ref="§4 ISDA 2002")
+    except ValueError as e:
+        _http_error(409, "UPLOAD_CONFLICT", str(e), isda_ref="§4 ISDA 2002")
+
+    # Propagate to all contracts involving this entity
+    for cid, eng in _engines.items():
+        if (eng.dd_checker and (
+                eng.dd_checker.params.party_a.name == entity_name or
+                eng.dd_checker.params.party_b.name == entity_name)):
+            eng.audit.log("ENTITY_DOCUMENT_UPLOADED", {
+                "doc_id": rec.doc_id,
+                "doc_type": rec.doc_type.value,
+                "entity": entity_name,
+                "filename": rec.filename,
+                "uploaded_by": uploaded_by,
+            }, actor=uploaded_by)
+
+    logger.info(
+        f"[ENTITY:{entity_name}] DOC UPLOADED: {doc_id} by '{uploaded_by}'"
+    )
+    return {
+        "status": "UPLOADED",
+        "document": rec.to_dict(),
+        "alerts": alerts,
+        "requires_advisor_review": rec.requires_human_review,
+        "advisor_action": (
+            rec.human_gate_reason if rec.requires_human_review
+            else "No immediate action — document queued for validation."
+        ),
+        "isda_ref": f"{rec.linked_obligation} ISDA 2002",
+    }
+
+
+def api_entity_validate_document(entity_name: str, doc_id: str, data: dict) -> dict:
+    """
+    POST /api/entities/{name}/documents/{doc_id}/validate
+    Advisor validates a general entity document.
+    """
+    if not _DD_OK:
+        _http_error(503, "DD_UNAVAILABLE", "Due diligence module not available")
+
+    advisor = str(data.get("advisor", "")).strip()
+    notes = str(data.get("notes", "")).strip()
+    accepted = bool(data.get("accepted", True))
+
+    if not advisor:
+        _http_error(400, "MISSING_ADVISOR",
+                    "advisor must identify the validating Calculation Agent",
+                    isda_ref="§14 ISDA 2002")
+
+    store = _entity_stores.get(entity_name)
+    if store is None:
+        _http_error(404, "ENTITY_NOT_FOUND",
+                    f"Entity '{entity_name}' has no document store")
+
+    try:
+        rec = store.validate_document(
+            doc_id=doc_id,
+            advisor=advisor,
+            notes=notes,
+            accepted=accepted,
+            today=date.today(),
+        )
+    except KeyError as e:
+        _http_error(404, "DOCUMENT_NOT_FOUND", str(e), isda_ref="§4 ISDA 2002")
+    except ValueError as e:
+        _http_error(409, "VALIDATION_CONFLICT", str(e), isda_ref="§4 ISDA 2002")
+
+    action = "VALIDATED" if accepted else "REJECTED"
+    for cid, eng in _engines.items():
+        if (eng.dd_checker and (
+                eng.dd_checker.params.party_a.name == entity_name or
+                eng.dd_checker.params.party_b.name == entity_name)):
+            eng.audit.log(f"ENTITY_DOCUMENT_{action}", {
+                "doc_id": rec.doc_id,
+                "doc_type": rec.doc_type.value,
+                "entity": entity_name,
+                "advisor": advisor,
+                "notes": notes,
+            }, actor=advisor)
+
+    logger.info(f"[ENTITY:{entity_name}] DOC {action}: {doc_id} by '{advisor}'")
+    return {
+        "status": action,
+        "document": rec.to_dict(),
+        "obligation_satisfied": accepted,
+        "isda_ref": f"{rec.linked_obligation} ISDA 2002",
+        "note": (
+            "General document validated — applies to all contracts for this entity."
+            if accepted
+            else "Document rejected — client must re-upload."
+        ),
+    }
 
 
 # ─── Oracle v3 endpoints ──────────────────────────────────────────────────────
@@ -2128,6 +2430,20 @@ if HAS_FASTAPI:
         notes: str = ""
         accepted: bool = True
 
+    class EntityUploadRequest(BaseModel):
+        """Body for POST /api/entities/{name}/documents/upload"""
+        doc_id: str
+        filename: str
+        uploaded_by: str
+        file_hash: Optional[str] = None
+        file_content_b64: Optional[str] = None
+
+    class EntityValidateRequest(BaseModel):
+        """Body for POST /api/entities/{name}/documents/{doc_id}/validate"""
+        advisor: str
+        notes: str = ""
+        accepted: bool = True
+
     class AddCommentRequest(BaseModel):
         """Body for POST /api/contracts/{id}/comments"""
         author: str
@@ -2681,6 +2997,41 @@ if HAS_FASTAPI:
         lei:           str = ""
         contact_email: str = ""
         advisor_key:   str = ""
+
+    @app.get("/api/entities/{entity_name}/documents", tags=["Due Diligence"])
+    def entity_documents(entity_name: str):
+        """Return general (entity-level) document summary for an entity."""
+        try:
+            return api_entity_documents(entity_name)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"entity docs error: {e}\n{traceback.format_exc()}")
+            raise HTTPException(500, detail={"code": "INTERNAL_ERROR", "message": str(e)})
+
+    @app.post("/api/entities/{entity_name}/documents/upload", tags=["Due Diligence"])
+    def entity_upload_document(entity_name: str, req: EntityUploadRequest):
+        """Client uploads a general (entity-level) document."""
+        try:
+            return api_entity_upload_document(entity_name, req.dict())
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"entity upload error: {e}\n{traceback.format_exc()}")
+            raise HTTPException(500, detail={"code": "INTERNAL_ERROR", "message": str(e)})
+
+    @app.post("/api/entities/{entity_name}/documents/{doc_id}/validate",
+              tags=["Due Diligence"])
+    def entity_validate_document(entity_name: str, doc_id: str,
+                                  req: EntityValidateRequest):
+        """Advisor validates a general entity document."""
+        try:
+            return api_entity_validate_document(entity_name, doc_id, req.dict())
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"entity validate error: {e}\n{traceback.format_exc()}")
+            raise HTTPException(500, detail={"code": "INTERNAL_ERROR", "message": str(e)})
 
     @app.get("/api/client/profile", tags=["Client"])
     def get_client_profile():
