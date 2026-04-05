@@ -180,12 +180,28 @@ body{background:var(--bg);color:var(--t1);font-family:var(--ff);font-size:13px;d
 .al-r{font-family:var(--fm);font-size:9px;color:var(--t3);margin-top:4px}
 .al-a{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
 
-/* ── Clause builder ── */
-.clause{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--b0)}
-.clause:last-child{border-bottom:none}
-.clause-l{display:flex;align-items:center;gap:12px}
-.clause-ref{font-family:var(--fm);font-size:10px;color:var(--t3);width:70px}
-.clause-name{font-size:12px;font-weight:500}.clause-desc{font-size:10px;color:var(--t3);margin-top:2px}
+/* ── Mode selector cards ── */
+.mode-card{
+  background:var(--s2);border:2px solid var(--b1);border-radius:14px;
+  padding:22px 20px;cursor:pointer;transition:border-color .2s,box-shadow .2s;
+  user-select:none;
+}
+.mode-card:hover{border-color:rgba(167,139,250,.4);box-shadow:0 0 0 4px rgba(167,139,250,.07)}
+.mode-card.selected{border-color:var(--vi);box-shadow:0 0 0 4px rgba(167,139,250,.1)}
+
+/* ── Clause builder (inside modal) ── */
+.cb-part{margin-bottom:0}
+.cb-part-hd{
+  font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--vi);padding:14px 0 8px;border-top:1px solid var(--b0);margin-top:14px;
+}
+.cb-part-hd:first-child{border-top:none;margin-top:0;padding-top:4px}
+.doc-row{display:flex;gap:8px;align-items:center;margin-bottom:6px}
+.doc-row input{flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:6px 10px;color:var(--t1);font-size:11px;outline:none}
+.doc-row input:focus{border-color:rgba(167,139,250,.55)}
+.doc-tag{font-size:9px;padding:2px 7px;border-radius:4px;background:rgba(167,139,250,.12);color:var(--vi);white-space:nowrap}
+.doc-del{background:none;border:1px solid rgba(248,113,113,.3);border-radius:5px;color:var(--r);font-size:11px;padding:3px 8px;cursor:pointer;transition:background .15s}
+.doc-del:hover{background:rgba(248,113,113,.1)}
 .toggle{
   width:36px;height:20px;border-radius:10px;background:var(--s3);
   cursor:pointer;position:relative;transition:background var(--trans);flex-shrink:0;
@@ -385,7 +401,6 @@ select.fi option{background:var(--s2)}
   <div class="side-l">Contracts</div>
   <div class="si" onclick="openNC()" style="color:var(--vi);font-weight:500">+ New Contract</div>
   <div class="si" onclick="N('mon',this)">Monitoring §3/§4/§5 <span class="si-badge vi" id="sb-cts">—</span></div>
-  <div class="si" onclick="N('cb',this)">Clause Builder</div>
   <div class="si" onclick="N('net',this)">Netting Opinions</div>
   <div class="si" onclick="N('dd',this)">Due Diligence <span class="si-badge al" id="sb-dd">—</span></div>
   <div class="side-l">Operations</div>
@@ -558,7 +573,7 @@ function updateSidebar() {
 
 // ── NAVIGATION ────────────────────────────────────────────────────────────────
 function N(v, el) { view=v; document.querySelectorAll('.si').forEach(e=>e.classList.remove('on')); if(el) el.classList.add('on'); _closeSide(); R() }
-function R() { const fn=({d:rD,act:rAct,mon:rMon,cb:rCb,net:rNet,orc:rOrc,dd:rDd,aud:rAud,not:rNot,det:rDet,cli:rCli})[view]; const res=fn(document.getElementById('C')); if(res instanceof Promise) res.catch(console.error) }
+function R() { const fn=({d:rD,act:rAct,mon:rMon,net:rNet,orc:rOrc,dd:rDd,aud:rAud,not:rNot,det:rDet,cli:rCli})[view]; const res=fn(document.getElementById('C')); if(res instanceof Promise) res.catch(console.error) }
 
 // ── DISPLAY HELPERS ───────────────────────────────────────────────────────────
 const eur = (v,d=2) => v!=null ? '€'+Number(v).toLocaleString('en-GB',{minimumFractionDigits:d,maximumFractionDigits:d}) : '—'
@@ -983,35 +998,6 @@ ${Object.entries(S.details).flatMap(([id,det])=>(det.eods||[]).map(e=>`
 }
 
 // ── CLAUSE BUILDER ────────────────────────────────────────────────────────────
-function rCb(c) {
-  const clauses = [
-    {ref:'§2(c)',     name:'Payment Netting',             desc:'Automatic netting of same-date, same-currency payments',              auto:true,  mandatory:true,  on:true},
-    {ref:'Part 4(i)', name:'Multiple Transaction Netting', desc:'Net across multiple Transactions between same Offices',               auto:true,  mandatory:false, on:true},
-    {ref:'Part 1(e)', name:'Automatic Early Termination',  desc:'AET on Bankruptcy §5(a)(vii) — immediate termination without notice', auto:true,  mandatory:false, on:false},
-    {ref:'Part 1(c)', name:'Cross-Default',                desc:'§5(a)(vi) — default under external debt triggers EoD here',          auto:false, mandatory:false, on:false},
-    {ref:'CSA',       name:'Credit Support Annex',         desc:'Margin calls, threshold-based collateral posting',                    auto:false, mandatory:false, on:false},
-    {ref:'Break',     name:'Break Clause',                 desc:'Optional early termination right at specified break dates',           auto:false, mandatory:false, on:false},
-    {ref:'§3(g)',     name:'No Agency Representation',     desc:'Each party acts as principal, not agent',                            auto:false, mandatory:false, on:true}
-  ]
-  c.innerHTML = `${crumb('Clause Builder')}<div class="hd">Clause Builder</div><div class="sub">Configure Schedule elections and optional clauses · Changes affect contract generation</div>
-<div class="card" style="padding:0;overflow:hidden">
-${clauses.map(cl=>`<div class="clause">
-  <div class="clause-l"><div class="clause-ref">${cl.ref}</div><div>
-    <div class="clause-name">${cl.name}
-      ${cl.auto?'<span class="tag tag-v" style="margin-left:6px">AUTO</span>':''}
-      ${cl.mandatory?'<span class="tag tag-g" style="margin-left:4px">MANDATORY</span>':''}
-    </div>
-    <div class="clause-desc">${cl.desc}</div>
-  </div></div>
-  <div class="toggle ${cl.on?'on':''} ${cl.mandatory?'mandatory':''}" onclick="${cl.mandatory?'':`this.classList.toggle('on')`}"></div>
-</div>`).join('')}
-</div>
-<div style="margin-top:16px;display:flex;gap:8px">
-  <button class="btn act">Save Elections</button>
-  <button class="btn">Generate PDF</button>
-  <button class="btn">Export Schedule</button>
-</div>`
-}
 
 // ── NETTING OPINIONS ──────────────────────────────────────────────────────────
 function rNet(c) {
@@ -1884,14 +1870,32 @@ function _genId(){return 'SLC-IRS-EUR-'+String(Math.floor(Math.random()*9000)+10
 function openNC(){
   const today=new Date().toISOString().slice(0,10)
   const twoYears=new Date(Date.now()+2*365.25*86400000).toISOString().slice(0,10)
-  NC={step:1,loading:false,err:null,fieldErrors:{},result:null,data:{
+  NC={step:0,loading:false,err:null,fieldErrors:{},result:null,data:{
+    mode: null,
     contract_id:_genId(),
     party_a_name:'', party_a_short:'', party_a_jurisdiction:'GB',
     party_b_name:'', party_b_short:'', party_b_jurisdiction:'FR',
     notional:'10000000', fixed_rate:'3.200', currency:'EUR',
     floating_index:'EURIBOR 3M', effective_date:today, termination_date:twoYears,
-    governing_law:'English Law', mtpn:true, aet:false, csa:false,
-    csa_threshold_a:'500000', csa_threshold_b:'500000', csa_mta:'50000'
+    // Part 4 / misc
+    governing_law:'English Law', mtpn:true, aet:false,
+    calc_agent:'Party A',
+    // Part 1: termination
+    cross_default:false, cross_default_threshold_a:'10000000', cross_default_threshold_b:'10000000',
+    specified_entities_a:'', specified_entities_b:'',
+    // Part 2: tax reps
+    tax_rep_a:'payer', tax_rep_b:'payer',
+    // Part 3: docs checklist
+    docs_to_deliver:[
+      {id:'dd1',party:'Both',desc:'Annual Financial Statements',timing:'Within 120 days of fiscal year-end'},
+      {id:'dd2',party:'Both',desc:'Compliance Certificate',timing:'With each set of financial statements'},
+      {id:'dd3',party:'Both',desc:'Tax Form (W-8BEN / W-8BEN-E)',timing:'Upon execution and upon expiry'},
+    ],
+    // Part 5: additional provisions
+    additional_provisions:'',
+    // CSA
+    csa:false, csa_threshold_a:'500000', csa_threshold_b:'500000',
+    csa_mta:'50000', csa_collateral:'EUR Cash',
   }}
   renderNC()
   document.getElementById('nc-bg').style.display='flex'
@@ -1900,6 +1904,9 @@ function closeNC(){document.getElementById('nc-bg').style.display='none'}
 
 function ncV(){
   NC.err=null; NC.fieldErrors={}
+  if(NC.step===0){
+    if(!NC.data.mode){NC.err='Please select a contract type.';return false}
+  }
   if(NC.step===1){
     if(!NC.data.contract_id) NC.fieldErrors.contract_id='Required'
     if(!NC.data.party_a_name) NC.fieldErrors.party_a_name='Required'
@@ -1923,11 +1930,21 @@ function ncV(){
   }
   return true
 }
-function ncNext(){if(!ncV()){renderNC();return}NC.step++;renderNC()}
-function ncBack(){NC.err=null;NC.fieldErrors={};NC.step--;renderNC()}
+
+function ncNext(){
+  if(!ncV()){renderNC();return}
+  // Standard path: skip clause builder, submit directly after economics
+  if(NC.step===2 && NC.data.mode==='standard'){ncSubmit();return}
+  NC.step++;renderNC()
+}
+function ncBack(){
+  NC.err=null;NC.fieldErrors={}
+  // Standard path coming back from loading puts us on step 2
+  NC.step--;renderNC()
+}
 
 async function ncSubmit(){
-  if(!ncV()){renderNC();return}
+  if(NC.step!==0 && !ncV()){renderNC();return}
   NC.loading=true;NC.err=null;NC.fieldErrors={};renderNC()
   try{
     const d=NC.data
@@ -1939,15 +1956,29 @@ async function ncSubmit(){
       effective_date:d.effective_date, termination_date:d.termination_date,
       initiated_by:'ADVISOR',
       governing_law:d.governing_law, mtpn:d.mtpn, aet:d.aet,
-      csa:d.csa, csa_threshold_a:d.csa?Number(d.csa_threshold_a):undefined,
+      csa:d.csa,
+      csa_threshold_a:d.csa?Number(d.csa_threshold_a):undefined,
       csa_threshold_b:d.csa?Number(d.csa_threshold_b):undefined,
       csa_mta:d.csa?Number(d.csa_mta):undefined,
       contract_mode: d.contract_mode||'advisor_managed',
       created_by_role: 'advisor',
     })
-    NC.loading=false; NC.result=r; NC.step=4; renderNC()
+    NC.loading=false; NC.result=r; NC.step=99; renderNC()
     await refresh()
   }catch(e){NC.loading=false;NC.err='API error: '+e.message;renderNC()}
+}
+
+function _ncAddDoc(){
+  NC.data.docs_to_deliver.push({id:'dd'+Date.now(),party:'Both',desc:'',timing:''})
+  renderNC()
+}
+function _ncDelDoc(id){
+  NC.data.docs_to_deliver=NC.data.docs_to_deliver.filter(d=>d.id!==id)
+  renderNC()
+}
+function _ncDocField(id,field,val){
+  const doc=NC.data.docs_to_deliver.find(d=>d.id===id)
+  if(doc) doc[field]=val
 }
 
 function renderNC(){
@@ -1956,10 +1987,22 @@ function renderNC(){
   const fe = NC.fieldErrors||{}
   const jSel=(key)=>JURIS.map(j=>`<option value="${j.v}"${NC.data[key]===j.v?' selected':''}>${j.l}</option>`).join('')
   const glSel=GLAW.map(g=>`<option value="${g.v}"${NC.data.governing_law===g.v?' selected':''}>${g.l}</option>`).join('')
-  const ind=[1,2,3,4].map(i=>`<div class="step-dot ${i<NC.step?'done':i===NC.step?'cur':''}"></div>`).join('')
-  const labels=['Parties','Economic Terms','Schedule Elections','Complete']
   const genErr=NC.err?`<div class="merr">⚠ ${NC.err}</div>`:''
   const fld=(key,content)=>`<div class="fr">${content}${fe[key]?`<div class="ferr">⚠ ${fe[key]}</div>`:''}</div>`
+
+  const isCustom = NC.data.mode==='custom'
+  // Progress dots: step 0=mode, 1=parties, 2=economics, 3=clauses(custom), result
+  const totalSteps = isCustom ? 4 : 3
+  const stepLabels = isCustom
+    ? ['Contract Type','Parties','Economic Terms','Schedule & Clauses']
+    : ['Contract Type','Parties','Economic Terms']
+  const curStep = NC.step  // 0=mode,1=parties,2=econ,3=clauses,99=result
+  const ind = Array.from({length:totalSteps},(_,i)=>
+    `<div class="step-dot ${i<curStep?'done':i===curStep?'cur':''}"></div>`).join('')
+  const subLabel = curStep===99 ? 'Transaction complete'
+    : curStep<totalSteps ? `Step ${curStep+1} of ${totalSteps} — ${stepLabels[curStep]}`
+    : ''
+
   let body
 
   if(NC.loading){
@@ -1968,6 +2011,26 @@ function renderNC(){
 <div style="font-size:13px;color:var(--t2);margin-bottom:10px">Creating contract…</div>
 <div style="font-size:10px;line-height:2.2;font-family:var(--fm)">Fetching EURIBOR 3M from ECB SDW<br>Generating quarterly schedule<br>Running netting opinion check<br>Producing Confirmation PDF (SHA-256)</div>
 </div>`
+
+  } else if(NC.step===0){
+    body=`
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:4px 0 20px">
+  <div class="mode-card${NC.data.mode==='standard'?' selected':''}" onclick="NC.data.mode='standard';renderNC()">
+    <div style="font-size:22px;margin-bottom:10px">▣</div>
+    <div style="font-size:13px;font-weight:600;margin-bottom:6px">Standard Contract</div>
+    <div style="font-size:11px;color:var(--t3);line-height:1.7;margin-bottom:14px">Uses <span style="font-family:var(--fm);color:var(--t2)">nomos_standard_v1</span> template with default Schedule elections. Fastest path to execution.</div>
+    <div style="font-size:10px;color:var(--t3);line-height:2">✓ §2(c) Payment Netting<br>✓ MTPN elected<br>✓ English Law · Party A calc agent<br>✗ No AET · No CSA · No cross-default</div>
+  </div>
+  <div class="mode-card${NC.data.mode==='custom'?' selected':''}" onclick="NC.data.mode='custom';renderNC()">
+    <div style="font-size:22px;margin-bottom:10px">⚙</div>
+    <div style="font-size:13px;font-weight:600;margin-bottom:6px">Custom Contract</div>
+    <div style="font-size:11px;color:var(--t3);line-height:1.7;margin-bottom:14px">Full Schedule configuration: termination provisions, tax reps, documents, miscellaneous elections, and custom clauses.</div>
+    <div style="font-size:10px;color:var(--t3);line-height:2">+ Termination provisions<br>+ Tax representations<br>+ Documents to deliver<br>+ CSA / collateral</div>
+  </div>
+</div>
+${genErr}
+<div class="mfooter"><div/><div style="display:flex;gap:8px"><button class="btn" onclick="closeNC()">Cancel</button><button class="btn act" onclick="ncNext()"${!NC.data.mode?' disabled':''}>Next →</button></div></div>`
+
   } else if(NC.step===1){
     body=`
 ${fld('contract_id',`<div class="fl">Contract Reference <span class="req">*</span></div><input class="fi${fe.contract_id?' err':''}" value="${NC.data.contract_id}" oninput="NC.data.contract_id=this.value" placeholder="SLC-IRS-EUR-001"/>`)}
@@ -1984,11 +2047,15 @@ ${fld('party_b_name',`<div class="fl">Legal Name <span class="req">*</span></div
 </div>
 <div class="fr"><div class="fl">Jurisdiction of Incorporation</div><select class="fi" onchange="NC.data.party_b_jurisdiction=this.value">${jSel('party_b_jurisdiction')}</select></div>
 ${genErr}
-<div class="mfooter"><div/><div style="display:flex;gap:8px"><button class="btn" onclick="closeNC()">Cancel</button><button class="btn act" onclick="ncNext()">Next →</button></div></div>`
+<div class="mfooter"><button class="btn" onclick="ncBack()">← Back</button><div style="display:flex;gap:8px"><button class="btn" onclick="closeNC()">Cancel</button><button class="btn act" onclick="ncNext()">Next →</button></div></div>`
+
   } else if(NC.step===2){
-    const notM=(Number(NC.data.notional)/1e6).toFixed(1)
     const qFixed=NC.data.notional&&NC.data.fixed_rate?(Number(NC.data.notional)*Number(NC.data.fixed_rate)/100/4).toFixed(0):null
     const preview=qFixed?`<div style="background:var(--s2);border-radius:8px;padding:12px 14px;font-size:10px;color:var(--t3);margin-top:8px;border:1px solid var(--b0)"><strong style="color:var(--t2)">Indicative economics</strong><br>Notional: ${NC.data.currency} ${Number(NC.data.notional).toLocaleString()} · Fixed leg: ~${NC.data.currency} ${Number(qFixed).toLocaleString()}/quarter<br>Day count: Fixed 30/360 · Float ACT/360 · Frequency: Quarterly · §2(c) netting</div>`:''
+    const nextLabel = NC.data.mode==='standard' ? 'Generate Contract' : 'Next →'
+    const nextBtn = NC.data.mode==='standard'
+      ? `<button class="btn approve" onclick="ncNext()">${nextLabel}</button>`
+      : `<button class="btn act" onclick="ncNext()">${nextLabel}</button>`
     body=`
 <div class="fr2">
 ${fld('notional',`<div class="fl">Notional Amount <span class="req">*</span></div><input class="fi${fe.notional?' err':''}" type="number" value="${NC.data.notional}" oninput="NC.data.notional=this.value;renderNC()" placeholder="10000000"/>`)}
@@ -2003,52 +2070,136 @@ ${fld('effective_date',`<div class="fl">Effective Date <span class="req">*</span
 ${fld('termination_date',`<div class="fl">Termination Date <span class="req">*</span></div><input class="fi${fe.termination_date?' err':''}" type="date" value="${NC.data.termination_date}" oninput="NC.data.termination_date=this.value"/>`)}
 </div>
 ${preview}
+${NC.data.mode==='standard'?`<div style="background:rgba(74,222,128,.06);border:1px solid rgba(74,222,128,.2);border-radius:8px;padding:10px 14px;margin-top:12px;font-size:10px;color:var(--t3)"><strong style="color:var(--g)">Standard template elected</strong> — English Law · MTPN · §2(c) netting · No AET · No CSA. Clicking "Generate Contract" will create the contract immediately.</div>`:''}
 ${genErr}
-<div class="mfooter"><button class="btn" onclick="ncBack()">← Back</button><div style="display:flex;gap:8px"><button class="btn" onclick="closeNC()">Cancel</button><button class="btn act" onclick="ncNext()">Next →</button></div></div>`
+<div class="mfooter"><button class="btn" onclick="ncBack()">← Back</button><div style="display:flex;gap:8px"><button class="btn" onclick="closeNC()">Cancel</button>${nextBtn}</div></div>`
+
   } else if(NC.step===3){
-    const csaFields=NC.data.csa?`<div style="background:var(--s2);border-radius:8px;padding:14px;margin-top:12px;border:1px solid var(--b0)"><div style="font-size:10px;color:var(--t3);margin-bottom:12px;font-weight:500;letter-spacing:.05em;text-transform:uppercase">CSA Parameters</div><div class="fr3">
-<div class="fr"><div class="fl">Threshold A (EUR)</div><input class="fi" type="number" value="${NC.data.csa_threshold_a}" oninput="NC.data.csa_threshold_a=this.value"/></div>
-<div class="fr"><div class="fl">Threshold B (EUR)</div><input class="fi" type="number" value="${NC.data.csa_threshold_b}" oninput="NC.data.csa_threshold_b=this.value"/></div>
-<div class="fr"><div class="fl">Min. Transfer (EUR)</div><input class="fi" type="number" value="${NC.data.csa_mta}" oninput="NC.data.csa_mta=this.value"/></div>
-</div></div>`:''
+    // ── Full clause builder (Custom path only) ─────────────────────────────
+    const cdFields = NC.data.cross_default ? `
+<div style="background:var(--s2);border-radius:8px;padding:14px;margin-top:10px;border:1px solid var(--b0)">
+  <div class="fr3">
+    <div class="fr"><div class="fl">Threshold A (EUR)</div><input class="fi" type="number" value="${NC.data.cross_default_threshold_a}" oninput="NC.data.cross_default_threshold_a=this.value"/></div>
+    <div class="fr"><div class="fl">Threshold B (EUR)</div><input class="fi" type="number" value="${NC.data.cross_default_threshold_b}" oninput="NC.data.cross_default_threshold_b=this.value"/></div>
+  </div>
+  <div class="fr"><div class="fl">Specified Entities — Party A</div><input class="fi" value="${NC.data.specified_entities_a}" oninput="NC.data.specified_entities_a=this.value" placeholder="e.g. Alpha Holdings Ltd; Alpha Capital S.A."/></div>
+  <div class="fr"><div class="fl">Specified Entities — Party B</div><input class="fi" value="${NC.data.specified_entities_b}" oninput="NC.data.specified_entities_b=this.value" placeholder="e.g. Beta Group plc"/></div>
+</div>` : ''
+
+    const csaFields = NC.data.csa ? `
+<div style="background:var(--s2);border-radius:8px;padding:14px;margin-top:10px;border:1px solid var(--b0)">
+  <div class="fr3">
+    <div class="fr"><div class="fl">Threshold A (EUR)</div><input class="fi" type="number" value="${NC.data.csa_threshold_a}" oninput="NC.data.csa_threshold_a=this.value"/></div>
+    <div class="fr"><div class="fl">Threshold B (EUR)</div><input class="fi" type="number" value="${NC.data.csa_threshold_b}" oninput="NC.data.csa_threshold_b=this.value"/></div>
+    <div class="fr"><div class="fl">Min. Transfer Amount (EUR)</div><input class="fi" type="number" value="${NC.data.csa_mta}" oninput="NC.data.csa_mta=this.value"/></div>
+  </div>
+  <div class="fr"><div class="fl">Eligible Collateral</div>
+    <select class="fi" onchange="NC.data.csa_collateral=this.value">
+      <option value="EUR Cash"${NC.data.csa_collateral==='EUR Cash'?' selected':''}>EUR Cash</option>
+      <option value="USD Cash"${NC.data.csa_collateral==='USD Cash'?' selected':''}>USD Cash</option>
+      <option value="EUR Cash + G7 Govvies"${NC.data.csa_collateral==='EUR Cash + G7 Govvies'?' selected':''}>EUR Cash + G7 Government Bonds</option>
+      <option value="EUR Cash + ECB Eligible"${NC.data.csa_collateral==='EUR Cash + ECB Eligible'?' selected':''}>EUR Cash + ECB Eligible Securities</option>
+    </select>
+  </div>
+</div>` : ''
+
+    const taxOpts = ['payer','not-payer','not-exempt','exempt-recipient'].map(o=>o)
+    const taxSel=(key)=>taxOpts.map(o=>`<option value="${o}"${NC.data[key]===o?' selected':''}>${{
+      'payer':'Payer — not acting through PE',
+      'not-payer':'Not a Payer',
+      'not-exempt':'Not exempt from withholding tax',
+      'exempt-recipient':'Exempt Recipient (§6012 / §501)'
+    }[o]||o}</option>`).join('')
+
+    const docsHtml = NC.data.docs_to_deliver.map(d=>`
+<div class="doc-row">
+  <span class="doc-tag">${d.party||'Both'}</span>
+  <input value="${d.desc}" oninput="_ncDocField('${d.id}','desc',this.value)" placeholder="Document description…"/>
+  <input value="${d.timing}" oninput="_ncDocField('${d.id}','timing',this.value)" placeholder="Timing…" style="max-width:200px"/>
+  <button class="doc-del" onclick="_ncDelDoc('${d.id}')">✕</button>
+</div>`).join('')
+
     body=`
+<!-- Part 1: Termination Provisions -->
+<div class="cb-part-hd">Part 1 — Termination Provisions</div>
+<div style="background:var(--s2);border-radius:8px;padding:0 14px;margin-bottom:4px;border:1px solid var(--b0)">
+<div class="ftog"><div class="ftog-l"><div class="fn">Automatic Early Termination</div><div class="fd">§6(a) AET — immediate termination on §5(a)(vii) Bankruptcy, no notice required</div></div>
+<div class="toggle${NC.data.aet?' on':''}" onclick="NC.data.aet=!NC.data.aet;this.classList.toggle('on')"></div></div>
+<div class="ftog"><div class="ftog-l"><div class="fn">Cross-Default</div><div class="fd">§5(a)(vi) — default under Specified Indebtedness triggers EoD here · threshold applies</div></div>
+<div class="toggle${NC.data.cross_default?' on':''}" onclick="NC.data.cross_default=!NC.data.cross_default;renderNC()"></div></div>
+</div>
+${cdFields}
+
+<!-- Part 2: Tax Representations -->
+<div class="cb-part-hd">Part 2 — Tax Representations §3(f)</div>
+<div class="fr2">
+<div class="fr"><div class="fl">Party A Tax Representation</div>
+<select class="fi" onchange="NC.data.tax_rep_a=this.value">${taxSel('tax_rep_a')}</select></div>
+<div class="fr"><div class="fl">Party B Tax Representation</div>
+<select class="fi" onchange="NC.data.tax_rep_b=this.value">${taxSel('tax_rep_b')}</select></div>
+</div>
+
+<!-- Part 3: Documents to Deliver -->
+<div class="cb-part-hd">Part 3 — Documents to Deliver (Schedule Part 3 / §4(a))</div>
+<div style="margin-bottom:8px">${docsHtml}</div>
+<button class="btn" style="font-size:10px;margin-bottom:4px" onclick="_ncAddDoc()">+ Add Document</button>
+
+<!-- Part 4: Miscellaneous -->
+<div class="cb-part-hd">Part 4 — Miscellaneous Elections</div>
 <div class="fr"><div class="fl">Governing Law</div><select class="fi" onchange="NC.data.governing_law=this.value">${glSel}</select></div>
-<div style="background:var(--s2);border-radius:8px;padding:0 14px;margin:14px 0;border:1px solid var(--b0)">
+<div style="background:var(--s2);border-radius:8px;padding:0 14px;margin-bottom:4px;border:1px solid var(--b0)">
 <div class="ftog"><div class="ftog-l"><div class="fn">§2(c) Payment Netting</div><div class="fd">Automatic — same date, same currency · MANDATORY</div></div><div class="toggle on mandatory"></div></div>
 <div class="ftog"><div class="ftog-l"><div class="fn">Multiple Transaction Payment Netting</div><div class="fd">Part 4(i) — net across all Transactions between the parties</div></div>
-<div id="tog-mtpn" class="toggle${NC.data.mtpn?' on':''}" onclick="NC.data.mtpn=!NC.data.mtpn;this.classList.toggle('on')"></div></div>
-<div class="ftog"><div class="ftog-l"><div class="fn">Automatic Early Termination</div><div class="fd">§6(a) AET — immediate termination on §5(a)(vii) Bankruptcy</div></div>
-<div id="tog-aet" class="toggle${NC.data.aet?' on':''}" onclick="NC.data.aet=!NC.data.aet;this.classList.toggle('on')"></div></div>
+<div class="toggle${NC.data.mtpn?' on':''}" onclick="NC.data.mtpn=!NC.data.mtpn;this.classList.toggle('on')"></div></div>
+</div>
+<div class="fr"><div class="fl">Calculation Agent</div>
+<select class="fi" onchange="NC.data.calc_agent=this.value">
+  <option value="Party A"${NC.data.calc_agent==='Party A'?' selected':''}>Party A</option>
+  <option value="Party B"${NC.data.calc_agent==='Party B'?' selected':''}>Party B</option>
+  <option value="Both"${NC.data.calc_agent==='Both'?' selected':''}>Both (dispute resolution)</option>
+</select></div>
+
+<!-- CSA -->
+<div class="cb-part-hd">Credit Support Annex</div>
+<div style="background:var(--s2);border-radius:8px;padding:0 14px;margin-bottom:4px;border:1px solid var(--b0)">
 <div class="ftog"><div class="ftog-l"><div class="fn">Credit Support Annex (CSA)</div><div class="fd">VM CSA — threshold-based margin and collateral posting</div></div>
-<div id="tog-csa" class="toggle${NC.data.csa?' on':''}" onclick="NC.data.csa=!NC.data.csa;renderNC()"></div></div>
+<div class="toggle${NC.data.csa?' on':''}" onclick="NC.data.csa=!NC.data.csa;renderNC()"></div></div>
 </div>
 ${csaFields}
+
+<!-- Part 5: Additional Provisions -->
+<div class="cb-part-hd">Part 5 — Additional Provisions</div>
+<div class="fr"><div class="fl">Custom Clauses (free text)</div>
+<textarea class="fi" rows="4" style="resize:vertical;font-family:var(--ff)" oninput="NC.data.additional_provisions=this.value" placeholder="Enter any bespoke Schedule provisions, representations, or additional agreements…">${NC.data.additional_provisions}</textarea></div>
+
 ${genErr}
-<div class="mfooter"><button class="btn" onclick="ncBack()">← Back</button><div style="display:flex;gap:8px"><button class="btn" onclick="closeNC()">Cancel</button><button class="btn approve" onclick="ncSubmit()">Generate Contract</button></div></div>`
-  } else if(NC.step===4){
+<div class="mfooter"><button class="btn" onclick="ncBack()">← Back</button><div style="display:flex;gap:8px"><button class="btn" onclick="closeNC()">Cancel</button><button class="btn approve" onclick="ncSubmit()">Review &amp; Generate</button></div></div>`
+
+  } else if(NC.step===99){
     const r=NC.result||{}
     body=`
 <div style="text-align:center;padding:16px 0 24px">
 <div class="success-ring">✓</div>
 <div style="font-size:17px;font-weight:600;margin-bottom:4px">Contract Generated</div>
-<div style="font-size:11px;color:var(--t3)">Awaiting client signature to activate</div>
+<div style="font-size:11px;color:var(--t3)">Confirmation PDF ready · Awaiting client DD + signature to activate</div>
 </div>
 <table style="width:100%;border-collapse:collapse">
-<tr><td style="padding:8px 0;font-size:10px;color:var(--t3);width:140px;letter-spacing:.03em">Contract ID</td><td style="font-family:var(--fm);font-size:11px;color:var(--warm)">${r.contract_id||'—'}</td></tr>
+<tr><td style="padding:8px 0;font-size:10px;color:var(--t3);width:140px">Contract ID</td><td style="font-family:var(--fm);font-size:11px;color:var(--warm)">${r.contract_id||'—'}</td></tr>
+<tr><td style="padding:8px 0;font-size:10px;color:var(--t3)">Type</td><td style="font-size:11px">${NC.data.mode==='standard'?'Standard (nomos_standard_v1)':'Custom Schedule'}</td></tr>
 <tr><td style="padding:8px 0;font-size:10px;color:var(--t3)">Periods</td><td style="font-size:11px">${r.periods||'—'} quarterly payment periods</td></tr>
 <tr><td style="padding:8px 0;font-size:10px;color:var(--t3)">Status</td><td><span class="p p-w">◐ Pending Signature</span></td></tr>
 <tr><td style="padding:8px 0;font-size:10px;color:var(--t3)">Netting</td><td><span class="p ${r.netting_status==='GREEN'?'p-g':r.netting_status==='AMBER'?'p-w':'p-b'}">${r.netting_status||'NOT_ASSESSED'}</span></td></tr>
 </table>
 <div style="font-size:10px;color:var(--t3);margin-top:16px;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Confirmation SHA-256 fingerprint</div>
 <div class="hash-box">${r.confirmation_hash||'—'}</div>
-<div style="font-size:10px;color:var(--t3);margin-top:10px;line-height:2">§1(b) ISDA 2002 · Confirmation prevails over Schedule and MA<br>Contract will activate once client executes the Confirmation</div>
-<div class="mfooter"><div/><button class="btn act" onclick="closeNC()">Close</button></div>`
+<div style="font-size:10px;color:var(--t3);margin-top:10px;line-height:2">§1(b) ISDA 2002 · Confirmation prevails over Schedule and MA<br>Next step: client completes DD documents, then signs to activate</div>
+<div class="mfooter"><div/><div style="display:flex;gap:8px"><button class="btn" onclick="closeNC();N('dd',null)">Go to Due Diligence</button><button class="btn act" onclick="closeNC()">Close</button></div></div>`
   }
 
   el.innerHTML=`
 <div class="modal-h">New IRS Transaction</div>
-<div class="modal-sub">${NC.step<=3?'Step '+NC.step+' of 3 — '+labels[NC.step-1]:'Transaction complete'}</div>
-<div class="step-ind">${ind}</div>
+<div class="modal-sub">${subLabel}</div>
+<div class="step-ind">${NC.step<99&&!NC.loading?ind:''}</div>
 ${NC.loading?body:(body||'')}`
 }
 </script></body></html>
