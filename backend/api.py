@@ -1869,11 +1869,18 @@ def api_oracle_events(contract_id: Optional[str] = None, min_severity: str = "LO
     }
     sev = sev_map.get(min_severity.upper(), EventSeverity.LOW)
 
-    events = oracle.get_events(contract_id=contract_id, min_severity=sev, since_hours=48)
+    has_api_key = oracle.event_monitor.api_key is not None
+    # Seed stub events on first call when no API key; no-op on subsequent calls
+    oracle.poll_events()
+    # Use 7-day window for stub mode (stubs are seeded once and persist in memory)
+    window_hours = 168 if not has_api_key else 48
+    events = oracle.get_events(contract_id=contract_id, min_severity=sev, since_hours=window_hours)
     return {
         "status":      "ok",
         "event_count": len(events),
         "events":      [e.as_dict() for e in events],
+        "has_api_key": has_api_key,
+        "stub_mode":   not has_api_key,
         "as_of":       _utcnow_iso(),
     }
 
@@ -1905,6 +1912,9 @@ def api_oracle_regulatory(contract_type: str = "IRS", jurisdiction: str = "") ->
             "effective_date":         a.effective_date,
             "source_url":             a.source_url,
             "severity":               a.severity.value,
+            "urgency":                a.urgency.value,
+            "status":                 a.status,
+            "theme":                  a.theme,
         }
 
     return {

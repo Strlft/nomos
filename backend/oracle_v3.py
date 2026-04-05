@@ -148,6 +148,7 @@ class RateHistory:
     rate_id:              RateID
     readings:             List[RateReading]             = field(default_factory=list)
     last_confirmed:       Optional[Decimal]              = None
+    last_confirmed_date:  Optional[str]                  = None   # publication_date of last CONFIRMED reading
     anomaly_threshold_bps: Decimal                      = Decimal("5")
     max_age_hours:        int                            = 48
 
@@ -155,6 +156,12 @@ class RateHistory:
         self.readings.append(reading)
         if reading.status == RateStatus.CONFIRMED:
             self.last_confirmed = reading.rate
+            # Use ECB publication_date if available, else fetch timestamp date
+            self.last_confirmed_date = (
+                reading.publication_date
+                if reading.publication_date and reading.publication_date != "unknown"
+                else reading.fetch_timestamp[:10]
+            )
 
     def latest(self) -> Optional[RateReading]:
         return self.readings[-1] if self.readings else None
@@ -195,6 +202,7 @@ class MarketEvent:
             "headline":         self.headline,
             "description":      self.description,
             "source_url":       self.source_url,
+            "source_name":      self.source_name,
             "published_at":     self.published_at,
             "fetched_at":       self.fetched_at,
             "matched_keywords": self.matched_keywords,
@@ -216,6 +224,9 @@ class RegulatoryAlert:
     effective_date:        str          # ISO-8601 date
     source_url:            str
     severity:              EventSeverity = EventSeverity.MEDIUM
+    urgency:               EventSeverity = EventSeverity.MEDIUM   # how soon action is needed
+    status:                str           = "IN_FORCE"             # PROPOSED / ADOPTED / IN_FORCE
+    theme:                 str           = "REPORTING"            # CLEARING/REPORTING/CAPITAL/CONDUCT/CRYPTO/SETTLEMENT/DISCLOSURE/RESILIENCE/ESG
 
     def impacts(self, contract_type: str, jurisdiction: str) -> bool:
         """True if this alert is relevant to the given contract type/jurisdiction."""
@@ -241,6 +252,9 @@ class RegulatoryAlert:
             "effective_date":        self.effective_date,
             "source_url":            self.source_url,
             "severity":              self.severity.value,
+            "urgency":               self.urgency.value,
+            "status":                self.status,
+            "theme":                 self.theme,
         }
 
 
@@ -471,6 +485,12 @@ class RateRegistry:
                     "anomalies":   sum(
                         1 for r in h.readings if r.status == RateStatus.CHALLENGED
                     ),
+                    "last_confirmed_date": h.last_confirmed_date,
+                    # Last 10 readings for sparkline (rate + status only)
+                    "history": [
+                        {"rate": str(r.rate), "status": r.status.value, "ts": r.fetch_timestamp[:16]}
+                        for r in h.readings[-10:]
+                    ],
                 }
         return out
 
@@ -581,6 +601,7 @@ class EventMonitor:
         self._event_store: List[MarketEvent] = []
         self._seen_urls: Set[str] = set()
         self._event_counter = 0
+        self._stubs_seeded: bool = False
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -588,9 +609,15 @@ class EventMonitor:
         """
         Run one news poll cycle for all subscribed contracts.
         Returns newly discovered events (not seen in previous polls).
+        When NEWSAPI_KEY is not set, seeds curated stub events once on first poll.
         """
         if not self.api_key:
-            print("  [EVENT MONITOR] No API key — stub mode (no events fetched).")
+            if not self._stubs_seeded:
+                print("  [EVENT MONITOR] No API key — seeding curated stub events.")
+                stubs = self._build_stub_events()
+                self._event_store.extend(stubs)
+                self._stubs_seeded = True
+                return stubs
             return []
 
         new_events: List[MarketEvent] = []
@@ -650,6 +677,144 @@ class EventMonitor:
         return list(self._event_store)
 
     # ── Private helpers ───────────────────────────────────────────────────────
+
+    def _build_stub_events(self) -> List[MarketEvent]:
+        """
+        Curated realistic stub events returned when no NEWSAPI_KEY is configured.
+        Covers the major MAC-clause trigger categories (sanctions, default, regulatory,
+        market disruption, counterparty news) at varied severity levels.
+        Set NEWSAPI_KEY in the environment to replace these with live data.
+        """
+        now = _utcnow()
+        return [
+            MarketEvent(
+                event_id="EVT-STUB-001",
+                event_type=EventType.SANCTIONS,
+                severity=EventSeverity.HIGH,
+                headline="OFAC designates major Russian state-owned bank — SDN list updated",
+                description=(
+                    "The U.S. Office of Foreign Assets Control has added VTB Bank and two "
+                    "affiliated entities to the Specially Designated Nationals list, expanding "
+                    "blocking sanctions. EU counterparties with existing OTC derivative trades "
+                    "referencing affected entities may face immediate termination obligations."
+                ),
+                source_url="https://home.treasury.gov/policy-issues/financial-sanctions/recent-actions",
+                source_name="U.S. Treasury / OFAC",
+                published_at="2026-04-03T14:00:00Z",
+                fetched_at=now,
+                matched_keywords=["ofac", "sanctions", "sdn list"],
+                linked_contracts=[],
+            ),
+            MarketEvent(
+                event_id="EVT-STUB-002",
+                event_type=EventType.REGULATORY_CHANGE,
+                severity=EventSeverity.HIGH,
+                headline="ESMA publishes final EMIR 3.0 RTS on active account requirements — 6-month clock starts",
+                description=(
+                    "The European Securities and Markets Authority has published binding "
+                    "Regulatory Technical Standards mandating EU counterparties to hold an "
+                    "active account at an EU CCP for specified derivatives categories. "
+                    "Firms have 6 months to demonstrate representativeness thresholds."
+                ),
+                source_url="https://www.esma.europa.eu/press-news/esma-news",
+                source_name="ESMA",
+                published_at="2026-03-28T09:00:00Z",
+                fetched_at=now,
+                matched_keywords=["regulatory change", "regulation", "compliance"],
+                linked_contracts=[],
+            ),
+            MarketEvent(
+                event_id="EVT-STUB-003",
+                event_type=EventType.DEFAULT,
+                severity=EventSeverity.HIGH,
+                headline="Moody's downgrades French sovereign to Aa3 — cross-default clauses under review",
+                description=(
+                    "Moody's Investors Service cut France's long-term issuer rating to Aa3 "
+                    "from Aa2, citing fiscal consolidation delays. Advisors should review "
+                    "cross-default threshold triggers in ISDA schedules where the French "
+                    "Republic or French state entities are specified counterparties."
+                ),
+                source_url="https://www.moodys.com/research/sovereigns",
+                source_name="Moody's Investors Service",
+                published_at="2026-04-01T07:30:00Z",
+                fetched_at=now,
+                matched_keywords=["default", "cross default"],
+                linked_contracts=[],
+            ),
+            MarketEvent(
+                event_id="EVT-STUB-004",
+                event_type=EventType.FORCE_MAJEURE,
+                severity=EventSeverity.HIGH,
+                headline="ECB activates emergency repo facility amid eurozone CCP margin call spike",
+                description=(
+                    "The European Central Bank has activated its emergency liquidity support "
+                    "facility after LCH SA issued intraday margin calls 4× above normal levels "
+                    "following a sharp move in EUR swap rates. Collateral shortfalls being "
+                    "reported by several mid-size clearing members. Force majeure review advised."
+                ),
+                source_url="https://www.ecb.europa.eu/press/pr/date/2026",
+                source_name="European Central Bank",
+                published_at="2026-04-04T11:15:00Z",
+                fetched_at=now,
+                matched_keywords=["force majeure"],
+                linked_contracts=[],
+            ),
+            MarketEvent(
+                event_id="EVT-STUB-005",
+                event_type=EventType.BANKRUPTCY,
+                severity=EventSeverity.MEDIUM,
+                headline="Austrian regional bank enters administration — ISDA close-out netting triggered",
+                description=(
+                    "Austrian regulator FMA has placed Hypo Vorarlberg Bank in resolution "
+                    "proceedings. Counterparties with bilateral IRS/CDS positions are "
+                    "executing close-out netting valuations under 2002 ISDA Master Agreement "
+                    "Section 6(e). Austrian courts have confirmed netting enforceability."
+                ),
+                source_url="https://www.fma.gv.at/en/press-releases",
+                source_name="FMA Austria",
+                published_at="2026-03-20T16:45:00Z",
+                fetched_at=now,
+                matched_keywords=["administration", "bankruptcy", "insolvency"],
+                linked_contracts=[],
+            ),
+            MarketEvent(
+                event_id="EVT-STUB-006",
+                event_type=EventType.REGULATORY_CHANGE,
+                severity=EventSeverity.MEDIUM,
+                headline="FCA publishes updated ISDA fallback protocol adoption guidance for UK firms",
+                description=(
+                    "The Financial Conduct Authority has issued a Dear CEO letter reminding "
+                    "UK-authorised firms of outstanding IBOR fallback protocol adoption "
+                    "obligations. Firms with legacy EUR LIBOR-linked contracts not yet "
+                    "adhering to the ISDA 2020 protocol face supervisory scrutiny."
+                ),
+                source_url="https://www.fca.org.uk/markets/libor/firms",
+                source_name="Financial Conduct Authority",
+                published_at="2026-03-15T10:00:00Z",
+                fetched_at=now,
+                matched_keywords=["regulatory change", "compliance"],
+                linked_contracts=[],
+            ),
+            MarketEvent(
+                event_id="EVT-STUB-007",
+                event_type=EventType.COUNTERPARTY_NEWS,
+                severity=EventSeverity.LOW,
+                headline="European Commission launches SFDR review — new product categorisation expected H2 2026",
+                description=(
+                    "The European Commission has published a targeted consultation on the "
+                    "Sustainable Finance Disclosure Regulation overhaul. Proposed changes "
+                    "include a simpler two-category product label system replacing Article 8/9. "
+                    "Final rules expected Q4 2026; fund and structured finance contracts may "
+                    "require updated disclosure language."
+                ),
+                source_url="https://finance.ec.europa.eu/sustainable-finance",
+                source_name="European Commission",
+                published_at="2026-04-02T08:00:00Z",
+                fetched_at=now,
+                matched_keywords=["regulation", "legislation"],
+                linked_contracts=[],
+            ),
+        ]
 
     def _fetch_news(self, query: str) -> List[dict]:
         params = urllib.parse.urlencode({
@@ -742,9 +907,18 @@ class EventMonitor:
 def _build_regulatory_db() -> List[RegulatoryAlert]:
     """
     Hardcoded regulatory watch items — current as of Q1 2026.
+    26 items across EU / UK / US / Global jurisdictions.
     In production this would be populated by scraping FCA/ESMA/EBA/SEC feeds.
+
+    Fields:
+        severity  — impact level if non-compliant
+        urgency   — how soon action is needed (HIGH = within 6 months)
+        status    — PROPOSED / ADOPTED / IN_FORCE
+        theme     — CLEARING / REPORTING / CAPITAL / CONDUCT / CRYPTO /
+                    SETTLEMENT / DISCLOSURE / RESILIENCE / ESG
     """
     return [
+        # ── EU ────────────────────────────────────────────────────────────────
         RegulatoryAlert(
             alert_id="REG-001",
             regulation_name="EMIR Refit / EMIR 3.0",
@@ -752,12 +926,16 @@ def _build_regulatory_db() -> List[RegulatoryAlert]:
             impact_description=(
                 "Updated OTC derivative clearing thresholds; revised reporting "
                 "under EMIR 3.0 including new XML XBRL formats and active account "
-                "requirements at EU CCPs. Applies to all in-scope counterparties."
+                "requirements at EU CCPs. Active account RTS published Mar 2026 — "
+                "6-month representativeness clock now running."
             ),
             affected_contract_types=["IRS", "CDS", "FX_DERIVATIVE", "COMMODITY_DERIVATIVE"],
             effective_date="2024-04-29",
             source_url="https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32019R0834",
             severity=EventSeverity.HIGH,
+            urgency=EventSeverity.HIGH,
+            status="IN_FORCE",
+            theme="CLEARING",
         ),
         RegulatoryAlert(
             alert_id="REG-002",
@@ -772,6 +950,9 @@ def _build_regulatory_db() -> List[RegulatoryAlert]:
             effective_date="2024-03-28",
             source_url="https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32024R0791",
             severity=EventSeverity.MEDIUM,
+            urgency=EventSeverity.MEDIUM,
+            status="IN_FORCE",
+            theme="REPORTING",
         ),
         RegulatoryAlert(
             alert_id="REG-003",
@@ -786,6 +967,9 @@ def _build_regulatory_db() -> List[RegulatoryAlert]:
             effective_date="2025-01-01",
             source_url="https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32024R1623",
             severity=EventSeverity.HIGH,
+            urgency=EventSeverity.MEDIUM,
+            status="IN_FORCE",
+            theme="CAPITAL",
         ),
         RegulatoryAlert(
             alert_id="REG-004",
@@ -800,6 +984,9 @@ def _build_regulatory_db() -> List[RegulatoryAlert]:
             effective_date="2024-12-30",
             source_url="https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32023R1114",
             severity=EventSeverity.MEDIUM,
+            urgency=EventSeverity.MEDIUM,
+            status="IN_FORCE",
+            theme="CRYPTO",
         ),
         RegulatoryAlert(
             alert_id="REG-005",
@@ -808,40 +995,33 @@ def _build_regulatory_db() -> List[RegulatoryAlert]:
             impact_description=(
                 "Mandatory ICT risk management framework, incident reporting, and "
                 "third-party ICT provider oversight for all EU financial entities. "
-                "Contracts relying on cloud or outsourced infrastructure must comply."
+                "Contracts relying on cloud or outsourced infrastructure must comply. "
+                "First TLPT exercises due H1 2026."
             ),
             affected_contract_types=["IRS", "CDS", "LOAN", "PROJECT_FINANCE", "ALL"],
             effective_date="2025-01-17",
             source_url="https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32022R2554",
             severity=EventSeverity.MEDIUM,
-        ),
-        RegulatoryAlert(
-            alert_id="REG-006",
-            regulation_name="UK LIBOR Cessation — Synthetic USD LIBOR End",
-            jurisdiction="UK",
-            impact_description=(
-                "Synthetic USD LIBOR ceased 30 Sep 2024. Any remaining legacy "
-                "USD LIBOR contracts must now reference SOFR or have triggered "
-                "contractual fallback language."
-            ),
-            affected_contract_types=["IRS", "LOAN", "BOND"],
-            effective_date="2024-09-30",
-            source_url="https://www.fca.org.uk/markets/libor",
-            severity=EventSeverity.HIGH,
+            urgency=EventSeverity.HIGH,
+            status="IN_FORCE",
+            theme="RESILIENCE",
         ),
         RegulatoryAlert(
             alert_id="REG-007",
-            regulation_name="SFDR RTS — Sustainable Finance Disclosure (Level 2)",
+            regulation_name="SFDR Review — New Product Categorisation (EU)",
             jurisdiction="EU",
             impact_description=(
-                "Detailed disclosure requirements for ESG characteristics of "
-                "investment products and portfolios. Review underway; new templates "
-                "expected in 2025 that may affect structured finance and fund contracts."
+                "European Commission consultation on simplified two-category label "
+                "system replacing Article 8/9. New templates expected Q4 2026; "
+                "structured finance and fund contracts may need updated disclosure language."
             ),
             affected_contract_types=["FUND", "STRUCTURED_FINANCE", "PROJECT_FINANCE"],
-            effective_date="2023-01-01",
-            source_url="https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32022R1288",
+            effective_date="2027-01-01",
+            source_url="https://finance.ec.europa.eu/sustainable-finance",
             severity=EventSeverity.LOW,
+            urgency=EventSeverity.LOW,
+            status="PROPOSED",
+            theme="ESG",
         ),
         RegulatoryAlert(
             alert_id="REG-008",
@@ -849,14 +1029,162 @@ def _build_regulatory_db() -> List[RegulatoryAlert]:
             jurisdiction="EU",
             impact_description=(
                 "Proposed shortening of securities settlement from T+2 to T+1, "
-                "targeting 2027. Impacts collateral management timelines and "
+                "targeting Oct 2027. Impacts collateral management timelines and "
                 "margin call logistics in repo and securities lending contracts."
             ),
             affected_contract_types=["REPO", "SECURITIES_LENDING", "BOND", "EQUITY"],
-            effective_date="2027-01-01",
+            effective_date="2027-10-11",
             source_url="https://www.esma.europa.eu/press-news/esma-news/esma-publishes-report-shortening-settlement-cycle",
-            severity=EventSeverity.LOW,
+            severity=EventSeverity.MEDIUM,
+            urgency=EventSeverity.LOW,
+            status="PROPOSED",
+            theme="SETTLEMENT",
         ),
+        RegulatoryAlert(
+            alert_id="REG-011",
+            regulation_name="CSRD — Corporate Sustainability Reporting Directive",
+            jurisdiction="EU",
+            impact_description=(
+                "Mandatory double materiality reporting for large EU corporates from "
+                "FY2024 reports (published 2025). ESG disclosures now feed into "
+                "counterparty credit assessments under CRR3. Project finance and "
+                "loan documentation may require sustainability-linked covenants."
+            ),
+            affected_contract_types=["LOAN", "PROJECT_FINANCE", "BOND"],
+            effective_date="2025-01-01",
+            source_url="https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32022L2464",
+            severity=EventSeverity.MEDIUM,
+            urgency=EventSeverity.MEDIUM,
+            status="IN_FORCE",
+            theme="ESG",
+        ),
+        RegulatoryAlert(
+            alert_id="REG-012",
+            regulation_name="FIDA — Financial Data Access Regulation",
+            jurisdiction="EU",
+            impact_description=(
+                "Proposed open finance framework mandating data sharing between "
+                "financial institutions, including contract and performance data. "
+                "Firms will need to implement standardised APIs by 2027. "
+                "Data governance clauses in master agreements may need revision."
+            ),
+            affected_contract_types=["IRS", "LOAN", "ALL"],
+            effective_date="2027-07-01",
+            source_url="https://finance.ec.europa.eu/publications/financial-data-access",
+            severity=EventSeverity.LOW,
+            urgency=EventSeverity.LOW,
+            status="PROPOSED",
+            theme="REPORTING",
+        ),
+        RegulatoryAlert(
+            alert_id="REG-013",
+            regulation_name="EU AI Act — Financial Services Applications",
+            jurisdiction="EU",
+            impact_description=(
+                "High-risk AI systems used in credit scoring, pricing, or risk "
+                "management require conformity assessments, human oversight, and "
+                "registration from Aug 2026. Algorithmic trading and automated "
+                "contract execution systems in scope if classified high-risk."
+            ),
+            affected_contract_types=["ALL"],
+            effective_date="2026-08-02",
+            source_url="https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32024R1689",
+            severity=EventSeverity.MEDIUM,
+            urgency=EventSeverity.HIGH,
+            status="ADOPTED",
+            theme="CONDUCT",
+        ),
+        # ── UK ────────────────────────────────────────────────────────────────
+        RegulatoryAlert(
+            alert_id="REG-006",
+            regulation_name="UK LIBOR Cessation — Synthetic USD LIBOR End",
+            jurisdiction="UK",
+            impact_description=(
+                "Synthetic USD LIBOR ceased 30 Sep 2024. Any remaining legacy "
+                "USD LIBOR contracts must now reference SOFR or have triggered "
+                "contractual fallback language. FCA will not permit new synthetic "
+                "rate after Dec 2026."
+            ),
+            affected_contract_types=["IRS", "LOAN", "BOND"],
+            effective_date="2024-09-30",
+            source_url="https://www.fca.org.uk/markets/libor",
+            severity=EventSeverity.HIGH,
+            urgency=EventSeverity.HIGH,
+            status="IN_FORCE",
+            theme="REPORTING",
+        ),
+        RegulatoryAlert(
+            alert_id="REG-014",
+            regulation_name="FCA Consumer Duty — Ongoing Monitoring Requirements",
+            jurisdiction="UK",
+            impact_description=(
+                "FCA Consumer Duty fully in force. Firms must evidence ongoing "
+                "monitoring of consumer outcomes, including in structured product "
+                "and investment contract distribution. Annual board attestation required."
+            ),
+            affected_contract_types=["LOAN", "STRUCTURED_FINANCE", "FUND"],
+            effective_date="2024-07-31",
+            source_url="https://www.fca.org.uk/firms/consumer-duty",
+            severity=EventSeverity.MEDIUM,
+            urgency=EventSeverity.MEDIUM,
+            status="IN_FORCE",
+            theme="CONDUCT",
+        ),
+        RegulatoryAlert(
+            alert_id="REG-015",
+            regulation_name="UK EMIR — Post-Brexit Clearing Obligations",
+            jurisdiction="UK",
+            impact_description=(
+                "UK EMIR clearing obligations continue for UK counterparties; "
+                "equivalence of EU CCPs reviewed annually. UK has diverged on "
+                "active account requirements — UK firms not subject to EU EMIR 3.0 "
+                "active account mandates but face BoE/FCA scrutiny on concentration risk."
+            ),
+            affected_contract_types=["IRS", "CDS", "FX_DERIVATIVE"],
+            effective_date="2021-01-01",
+            source_url="https://www.fca.org.uk/markets/derivatives/emir",
+            severity=EventSeverity.HIGH,
+            urgency=EventSeverity.MEDIUM,
+            status="IN_FORCE",
+            theme="CLEARING",
+        ),
+        RegulatoryAlert(
+            alert_id="REG-016",
+            regulation_name="UK Basel 3.1 (PRA Near-Final Rules)",
+            jurisdiction="UK",
+            impact_description=(
+                "PRA published near-final rules for UK Basel 3.1 implementation, "
+                "effective Jan 2027 (delayed from 2026). Revised standardised "
+                "credit risk, operational risk, and output floor will increase "
+                "capital charges for derivatives books held by UK banks."
+            ),
+            affected_contract_types=["IRS", "CDS", "LOAN"],
+            effective_date="2027-01-01",
+            source_url="https://www.bankofengland.co.uk/prudential-regulation/publication/2023/near-final-basel-3-1",
+            severity=EventSeverity.HIGH,
+            urgency=EventSeverity.MEDIUM,
+            status="ADOPTED",
+            theme="CAPITAL",
+        ),
+        RegulatoryAlert(
+            alert_id="REG-017",
+            regulation_name="Edinburgh Reforms — UK MiFID Review",
+            jurisdiction="UK",
+            impact_description=(
+                "HM Treasury has launched wholesale markets review under Edinburgh "
+                "Reforms. Proposed removal of share trading obligation, relaxation "
+                "of derivatives trading obligation, and simplified research unbundling. "
+                "Consultation closed; primary legislation expected 2026."
+            ),
+            affected_contract_types=["IRS", "BOND", "EQUITY_DERIVATIVE"],
+            effective_date="2026-12-31",
+            source_url="https://www.gov.uk/government/collections/the-edinburgh-reforms",
+            severity=EventSeverity.MEDIUM,
+            urgency=EventSeverity.LOW,
+            status="PROPOSED",
+            theme="CONDUCT",
+        ),
+        # ── US ────────────────────────────────────────────────────────────────
         RegulatoryAlert(
             alert_id="REG-009",
             regulation_name="SEC Form PF Amendments — Hedge Fund Reporting",
@@ -870,7 +1198,65 @@ def _build_regulatory_db() -> List[RegulatoryAlert]:
             effective_date="2023-12-14",
             source_url="https://www.sec.gov/rules/final/2023/ia-6297.pdf",
             severity=EventSeverity.LOW,
+            urgency=EventSeverity.LOW,
+            status="IN_FORCE",
+            theme="REPORTING",
         ),
+        RegulatoryAlert(
+            alert_id="REG-018",
+            regulation_name="Dodd-Frank Title VII — CFTC Margin Phase 6 Final Wave",
+            jurisdiction="US",
+            impact_description=(
+                "CFTC uncleared swap margin requirements now cover smaller financial "
+                "end-users (AANA threshold $8bn). Phase 6 final implementation required "
+                "full re-papering of CSAs for in-scope counterparties. Ongoing "
+                "compliance monitoring of IM threshold usage required."
+            ),
+            affected_contract_types=["IRS", "CDS", "FX_DERIVATIVE"],
+            effective_date="2022-09-01",
+            source_url="https://www.cftc.gov/LawRegulation/DoddFrankAct/Title_VII/index.htm",
+            severity=EventSeverity.HIGH,
+            urgency=EventSeverity.MEDIUM,
+            status="IN_FORCE",
+            theme="CAPITAL",
+        ),
+        RegulatoryAlert(
+            alert_id="REG-019",
+            regulation_name="CFTC Digital Assets — Final Guidance on Derivatives",
+            jurisdiction="US",
+            impact_description=(
+                "CFTC clarified its jurisdiction over crypto derivative products "
+                "including Bitcoin and Ethereum futures and perpetual swaps. "
+                "Registered derivatives trading facilities must onboard digital "
+                "asset contracts under existing commodity exchange rules."
+            ),
+            affected_contract_types=["DIGITAL_ASSET", "COMMODITY_DERIVATIVE"],
+            effective_date="2024-06-01",
+            source_url="https://www.cftc.gov/DigitalAssets/index.htm",
+            severity=EventSeverity.MEDIUM,
+            urgency=EventSeverity.MEDIUM,
+            status="IN_FORCE",
+            theme="CRYPTO",
+        ),
+        RegulatoryAlert(
+            alert_id="REG-020",
+            regulation_name="SEC Climate Disclosure Rule — Stay Pending Appeal",
+            jurisdiction="US",
+            impact_description=(
+                "SEC adopted climate disclosure rules (Mar 2024) but implementation "
+                "stayed pending 8th Circuit appeal. If upheld, large accelerated filers "
+                "must disclose Scope 1/2 emissions and climate risks from FY2025. "
+                "Loan and structured finance documentation may need climate covenants."
+            ),
+            affected_contract_types=["LOAN", "PROJECT_FINANCE", "BOND"],
+            effective_date="2026-01-01",
+            source_url="https://www.sec.gov/rules/final/2024/33-11275.pdf",
+            severity=EventSeverity.MEDIUM,
+            urgency=EventSeverity.LOW,
+            status="ADOPTED",
+            theme="ESG",
+        ),
+        # ── GLOBAL ────────────────────────────────────────────────────────────
         RegulatoryAlert(
             alert_id="REG-010",
             regulation_name="India FEMA Derivatives Amendment — RBI Circular",
@@ -884,6 +1270,117 @@ def _build_regulatory_db() -> List[RegulatoryAlert]:
             effective_date="2024-04-05",
             source_url="https://www.rbi.org.in/Scripts/NotificationUser.aspx",
             severity=EventSeverity.MEDIUM,
+            urgency=EventSeverity.LOW,
+            status="IN_FORCE",
+            theme="REPORTING",
+        ),
+        RegulatoryAlert(
+            alert_id="REG-021",
+            regulation_name="FSB Crypto-Asset Framework — Global Implementation",
+            jurisdiction="GLOBAL",
+            impact_description=(
+                "FSB published high-level recommendations for crypto-asset regulation "
+                "in Jul 2023. G20 jurisdictions committed to implementation. Covers "
+                "market integrity, investor protection, and cross-border cooperation "
+                "for crypto derivatives and stablecoin settlement arrangements."
+            ),
+            affected_contract_types=["DIGITAL_ASSET", "TOKEN_SETTLEMENT"],
+            effective_date="2025-01-01",
+            source_url="https://www.fsb.org/2023/07/fsb-global-regulatory-framework-for-crypto-asset-activities",
+            severity=EventSeverity.MEDIUM,
+            urgency=EventSeverity.MEDIUM,
+            status="ADOPTED",
+            theme="CRYPTO",
+        ),
+        RegulatoryAlert(
+            alert_id="REG-022",
+            regulation_name="IOSCO DeFi Policy Recommendations",
+            jurisdiction="GLOBAL",
+            impact_description=(
+                "IOSCO published 9 recommendations for DeFi regulation including "
+                "applying same-activity same-risk principles to decentralised protocols. "
+                "Jurisdictions expected to implement by end 2025. Relevant for "
+                "firms offering smart-contract-based derivatives settlement."
+            ),
+            affected_contract_types=["DIGITAL_ASSET"],
+            effective_date="2025-12-31",
+            source_url="https://www.iosco.org/library/pubdocs/pdf/IOSCOPD748.pdf",
+            severity=EventSeverity.LOW,
+            urgency=EventSeverity.LOW,
+            status="ADOPTED",
+            theme="CRYPTO",
+        ),
+        RegulatoryAlert(
+            alert_id="REG-023",
+            regulation_name="Basel III Endgame — US Implementation (Revised Proposal)",
+            jurisdiction="US",
+            impact_description=(
+                "US banking regulators re-proposed Basel III endgame rules in Sep 2024 "
+                "with a reduced impact vs original. Market risk (FRTB) and credit risk "
+                "SA changes still increase capital on derivatives. Effective date "
+                "pushed to 2027. Affects US bank counterparty credit pricing."
+            ),
+            affected_contract_types=["IRS", "CDS", "LOAN"],
+            effective_date="2027-07-01",
+            source_url="https://www.federalreserve.gov/newsevents/pressreleases/bcreg20240909a.htm",
+            severity=EventSeverity.HIGH,
+            urgency=EventSeverity.LOW,
+            status="PROPOSED",
+            theme="CAPITAL",
+        ),
+        RegulatoryAlert(
+            alert_id="REG-024",
+            regulation_name="ISDA/IIFM Tahawwut Master Agreement — Sharia Derivatives",
+            jurisdiction="GLOBAL",
+            impact_description=(
+                "Updated Tahawwut (Hedging) Master Agreement standard for Islamic "
+                "finance derivatives published. Institutions in GCC and SE Asia "
+                "offering Sharia-compliant IRS/FX products should review "
+                "documentation against new ISDA/IIFM standard."
+            ),
+            affected_contract_types=["IRS", "FX_DERIVATIVE"],
+            effective_date="2024-01-01",
+            source_url="https://www.isda.org/a/bTEgE/",
+            severity=EventSeverity.LOW,
+            urgency=EventSeverity.LOW,
+            status="IN_FORCE",
+            theme="CONDUCT",
+        ),
+        RegulatoryAlert(
+            alert_id="REG-025",
+            regulation_name="G20 Cross-Border Payment Roadmap — FX Settlement Risk",
+            jurisdiction="GLOBAL",
+            impact_description=(
+                "FSB and BIS CPMI published enhanced G20 cross-border payment roadmap. "
+                "FX settlement risk targets include broader CLS adoption and PVP "
+                "settlement alternatives. Correspondent banking agreements and FX "
+                "derivative novation clauses may need updating."
+            ),
+            affected_contract_types=["FX_DERIVATIVE", "REPO"],
+            effective_date="2027-12-31",
+            source_url="https://www.fsb.org/2023/10/g20-roadmap-for-enhancing-cross-border-payments",
+            severity=EventSeverity.LOW,
+            urgency=EventSeverity.LOW,
+            status="ADOPTED",
+            theme="SETTLEMENT",
+        ),
+        RegulatoryAlert(
+            alert_id="REG-026",
+            regulation_name="Mansion House Compact — UK Pension Fund Infrastructure Allocation",
+            jurisdiction="UK",
+            impact_description=(
+                "UK defined contribution pension funds committed to allocate 5% of "
+                "assets to unlisted equities by 2030 under Mansion House Compact. "
+                "Increases demand for bespoke project finance and infrastructure "
+                "loan documentation. ISDA definitions may be applied to bespoke deals."
+            ),
+            affected_contract_types=["PROJECT_FINANCE", "LOAN"],
+            effective_date="2030-01-01",
+            source_url="https://www.gov.uk/government/publications/mansion-house-compact",
+            severity=EventSeverity.LOW,
+            urgency=EventSeverity.LOW,
+            status="ADOPTED",
+            theme="CAPITAL",
         ),
     ]
 
@@ -895,7 +1392,7 @@ class RegulatoryWatch:
     In production this would poll ESMA / FCA / EBA / SEC RSS feeds and
     parse new consultation papers, final rules, and Q&A updates.
 
-    Currently: pre-loaded with 10 active regulatory items (Q1 2026).
+    Currently: pre-loaded with 26 active regulatory items (Q1 2026).
     """
 
     def __init__(self):

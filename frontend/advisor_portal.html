@@ -489,7 +489,7 @@ function _sortBy(field, btn) {
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let S = {
   contracts:[], oracle:{}, details:{},
-  orc3: { rates:{}, events:[], regulatory:[], lastFetch:null },
+  orc3: { rates:{}, events:[], regulatory:[], lastFetch:null, hasApiKey:false, stubMode:true },
   dd: {},       // keyed by contract_id
   comments: {}, // keyed by contract_id
   loading:true, error:null, lastUpdate:null
@@ -525,6 +525,8 @@ async function refresh() {
     S.orc3.rates = rates.rates || {}
     S.orc3.events = events.events || []
     S.orc3.regulatory = regulatory.alerts || []
+    S.orc3.hasApiKey = !!(events.has_api_key)
+    S.orc3.stubMode = !!(events.stub_mode)
     S.orc3.lastFetch = new Date()
     await Promise.all(cs.map(x =>
       apiFetch(`/contracts/${x.id}?role=advisor`).then(d => S.details[x.id] = d).catch(()=>{})
@@ -555,12 +557,14 @@ function updateSidebar() {
       ? `<span class="dot"></span>Offline`
       : `<span class="dot pulse"></span>Live API`
   }
-  // Oracle badge
+  // Oracle badge — show HIGH-urgency regulatory count
   const ob = document.getElementById('sb-orc')
   if(ob) {
-    const rateCount = Object.keys(S.orc3.rates).length
-    ob.textContent = rateCount ? rateCount+' rates' : '●'
-    ob.className = 'si-badge '+(rateCount?'ok':'al')
+    const highUrgency = (S.orc3.regulatory||[]).filter(a=>a.urgency==='HIGH').length
+    const highEvents  = (S.orc3.events||[]).filter(e=>e.severity==='HIGH').length
+    const total = highUrgency + highEvents
+    ob.textContent = total ? total+' alerts' : Object.keys(S.orc3.rates).length+' rates'
+    ob.className   = 'si-badge '+(total?'al':'ok')
   }
   // DD badge — count contracts with RED or pending human gates
   const ddEl = document.getElementById('sb-dd')
@@ -1023,68 +1027,206 @@ ${nettingRows.map(r=>`
 }
 
 // ── ORACLE v3 ─────────────────────────────────────────────────────────────────
+// Filter state for regulatory table (module-level so it survives re-renders)
+let _orcRegFilter = { juris:'', urgency:'', theme:'', status:'' }
+
 function rOrc(c) {
-  const O = S.oracle
   const R3 = S.orc3
   const rates = R3.rates || {}
-  const events = R3.events || []
+  const events = [...(R3.events || [])].sort((a,b) => {
+    const o = {HIGH:2,MEDIUM:1,LOW:0}
+    return (o[b.severity]||0) - (o[a.severity]||0)
+  })
   const regulatory = R3.regulatory || []
 
+  // ── helpers ──────────────────────────────────────────────────────────────
   function statusPill(st) {
     if (!st) return '<span class="p p-gy">—</span>'
-    if (st==='CONFIRMED') return '<span class="p p-g">● Confirmed</span>'
-    if (st==='FALLBACK'||st==='STATIC_FALLBACK') return '<span class="p p-w">△ Fallback</span>'
+    if (st==='CONFIRMED') return '<span class="p p-g">● Live</span>'
+    if (st==='FALLBACK') return '<span class="p p-w">△ ISDA Fallback</span>'
+    if (st==='STATIC_FALLBACK') return '<span class="p p-gy">△ Static Fallback</span>'
     if (st==='STALE') return '<span class="p p-r">○ Stale</span>'
-    if (st==='CHALLENGED') return '<span class="p p-v">⚡ Challenged</span>'
+    if (st==='CHALLENGED') return '<span class="p p-v">⚡ Anomaly</span>'
     return `<span class="p p-b">${st}</span>`
   }
-  function sevCls(s) { return s==='HIGH'?'cr':s==='MEDIUM'?'wr':'inf' }
+  function sevTag(s,label) {
+    const cls = s==='HIGH'?'tag-r':s==='MEDIUM'?'tag-w':'tag-b'
+    return `<span class="tag ${cls}">${label||s}</span>`
+  }
+  function regStatusTag(s) {
+    if (s==='IN_FORCE')  return '<span class="tag tag-r" style="font-size:9px">IN FORCE</span>'
+    if (s==='ADOPTED')   return '<span class="tag tag-w" style="font-size:9px">ADOPTED</span>'
+    if (s==='PROPOSED')  return '<span class="tag tag-b" style="font-size:9px">PROPOSED</span>'
+    return `<span class="tag" style="font-size:9px">${s}</span>`
+  }
+
+  // ── Sparkline SVG (mini line chart from history array) ────────────────────
+  function sparkline(history) {
+    if (!history || history.length < 2) return '<span style="color:var(--t3);font-size:9px">—</span>'
+    const vals = history.map(h => Number(h.rate) * 100)
+    const min = Math.min(...vals), max = Math.max(...vals)
+    const range = max - min || 0.001
+    const W = 60, H = 20, pad = 2
+    const pts = vals.map((v,i) => {
+      const x = pad + (i / (vals.length - 1)) * (W - 2*pad)
+      const y = pad + (1 - (v - min) / range) * (H - 2*pad)
+      return `${x.toFixed(1)},${y.toFixed(1)}`
+    }).join(' ')
+    const lastSt = history[history.length-1]?.status
+    const col = lastSt==='CONFIRMED'?'#4caf82':lastSt==='CHALLENGED'?'#c0392b':'#e09c30'
+    return `<svg width="${W}" height="${H}" style="vertical-align:middle"><polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.5"/></svg>`
+  }
+
+  // ── Layer 1: Rate table ───────────────────────────────────────────────────
+  const fallbackRates = Object.values(rates).filter(r => r.status && r.status !== 'CONFIRMED' && r.status !== 'CHALLENGED')
+  const fallbackBanner = fallbackRates.length ? `
+<div class="al wr" style="margin-bottom:12px;font-size:11px">
+  <div>
+    <strong>ECB Data Partially Unavailable</strong> — ${fallbackRates.length} rate(s) are using fallback values.
+    The ISDA 2021 fallback waterfall applies: (1) ECB SDW live feed → (2) €STR + ISDA spread → (3) last confirmed reading → (4) static reference rate.
+    Fallback rates are valid for payment calculation but should be reviewed if the position is material.
+    Last ECB confirmed: ${Object.values(rates).map(r=>r.last_confirmed_date).filter(Boolean).sort().reverse()[0] || '—'}
+  </div>
+</div>` : ''
 
   const rateRows = Object.values(rates).map(r => `<tr>
-    <td class="m" style="color:var(--warm)">${r.rate_id||'—'}</td>
-    <td class="m">${r.rate ? (Number(r.rate)*100).toFixed(4)+'%' : '—'}</td>
+    <td class="m" style="color:var(--warm);font-family:var(--fm)">${r.rate_id||'—'}</td>
+    <td class="m" style="font-family:var(--fm)">${r.rate ? (Number(r.rate)*100).toFixed(4)+'%' : '—'}</td>
     <td>${statusPill(r.status)}</td>
-    <td style="font-size:10px;color:var(--t3)">${r.source||'—'}</td>
-    <td style="font-size:10px;color:var(--t3)">${(r.fetch_timestamp||'—').slice(0,16).replace('T',' ')}</td>
+    <td style="font-size:9px;color:var(--t3)">${r.source||'—'}</td>
+    <td style="font-size:9px;color:var(--t3)">${r.last_confirmed_date||'—'}</td>
+    <td>${sparkline(r.history)}</td>
   </tr>`).join('')
 
-  const eventRows = events.slice(0,10).map(e => `
-<div class="al ${sevCls(e.severity)}">
-  <div style="flex:1">
-    <div class="al-t">${e.headline||'—'} <span class="tag ${e.severity==='HIGH'?'tag-r':e.severity==='MEDIUM'?'tag-w':'tag-b'}" style="margin-left:6px">${e.severity}</span></div>
-    <div class="al-d">${(e.description||'').slice(0,140)}${(e.description||'').length>140?'…':''}</div>
-    <div class="al-r">${e.source_url||''} · ${(e.published_at||'').slice(0,10)} · Contracts: ${(e.linked_contracts||[]).join(', ')||'none'}</div>
+  // ── Layer 2: Event feed ───────────────────────────────────────────────────
+  const stubBanner = R3.stubMode ? `
+<div class="al inf" style="margin-bottom:10px;font-size:11px">
+  <div>
+    <strong>Demo mode</strong> — showing 7 curated example events. Set <code>NEWSAPI_KEY</code> environment variable to enable live news monitoring via NewsAPI.org.
+    Events are matched against counterparty names, jurisdictions, and keywords from active contracts.
   </div>
-</div>`).join('')
+</div>` : ''
 
-  const regRows = regulatory.map(a => `
-<div class="al ${a.severity==='HIGH'?'cr':a.severity==='MEDIUM'?'wr':'inf'}" style="align-items:flex-start">
+  const eventCards = events.slice(0,15).map(e => {
+    const sevCls = e.severity==='HIGH'?'cr':e.severity==='MEDIUM'?'wr':'inf'
+    const linkedHtml = (e.linked_contracts||[]).length
+      ? (e.linked_contracts||[]).map(cid=>`<button class="btn" style="padding:2px 7px;font-size:9px;margin-left:4px" onclick="_linkEventContract('${e.event_id}','${cid}')">${cid}</button>`).join('')
+      : ''
+    return `<div class="al ${sevCls}" style="align-items:flex-start;margin-bottom:8px">
   <div style="flex:1">
-    <div class="al-t">${a.regulation_name} <span class="tag ${a.severity==='HIGH'?'tag-r':a.severity==='MEDIUM'?'tag-w':'tag-b'}" style="margin-left:6px">${a.severity}</span></div>
-    <div class="al-d">${a.impact_description}</div>
-    <div class="al-r">${a.jurisdiction} · Effective: ${a.effective_date} · Contracts: ${(a.affected_contract_types||[]).join(', ')}</div>
+    <div class="al-t">${e.headline||'—'} ${sevTag(e.severity)}</div>
+    <div class="al-d" style="margin-top:4px">${(e.description||'').slice(0,200)}${(e.description||'').length>200?'…':''}</div>
+    <div class="al-r" style="margin-top:4px;display:flex;align-items:center;flex-wrap:wrap;gap:4px">
+      <span>${e.source_name||''} · ${(e.published_at||'').slice(0,10)}</span>
+      ${e.event_type ? `<span class="tag tag-b" style="font-size:9px">${e.event_type}</span>` : ''}
+      ${(e.matched_keywords||[]).slice(0,3).map(k=>`<span class="tag" style="font-size:9px;background:rgba(255,255,255,.06)">${k}</span>`).join('')}
+      ${linkedHtml}
+      <button class="btn" style="padding:2px 7px;font-size:9px;margin-left:auto" onclick="_linkEventToContract('${e.event_id}')">Link to Contract…</button>
+    </div>
   </div>
-</div>`).join('')
+</div>`}).join('')
 
+  // ── Layer 3: Regulatory table with filters ────────────────────────────────
+  const allJuris = [...new Set(regulatory.map(a=>a.jurisdiction))].sort()
+  const allThemes = [...new Set(regulatory.map(a=>a.theme))].filter(Boolean).sort()
+
+  function filterReg(items) {
+    return items.filter(a => {
+      if (_orcRegFilter.juris   && a.jurisdiction !== _orcRegFilter.juris)   return false
+      if (_orcRegFilter.urgency && a.urgency       !== _orcRegFilter.urgency) return false
+      if (_orcRegFilter.theme   && a.theme         !== _orcRegFilter.theme)   return false
+      if (_orcRegFilter.status  && a.status        !== _orcRegFilter.status)  return false
+      return true
+    }).sort((a,b) => {
+      const o = {HIGH:2,MEDIUM:1,LOW:0}
+      const byUrg = (o[b.urgency]||0) - (o[a.urgency]||0)
+      if (byUrg) return byUrg
+      return (o[b.severity]||0) - (o[a.severity]||0)
+    })
+  }
+
+  function selOpt(val, cur, label) {
+    return `<option value="${val}" ${cur===val?'selected':''}>${label}</option>`
+  }
+  const regFilterBar = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+  <select class="inp" style="width:auto;font-size:10px" onchange="_orcSetFilter('juris',this.value)">
+    ${selOpt('',_orcRegFilter.juris,'All Jurisdictions')}
+    ${allJuris.map(j=>selOpt(j,_orcRegFilter.juris,j)).join('')}
+  </select>
+  <select class="inp" style="width:auto;font-size:10px" onchange="_orcSetFilter('urgency',this.value)">
+    ${selOpt('',_orcRegFilter.urgency,'All Urgency')}
+    ${['HIGH','MEDIUM','LOW'].map(u=>selOpt(u,_orcRegFilter.urgency,u+' urgency')).join('')}
+  </select>
+  <select class="inp" style="width:auto;font-size:10px" onchange="_orcSetFilter('theme',this.value)">
+    ${selOpt('',_orcRegFilter.theme,'All Themes')}
+    ${allThemes.map(t=>selOpt(t,_orcRegFilter.theme,t)).join('')}
+  </select>
+  <select class="inp" style="width:auto;font-size:10px" onchange="_orcSetFilter('status',this.value)">
+    ${selOpt('',_orcRegFilter.status,'All Status')}
+    ${['IN_FORCE','ADOPTED','PROPOSED'].map(s=>selOpt(s,_orcRegFilter.status,s.replace('_',' '))).join('')}
+  </select>
+  <button class="btn" style="font-size:10px" onclick="_orcClearFilters()">Clear</button>
+</div>`
+
+  const filteredReg = filterReg(regulatory)
+  const highUrgCount = regulatory.filter(a=>a.urgency==='HIGH').length
+
+  const regRows = filteredReg.map(a => {
+    const urgCls = a.urgency==='HIGH'?'cr':a.urgency==='MEDIUM'?'wr':'inf'
+    return `<tr class="${urgCls}" style="border-left:3px solid ${a.urgency==='HIGH'?'var(--r)':a.urgency==='MEDIUM'?'var(--a)':'var(--b)'}">
+    <td style="font-size:10px;white-space:nowrap">${a.alert_id}</td>
+    <td class="m" style="font-weight:500">${a.regulation_name}</td>
+    <td style="font-size:10px">${a.jurisdiction}</td>
+    <td>${regStatusTag(a.status)}</td>
+    <td>${sevTag(a.urgency,'⚡ '+a.urgency)}</td>
+    <td style="font-size:10px;color:var(--t3)">${a.theme||'—'}</td>
+    <td style="font-size:10px;color:var(--t3);white-space:nowrap">${a.effective_date||'—'}</td>
+    <td style="font-size:10px;max-width:260px">${(a.impact_description||'').slice(0,100)}…</td>
+    <td style="font-size:10px">${(a.affected_contract_types||[]).join(', ')}</td>
+  </tr>`}).join('')
+
+  // ── Render ────────────────────────────────────────────────────────────────
   c.innerHTML = `${crumb('Oracle v3')}<div class="hd">Oracle v3${updBadge()}</div>
 <div class="sub">Market Data (9 rates) · Event Monitor · Regulatory Watch · ISDA 2021 fallback waterfall</div>
 
-<div style="display:flex;gap:8px;margin-bottom:20px">
+<div style="display:flex;gap:8px;align-items:center;margin-bottom:20px">
   <button class="btn act" onclick="_refreshRates(this)">⟳ Refresh All Rates (Live ECB)</button>
-  <span style="font-size:10px;color:var(--t3);padding:6px 0">Last fetched: ${R3.lastFetch ? R3.lastFetch.toLocaleTimeString() : '—'}</span>
+  <span style="font-size:10px;color:var(--t3)">Last fetched: ${R3.lastFetch ? R3.lastFetch.toLocaleTimeString() : '—'}</span>
+  ${highUrgCount ? `<span class="tag tag-r" style="margin-left:auto">${highUrgCount} HIGH-urgency regulatory items</span>` : ''}
 </div>
 
 <div class="sh">Layer 1 — Rate Registry <span class="tag tag-v">${Object.keys(rates).length} rates</span></div>
-<table class="tb"><thead><tr><th>Rate ID</th><th>Value</th><th>Status</th><th>Source</th><th>Fetched</th></tr></thead>
-<tbody>${rateRows||'<tr><td colspan="5" style="text-align:center;color:var(--t3);padding:16px">No cached rates yet — click Refresh to fetch from ECB</td></tr>'}</tbody>
+${fallbackBanner}
+<div style="overflow-x:auto">
+<table class="tb" style="font-size:11px"><thead><tr>
+  <th>Rate</th><th>Value</th><th>Status</th><th>Source</th><th>ECB Published</th><th style="width:70px">History</th>
+</tr></thead>
+<tbody>${rateRows||'<tr><td colspan="6" style="text-align:center;color:var(--t3);padding:16px">No cached rates yet — click Refresh to fetch from ECB</td></tr>'}</tbody>
 </table>
+</div>
 
-<div class="sh">Layer 2 — Market Events <span class="tag ${events.length?'tag-r':'tag-g'}">${events.length}</span></div>
-${eventRows||'<div class="card" style="text-align:center;color:var(--t3);padding:20px;font-size:11px">No market events. EventMonitor requires NEWSAPI_KEY to fetch live events.</div>'}
+<div class="sh" style="margin-top:24px">Layer 2 — Market Events
+  <span class="tag ${events.length?'tag-r':'tag-gy'}">${events.length} events</span>
+  ${R3.stubMode ? '<span class="tag tag-b" style="margin-left:4px;font-size:9px">DEMO</span>' : '<span class="tag tag-g" style="margin-left:4px;font-size:9px">LIVE</span>'}
+</div>
+${stubBanner}
+${eventCards||'<div class="card" style="text-align:center;color:var(--t3);padding:20px;font-size:11px">No events in store.</div>'}
 
-<div class="sh" style="margin-top:24px">Layer 3 — Regulatory Watch <span class="tag tag-w">${regulatory.length} alerts</span></div>
-${regRows||'<div class="card" style="text-align:center;color:var(--t3);padding:20px;font-size:11px">No regulatory alerts loaded.</div>'}`
+<div class="sh" style="margin-top:24px">Layer 3 — Regulatory Watch
+  <span class="tag tag-w">${regulatory.length} alerts</span>
+  ${highUrgCount ? `<span class="tag tag-r">${highUrgCount} urgent</span>` : ''}
+  ${filteredReg.length !== regulatory.length ? `<span class="tag tag-b">${filteredReg.length} shown</span>` : ''}
+</div>
+${regFilterBar}
+<div style="overflow-x:auto">
+<table class="tb" style="font-size:11px"><thead><tr>
+  <th>ID</th><th>Regulation</th><th>Jurisdiction</th><th>Status</th><th>Urgency</th><th>Theme</th><th>Effective</th><th>Impact</th><th>Contract Types</th>
+</tr></thead>
+<tbody>${regRows||'<tr><td colspan="9" style="text-align:center;color:var(--t3);padding:16px">No items match the current filters.</td></tr>'}</tbody>
+</table>
+</div>`
 
+  // ── event handlers ────────────────────────────────────────────────────────
   window._refreshRates = async (btn) => {
     btn.disabled=true; btn.textContent='Fetching from ECB…'
     try {
@@ -1094,6 +1236,31 @@ ${regRows||'<div class="card" style="text-align:center;color:var(--t3);padding:2
       rOrc(c)
     } catch(e) { toast('Rate refresh failed: '+e.message, 'err') }
     btn.disabled=false; btn.textContent='⟳ Refresh All Rates (Live ECB)'
+  }
+
+  window._orcSetFilter = (key, val) => {
+    _orcRegFilter[key] = val
+    rOrc(c)
+  }
+  window._orcClearFilters = () => {
+    _orcRegFilter = { juris:'', urgency:'', theme:'', status:'' }
+    rOrc(c)
+  }
+
+  window._linkEventToContract = (eventId) => {
+    const cids = S.contracts.map(x=>x.id)
+    if (!cids.length) { toast('No contracts loaded', 'err'); return }
+    const cid = prompt('Link event '+eventId+' to contract ID:\n'+cids.join(', '))
+    if (!cid) return
+    const ev = S.orc3.events.find(e=>e.event_id===eventId)
+    if (ev && !ev.linked_contracts.includes(cid)) {
+      ev.linked_contracts.push(cid)
+      toast('Linked '+eventId+' → '+cid)
+      rOrc(c)
+    }
+  }
+  window._linkEventContract = (eventId, cid) => {
+    N('cd', null, cid)
   }
 }
 
