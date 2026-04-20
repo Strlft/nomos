@@ -152,6 +152,10 @@ _client_profile: dict = {
     "advisor_key": "",
 }
 
+# Demo mode — bypass document validation for presentations and testing
+# Set NOMOS_MODE=demo to enable at startup; also togglable at runtime via API.
+_DEMO_MODE: bool = os.environ.get("NOMOS_MODE", "production").lower() == "demo"
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # CONSTANTS — Validation sets
@@ -853,9 +857,9 @@ def api_sign_contract(contract_id: str, signed_by: str = "PARTY_B",
             isda_ref="§1(b) ISDA 2002"
         )
 
-    # DD gate (applied once, before the first signature)
+    # DD gate (applied once, before the first signature; skipped in demo mode)
     first_sig = not meta.get("party_a_signed") and not meta.get("party_b_signed")
-    if first_sig and _DD_OK and eng.dd_checker:
+    if first_sig and _DD_OK and eng.dd_checker and not _DEMO_MODE:
         readiness = eng.dd_checker.workflow.signing_readiness(eng.dd_checker.documents)
         if not readiness["ready"]:
             _http_error(
@@ -1570,6 +1574,46 @@ def api_due_diligence(contract_id: str) -> dict:
     )
 
 
+def api_get_demo_mode() -> dict:
+    return {"demo": _DEMO_MODE, "mode": "demo" if _DEMO_MODE else "production"}
+
+
+def api_set_demo_mode(enabled: bool) -> dict:
+    global _DEMO_MODE
+    _DEMO_MODE = bool(enabled)
+    mode = "demo" if _DEMO_MODE else "production"
+    logger.info(f"Demo mode set to: {mode}")
+    return {"demo": _DEMO_MODE, "mode": mode}
+
+
+def api_demo_auto_validate(contract_id: str) -> dict:
+    """
+    Demo mode only: auto-validate all pending documents for a contract.
+    Forces all REQUIRED/UPLOADED documents to VALIDATED status, bypassing
+    the normal upload → advisor-review flow.
+    """
+    if not _DD_OK:
+        return {"validated": 0, "demo_mode": True, "message": "DD module not available"}
+
+    eng = _get_engine(contract_id)
+    today = date.today()
+    total = 0
+
+    if eng.dd_checker:
+        total += eng.dd_checker.auto_validate_all(today=today)
+
+    for store in _entity_stores.values():
+        total += store.auto_validate_all(today=today)
+
+    logger.info(f"[{contract_id}] demo auto-validate: {total} document(s) validated")
+    return {
+        "validated": total,
+        "demo_mode": True,
+        "contract_id": contract_id,
+        "message": f"Auto-validated {total} document(s) in demo mode.",
+    }
+
+
 def api_signing_readiness(contract_id: str) -> dict:
     """
     Return the signing gate status for a contract.
@@ -1583,6 +1627,26 @@ def api_signing_readiness(contract_id: str) -> dict:
         _http_error(503, "MODULE_UNAVAILABLE", "Engine modules unavailable")
 
     eng = _get_engine(contract_id)
+
+    # Demo mode: bypass DD document requirements; only open comments can block
+    if _DEMO_MODE:
+        open_count = sum(1 for c in _comments.get(contract_id, []) if c["status"] == "OPEN")
+        return {
+            "ready": open_count == 0,
+            "workflow_state": "DEMO_MODE",
+            "pre_signing_total": 0,
+            "pre_signing_validated": 0,
+            "blocking_count": 0,
+            "blocking_documents": [],
+            "missing": [],
+            "open_comments": open_count,
+            "demo_mode": True,
+            "message": (
+                "DEMO MODE: Documents auto-validated for testing."
+                if open_count == 0
+                else f"DEMO MODE: {open_count} open comment(s) must be resolved before signing."
+            ),
+        }
 
     open_count = sum(1 for c in _comments.get(contract_id, []) if c["status"] == "OPEN")
 
@@ -2481,6 +2545,10 @@ if HAS_FASTAPI:
         """Body for POST /api/contracts/{id}/approve-advisor (dual_advisor mode)"""
         approved_by: str
 
+    class DemoModeRequest(BaseModel):
+        """Body for POST /api/demo-mode"""
+        demo: bool
+
     # ── App ──────────────────────────────────────────────────────────────────
 
     app = FastAPI(
@@ -2966,6 +3034,36 @@ if HAS_FASTAPI:
                 f"{e}\n{traceback.format_exc()}")
             raise HTTPException(500, detail={
                 "code": "INTERNAL_ERROR", "message": str(e)})
+
+    # ── Demo mode routes ────────────────────────────────────────────────────
+
+    @app.get("/api/demo-mode", tags=["Demo"])
+    def get_demo_mode():
+        """Return current demo mode state."""
+        return api_get_demo_mode()
+
+    @app.post("/api/demo-mode", tags=["Demo"])
+    def set_demo_mode(req: DemoModeRequest):
+        """Enable or disable demo mode (bypasses DD document validation requirements)."""
+        return api_set_demo_mode(req.demo)
+
+    @app.post("/api/contracts/{contract_id}/demo/auto-validate", tags=["Demo"])
+    def demo_auto_validate(contract_id: str):
+        """
+        Demo mode only: auto-validate all required documents for a contract.
+        Simulates the 3-second validation flow for testing and presentations.
+        """
+        try:
+            return api_demo_auto_validate(contract_id)
+        except KeyError:
+            raise HTTPException(404, detail={
+                "code": "CONTRACT_NOT_FOUND",
+                "message": f"Contract '{contract_id}' not found"})
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"[{contract_id}] demo auto-validate error: {e}")
+            raise HTTPException(500, detail={"code": "INTERNAL_ERROR", "message": str(e)})
 
     # ── Oracle v3 routes ────────────────────────────────────────────────────
 

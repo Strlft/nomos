@@ -375,6 +375,22 @@ select.fi option{background:var(--s2)}
   .top-user{display:none}
   .top-sep{display:none}
 }
+/* ── Demo mode ── */
+.demo-banner{
+  display:none;background:rgba(234,179,8,.08);border-bottom:1px solid rgba(234,179,8,.25);
+  padding:7px 28px;font-size:11px;color:#eab308;font-weight:500;letter-spacing:.01em;
+  flex-shrink:0;
+}
+.demo-banner.on{display:flex;align-items:center;gap:8px}
+.demo-toggle{
+  padding:4px 10px;border-radius:20px;border:1px solid rgba(167,139,250,.3);
+  background:var(--viBg);color:var(--vi);font-size:10px;font-weight:500;
+  cursor:pointer;transition:var(--trans);white-space:nowrap;font-family:var(--ff);
+}
+.demo-toggle.on{
+  background:rgba(234,179,8,.1);border-color:rgba(234,179,8,.35);color:#eab308;
+}
+.demo-toggle:hover{opacity:.8}
 </style></head><body>
 
 <div class="top">
@@ -387,10 +403,18 @@ select.fi option{background:var(--s2)}
     <span class="top-user">Linklaters LLP · J. Smith</span>
   </div>
   <div class="top-r">
+    <button id="demo-toggle-btn" class="demo-toggle" onclick="toggleDemoMode()">Demo Mode</button>
     <span id="api-status" class="status-dot"><span class="dot pulse"></span>Connecting…</span>
     <span class="top-clock" id="ck"></span>
     <span class="sign-out" onclick="logout()">Sign out</span>
   </div>
+</div>
+
+<div id="demo-banner" class="demo-banner">
+  <span>⚠</span>
+  <span>DEMO MODE — documents auto-validated for testing</span>
+  <span style="flex:1"></span>
+  <span style="font-size:10px;color:rgba(234,179,8,.6);font-weight:400">Toggle off in the header to restore full DD workflow</span>
 </div>
 
 <div class="wrap">
@@ -429,6 +453,42 @@ const API = '/api'
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 ;(function(){const r=localStorage.getItem('nomos_role');if(r&&r!=='advisor')window.location.href='/'})()
 function logout(){localStorage.removeItem('nomos_role');window.location.href='/'}
+
+// ── DEMO MODE ─────────────────────────────────────────────────────────────────
+function isDemoMode() { return localStorage.getItem('nomos_demo_mode') === '1' }
+
+function _applyDemoMode() {
+  const on = isDemoMode()
+  const banner = document.getElementById('demo-banner')
+  const btn    = document.getElementById('demo-toggle-btn')
+  if (banner) { if (on) banner.classList.add('on'); else banner.classList.remove('on') }
+  if (btn)    { btn.textContent = on ? 'Demo ON' : 'Demo Mode'; if (on) btn.classList.add('on'); else btn.classList.remove('on') }
+}
+
+async function toggleDemoMode() {
+  const newVal = !isDemoMode()
+  localStorage.setItem('nomos_demo_mode', newVal ? '1' : '0')
+  try { await apiPost('/demo-mode', {demo: newVal}) } catch(e) {}
+  _applyDemoMode()
+  if (newVal) {
+    toast('Demo mode ON — documents will auto-validate', 'wr', 5000)
+    // Auto-validate all existing contracts after 3 seconds
+    setTimeout(async () => {
+      for (const x of S.contracts) {
+        try { await apiPost('/contracts/'+x.id+'/demo/auto-validate', {}) } catch(e) {}
+      }
+      delete S.dd
+      S.dd = {}
+      await refresh()
+      toast('✓ All documents auto-validated', 'ok')
+    }, 3000)
+  } else {
+    toast('Demo mode OFF — full DD workflow applies', 'inf')
+    await refresh()
+  }
+}
+
+;(function(){ _applyDemoMode() })()
 
 // ── TOAST NOTIFICATIONS ───────────────────────────────────────────────────────
 function toast(msg, type='inf', duration=4200) {
@@ -541,6 +601,13 @@ async function refresh() {
   R()
 }
 setInterval(refresh, 10000)
+// Sync demo mode from server env on load (in case NOMOS_MODE=demo was set at startup)
+apiFetch('/demo-mode').then(r => {
+  if (r.demo && !isDemoMode()) {
+    localStorage.setItem('nomos_demo_mode', '1')
+    _applyDemoMode()
+  }
+}).catch(()=>{})
 refresh()
 
 // ── SIDEBAR ───────────────────────────────────────────────────────────────────
@@ -1879,6 +1946,7 @@ ${crumb('Dashboard', _detId)}
 <!-- §3 — Due Diligence -->
 <div class="sh">Due Diligence <span class="tag tag-${dd.rag_status==='GREEN'?'g':dd.rag_status==='AMBER'?'w':'r'}">${dd.rag_status||'—'}</span></div>
 <div class="card" style="margin-bottom:16px">
+  ${isDemoMode()?`<div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.25);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:11px;color:#eab308;display:flex;align-items:center;gap:6px"><span>⚠</span><span>DEMO MODE: Documents auto-validated</span></div>`:''}
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
     <span style="font-size:11px;color:var(--t2)">${preVal} of ${preDocs.length} pre-signing documents validated</span>
     <span style="font-size:10px;color:${pctDD===100?'var(--g)':'var(--warm)'}">
@@ -2132,6 +2200,13 @@ async function ncSubmit(){
     })
     NC.loading=false; NC.result=r; NC.step=99; renderNC()
     await refresh()
+    if (isDemoMode() && r.contract_id) {
+      setTimeout(async () => {
+        try { await apiPost('/contracts/'+r.contract_id+'/demo/auto-validate', {}) } catch(e) {}
+        delete S.dd[r.contract_id]
+        await refresh()
+      }, 3000)
+    }
   }catch(e){NC.loading=false;NC.err='API error: '+e.message;renderNC()}
 }
 

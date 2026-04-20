@@ -860,6 +860,34 @@ class CovenantChecker:
         self.workflow.advance(self.documents, today)
         return rec
 
+    def auto_validate_all(self, advisor: str = "DEMO_SYSTEM", today=None) -> int:
+        """
+        Demo mode only: mark all pending documents VALIDATED without the
+        normal upload → advisor-review flow.
+        """
+        today = today or date.today()
+        count = 0
+        for doc in self.documents:
+            if doc.status in (DocumentStatus.VALIDATED, DocumentStatus.NOT_REQUIRED):
+                continue
+            if doc.status in (DocumentStatus.REQUIRED, DocumentStatus.EXPIRED):
+                doc.status = DocumentStatus.UPLOADED
+                doc.uploaded_by = advisor
+                doc.upload_date = today
+                doc.file_hash = "DEMO_AUTO"
+            try:
+                self.validate_document(
+                    doc_id=doc.doc_id,
+                    advisor=advisor,
+                    notes="Auto-validated — demo mode",
+                    accepted=True,
+                    today=today,
+                )
+                count += 1
+            except (ValueError, KeyError):
+                pass
+        return count
+
     # ── Expiry monitoring (AUTO) ──────────────────────────────────────────────
 
     def check_expirations(self, today: Optional[date] = None) -> List[DocumentRecord]:
@@ -1415,6 +1443,31 @@ class EntityDocumentStore:
                   f"by {advisor}")
 
         return rec
+
+    def auto_validate_all(self, advisor: str = "DEMO_SYSTEM", today=None) -> int:
+        """Demo mode only: mark all pending general documents VALIDATED."""
+        today = today or date.today()
+        count = 0
+        for doc in self.documents:
+            if doc.status in (DocumentStatus.VALIDATED, DocumentStatus.NOT_REQUIRED):
+                continue
+            if doc.status in (DocumentStatus.REQUIRED, DocumentStatus.EXPIRED):
+                doc.status = DocumentStatus.UPLOADED
+                doc.uploaded_by = advisor
+                doc.upload_date = today
+                doc.file_hash = "DEMO_AUTO"
+            try:
+                self.validate_document(
+                    doc_id=doc.doc_id,
+                    advisor=advisor,
+                    notes="Auto-validated — demo mode",
+                    accepted=True,
+                    today=today,
+                )
+                count += 1
+            except (ValueError, KeyError):
+                pass
+        return count
 
     # ── Expiry monitoring ────────────────────────────────────────────────────
 
