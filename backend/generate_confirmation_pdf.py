@@ -168,7 +168,7 @@ def generate_confirmation_pdf(params, schedule=None, initiation=None,
     story = []
 
     gov_law = params.governing_law if hasattr(params, 'governing_law') else "English Law"
-    is_english = "English" in gov_law
+    is_english = "english" in gov_law.lower()
 
     # ── HEADER ──────────────────────────────────────────────────────────────
     story.append(Spacer(1, 20))
