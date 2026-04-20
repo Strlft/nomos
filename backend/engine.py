@@ -2393,47 +2393,86 @@ class CloseOutModule:
         self.calc = calc_engine
         self.dc = DayCountModule()
 
+    # ISDA 2021 fallback: €STR spread adjustment for EURIBOR 3M (basis points → decimal)
+    _ESTR_EURIBOR_SPREAD = Decimal("0.000959")
+
+    def _ois_discount_factor(self, ois_rate: Decimal, days: int) -> Decimal:
+        """
+        OIS discount factor using continuous compounding: exp(-r * t).
+
+        ACT/365 day count convention for OIS instruments (market standard).
+        Using continuous compounding because:
+        - OIS rates are quoted as simple but compounded daily; continuous is a
+          close and analytically tractable approximation for maturities ≤ 2Y.
+        - Avoids the under-discounting bias of simple (1/(1+r*t)).
+
+        PRODUCTION: bootstrap a full OIS (€STR) discount curve from market
+        quotes for 1M, 3M, 6M, 1Y, 2Y, 3Y, 5Y tenor points.
+        """
+        import math
+        t = float(days) / 365.0
+        df = Decimal(str(math.exp(-float(ois_rate) * t)))
+        return df
+
     def calculate_indicative_mtm(self, etd: date, remaining_periods: List[CalculationPeriod],
                                   current_oracle: OracleReading,
                                   determining_party: str) -> Decimal:
         """
         Indicative Mark-to-Market value for Close-out Amount calculation.
 
-        SIMPLIFIED METHOD (prototype):
-        We approximate the replacement cost as the NPV of remaining net cash flows,
-        discounted at a flat rate (current EURIBOR proxy).
+        METHODOLOGY (per §6(e)(i) ISDA 2002 — replacement cost basis):
+        - Discount future net cash flows to the ETD using OIS (€STR) rates.
+        - Project floating cash flows using EURIBOR 3M (from oracle).
+        - OIS discount rate = max(EURIBOR_3M − ISDA_2021_spread, 0).
+          This is the standard pre-cessation proxy; production uses bootstrapped
+          €STR OIS curve.
+        - Discount convention: continuous compounding on ACT/365.
+
+        BEFORE (P1-6 bug): flat EURIBOR simple-interest discount factor
+          DF = 1 / (1 + EURIBOR * t)   [simple; ACT/365]
+        AFTER: OIS continuous discount factor
+          DF = exp(−€STR * t)           [continuous; ACT/365]
 
         PRODUCTION METHOD:
-        Close-out Amount should be based on:
-        (i)   Market quotations from dealers/end-users (§6(e)(i) clause (i))
-        (ii)  Relevant market data: yield curves, volatilities, correlations
-        (iii) Internal pricing models of the Determining Party
+        - Market quotations from ≥ 2 Reference Market-makers (§6(e)(i)).
+        - Full bootstrapped OIS + forward curve from Bloomberg/Reuters.
+        - Mark as "INDICATIVE" in the close-out notice.
 
-        The 2002 MA removed the strict Market Quotation procedure (4 Reference
-        Market-makers) in favour of a flexible "commercially reasonable" approach.
+        The 2002 MA removed the strict 4-market-maker requirement in favour of
+        commercially reasonable procedures.
         """
         print(f"\n  [CLOSE_OUT] Calculating indicative MTM for {len(remaining_periods)} remaining periods...")
-        print(f"  [CLOSE_OUT] ⚠ PROTOTYPE: Using simplified replacement cost. Production requires market quotations.")
+
+        # OIS rate: €STR proxy = EURIBOR_3M − ISDA_2021_spread (floor 0)
+        # In post-2022 markets, €STR ≈ EURIBOR_3M − 26bps (credit/term premium).
+        # The ISDA 2021 fallback spread (0.0959%) is a lower bound; actual spread
+        # varies. For indicative purposes, this is commercially reasonable.
+        ois_rate = max(current_oracle.rate - self._ESTR_EURIBOR_SPREAD,
+                       Decimal("0"))
+
+        print(f"  [CLOSE_OUT] EURIBOR 3M: {float(current_oracle.rate)*100:.3f}%")
+        print(f"  [CLOSE_OUT] OIS (€STR proxy): {float(ois_rate)*100:.3f}%  "
+              f"[EURIBOR − ISDA 2021 spread {float(self._ESTR_EURIBOR_SPREAD)*100:.4f}%]")
+        print(f"  [CLOSE_OUT] Discount method: continuous compounding ACT/365 (OIS standard)")
+        print(f"  [CLOSE_OUT] ⚠ INDICATIVE: Production requires market quotations §6(e)(i).")
 
         total_pv = Decimal("0")
-        discount_rate = current_oracle.rate  # Flat curve proxy
 
-        for i, period in enumerate(remaining_periods):
+        for period in remaining_periods:
             fixed_amt = self.calc.calculate_fixed_amount(period)
             float_amt = self.calc.calculate_floating_amount(period, current_oracle)
             net, payer = self.calc.apply_netting(fixed_amt, float_amt)
 
-            # Discount to ETD (simplified: compound at EURIBOR flat)
+            # Discount to ETD using OIS continuous discount factor (ACT/365)
             days_to_payment = max((period.payment_date - etd).days, 0)
-            dcf = Decimal(str(days_to_payment)) / Decimal("365")
-            discount_factor = Decimal("1") / (Decimal("1") + discount_rate * dcf)
-            pv = net * discount_factor
+            df = self._ois_discount_factor(ois_rate, days_to_payment)
+            pv = net * df
 
             # Sign convention: positive = benefit to Party A (fixed payer)
             if payer == NetPayer.PARTY_A:
-                pv = -pv  # Cost to Party A
+                pv = -pv   # cost to Party A
             elif payer == NetPayer.PARTY_B:
-                pv = pv   # Benefit to Party A
+                pv = pv    # benefit to Party A
 
             total_pv += pv
 
@@ -3003,10 +3042,7 @@ class IRSExecutionEngine:
                 rate=Decimal(str(rate_override)),
                 status=OracleStatus.RATE_OVERRIDE,
                 source="RATE_OVERRIDE",
-                timestamp=datetime.now(timezone.utc).isoformat(),
-                raw_value=str(rate_override),
-                fallback_used=False,
-                challenge_flag=False,
+                fetch_timestamp=datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
             )
             self.audit.log("ORACLE_RATE_OVERRIDE", {
                 "period": period_number,
