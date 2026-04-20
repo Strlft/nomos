@@ -96,7 +96,7 @@ def generate_contract_pdf(params, output_path, netting_assessment=None,
     story = []
 
     # ── Derived values ────────────────────────────────────────────────────
-    is_english = "English" in params.governing_law
+    is_english = "english" in params.governing_law.lower()
     gov_law_full = "English Law" if is_english else "the laws of the State of New York"
     jurisdiction_text = (
         "the non-exclusive jurisdiction of the English courts"

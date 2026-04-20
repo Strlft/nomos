@@ -119,6 +119,24 @@ NOTICE_TEMPLATES = {
 }
 
 
+def _compute_fixed_amount(params, period) -> str:
+    """
+    Compute indicative fixed amount for the schedule table using the 30/360 day count.
+    If the period already has a calculated fixed_amount, use that.
+    Otherwise compute from dates using the 30/360 convention.
+    """
+    if period.fixed_amount is not None:
+        return f"{params.currency} {float(period.fixed_amount):,.2f}"
+    # 30/360: (Y2-Y1)*360 + (M2-M1)*30 + min(D2,30) - min(D1,30)
+    sd, ed = period.start_date, period.end_date
+    days_30_360 = ((ed.year - sd.year) * 360
+                   + (ed.month - sd.month) * 30
+                   + min(ed.day, 30) - min(sd.day, 30))
+    dcf = days_30_360 / 360
+    fixed = float(params.notional) * float(params.fixed_rate) * dcf
+    return f"{params.currency} {fixed:,.2f}"
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # 1. CONFIRMATION PDF
 # ═══════════════════════════════════════════════════════════════════════════
@@ -218,8 +236,11 @@ def generate_confirmation_pdf(params, schedule=None, initiation=None,
         ["Fixed Rate Payer:", f"{params.party_a.name} (\"Party A\")"],
         ["Fixed Rate:", f"{params.fixed_rate * 100:.3f}% per annum"],
         ["Fixed Rate Day Count Fraction:", params.fixed_day_count],
-        ["Fixed Rate Payer Payment Dates:", f"Quarterly, commencing {params.effective_date + timedelta(days=90):%d %B %Y}, "
-         f"subject to the Business Day Convention, up to and including the Termination Date."],
+        ["Fixed Rate Payer Payment Dates:", (
+            f"Quarterly, commencing {payment_schedule[0].payment_date:%d %B %Y}, "
+            if payment_schedule else
+            f"Quarterly, subject to the Business Day Convention, "
+        ) + "up to and including the Termination Date."],
     ]
     for row in fixed:
         story.append(Paragraph(f"<b>{row[0]}</b> {row[1]}", sB))
@@ -254,7 +275,7 @@ def generate_confirmation_pdf(params, schedule=None, initiation=None,
                 str(p.start_date),
                 str(p.end_date),
                 str(p.payment_date),
-                f"{params.currency} {80000:,.2f}"  # simplified — in production from engine
+                _compute_fixed_amount(params, p)
             ])
         story.append(_tbl(sched_data, cw=[30, 90, 90, 90, 100]))
         story.append(Spacer(1, 8))
@@ -440,7 +461,7 @@ def generate_notice_pdf(notice_type, from_party, to_party, contract_id,
     story.append(Paragraph(f"Notice fingerprint: {notice_hash}", sRef))
     story.append(Paragraph(
         f"§12 · {template['isda_ref']} · "
-        f"{'English law' if 'English' in governing_law else 'New York law'}",
+        f"{'English law' if 'english' in governing_law.lower() else 'New York law'}",
         sFt))
 
     doc.build(story)

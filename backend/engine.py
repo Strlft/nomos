@@ -2846,7 +2846,7 @@ class IRSExecutionEngine:
             from netting_opinion_module import GoverningLaw
             gov_law_enum = (
                 GoverningLaw.ENGLISH_LAW
-                if "English" in self.params.governing_law
+                if "english" in self.params.governing_law.lower()
                 else GoverningLaw.NEW_YORK_LAW
             )
             self.netting_assessment = self._netting_checker.assess(
