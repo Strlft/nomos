@@ -114,6 +114,7 @@ try:
     from engine import (
         SwapParameters, PartyDetails, ScheduleElections, ContractInitiation,
         IRSExecutionEngine, OracleStatus, ContractState,
+        DefaultingParty, EventOfDefault,
     )
     from generate_confirmation_pdf import generate_confirmation_pdf, generate_notice_pdf
     _MODULES_OK = True
@@ -1270,6 +1271,343 @@ def api_mark_delivered(contract_id: str, section: str, party: str) -> dict:
         "party": str(party).upper(),
         "delivered_date": str(date.today()),
         "isda_ref": "§4(a) ISDA 2002",
+    }
+
+
+# ── P1-5: EoD / TE declaration endpoints ─────────────────────────────────────
+
+def _resolve_defaulting_party(party_str: str) -> "DefaultingParty":
+    """Resolve 'A'/'B'/'PARTY_A'/'PARTY_B' to DefaultingParty enum."""
+    s = str(party_str).upper().strip()
+    if s in ("A", "PARTY_A"):
+        return DefaultingParty.PARTY_A
+    if s in ("B", "PARTY_B"):
+        return DefaultingParty.PARTY_B
+    _http_error(400, "INVALID_PARTY",
+                f"party must be 'A'/'PARTY_A' or 'B'/'PARTY_B', got '{party_str}'")
+
+
+def api_declare_breach_of_agreement(contract_id: str, data: dict) -> dict:
+    """
+    Declare a §5(a)(ii) Breach of Agreement Event of Default.
+
+    Required: party ('A'/'B'), description (str)
+    Optional: repudiation (bool, default False) — §5(a)(ii)(2) repudiation,
+              no grace period.
+
+    HUMAN GATE: must be called by the Calculation Agent after written notice
+    has been given to the Defaulting Party.
+    ISDA ref: §5(a)(ii) ISDA 2002
+    """
+    if not _MODULES_OK:
+        _http_error(503, "MODULE_UNAVAILABLE", "Engine modules unavailable")
+    party = data.get("party")
+    description = data.get("description", "")
+    if not party:
+        _http_error(400, "MISSING_PARTY", "party ('A' or 'B') is required")
+    if not description:
+        _http_error(400, "MISSING_DESCRIPTION",
+                    "description of the breach is required", isda_ref="§5(a)(ii)")
+
+    eng = _get_engine(contract_id)
+    dp = _resolve_defaulting_party(party)
+    repudiation = bool(data.get("repudiation", False))
+    rec = eng.eod_monitor.declare_breach_of_agreement(
+        dp, description, date.today(), repudiation=repudiation)
+
+    eng.audit.log("EOD_BREACH_DECLARED", {
+        "party": party, "description": description,
+        "repudiation": repudiation,
+        "grace_period_end": str(rec.grace_period_end) if rec.grace_period_end else None,
+        "is_potential_eod": rec.is_potential_eod,
+        "isda_reference": "§5(a)(ii) ISDA 2002",
+    }, actor="CALCULATION_AGENT")
+
+    return {
+        "status": "EOD_REGISTERED",
+        "eod_type": "BREACH_OF_AGREEMENT",
+        "party": dp.value,
+        "is_potential_eod": rec.is_potential_eod,
+        "grace_period_end": str(rec.grace_period_end) if rec.grace_period_end else None,
+        "repudiation": repudiation,
+        "isda_ref": "§5(a)(ii) ISDA 2002",
+        "human_gate": True,
+    }
+
+
+def api_declare_bankruptcy(contract_id: str, data: dict) -> dict:
+    """
+    Declare a §5(a)(vii) Bankruptcy Event of Default.
+
+    Required: party ('A'/'B'), description (str)
+
+    15-day grace period for bonafide disputes.
+    ISDA ref: §5(a)(vii) ISDA 2002
+    """
+    if not _MODULES_OK:
+        _http_error(503, "MODULE_UNAVAILABLE", "Engine modules unavailable")
+    party = data.get("party")
+    description = data.get("description", "")
+    if not party:
+        _http_error(400, "MISSING_PARTY", "party is required")
+    if not description:
+        _http_error(400, "MISSING_DESCRIPTION",
+                    "description of the insolvency event is required",
+                    isda_ref="§5(a)(vii)")
+
+    eng = _get_engine(contract_id)
+    dp = _resolve_defaulting_party(party)
+    rec = eng.eod_monitor.declare_bankruptcy(dp, description, date.today())
+
+    eng.audit.log("EOD_BANKRUPTCY_DECLARED", {
+        "party": dp.value, "description": description,
+        "grace_period_end": str(rec.grace_period_end),
+        "isda_reference": "§5(a)(vii) ISDA 2002",
+    }, actor="CALCULATION_AGENT")
+
+    return {
+        "status": "EOD_REGISTERED",
+        "eod_type": "BANKRUPTCY",
+        "party": dp.value,
+        "is_potential_eod": rec.is_potential_eod,
+        "grace_period_end": str(rec.grace_period_end),
+        "isda_ref": "§5(a)(vii) ISDA 2002",
+        "human_gate": True,
+    }
+
+
+def api_declare_cross_default(contract_id: str, data: dict) -> dict:
+    """
+    Declare a §5(a)(vi) Cross-Default Event of Default.
+
+    Required: party ('A'/'B'), amount (float, indebtedness amount in EUR)
+    Only fires if cross_default_elected=True and amount ≥ threshold.
+
+    ISDA ref: §5(a)(vi) ISDA 2002
+    """
+    if not _MODULES_OK:
+        _http_error(503, "MODULE_UNAVAILABLE", "Engine modules unavailable")
+    party = data.get("party")
+    amount = data.get("amount")
+    if not party:
+        _http_error(400, "MISSING_PARTY", "party is required")
+    if amount is None:
+        _http_error(400, "MISSING_AMOUNT",
+                    "amount (indebtedness in EUR) is required", isda_ref="§5(a)(vi)")
+
+    from decimal import Decimal as _D
+    eng = _get_engine(contract_id)
+    dp = _resolve_defaulting_party(party)
+    rec = eng.eod_monitor.check_cross_default(dp, _D(str(amount)), date.today())
+
+    if rec is None:
+        return {
+            "status": "NOT_TRIGGERED",
+            "reason": ("Cross-default not elected in Schedule"
+                       if not eng.params.cross_default_elected
+                       else f"Amount EUR {float(amount):,.2f} below threshold "
+                       f"EUR {float(eng.params.cross_default_threshold or 0):,.2f}"),
+            "isda_ref": "§5(a)(vi) ISDA 2002",
+        }
+
+    eng.audit.log("EOD_CROSS_DEFAULT_DECLARED", {
+        "party": dp.value, "amount": str(amount),
+        "isda_reference": "§5(a)(vi) ISDA 2002",
+    }, actor="CALCULATION_AGENT")
+
+    return {
+        "status": "EOD_REGISTERED",
+        "eod_type": "CROSS_DEFAULT",
+        "party": dp.value,
+        "amount": float(amount),
+        "isda_ref": "§5(a)(vi) ISDA 2002",
+        "human_gate": True,
+    }
+
+
+def api_declare_illegality(contract_id: str, data: dict) -> dict:
+    """
+    Declare a §5(b)(i) Illegality Termination Event.
+
+    Required: party ('A'/'B'), description (str)
+    Waiting period: 3 Local Business Days before ETD can be designated.
+
+    ISDA ref: §5(b)(i) ISDA 2002
+    """
+    if not _MODULES_OK:
+        _http_error(503, "MODULE_UNAVAILABLE", "Engine modules unavailable")
+    party = data.get("party")
+    description = data.get("description", "")
+    if not party:
+        _http_error(400, "MISSING_PARTY", "party is required")
+    if not description:
+        _http_error(400, "MISSING_DESCRIPTION",
+                    "description of the illegality is required", isda_ref="§5(b)(i)")
+
+    eng = _get_engine(contract_id)
+    # Termination Events use a free-form party string (not DefaultingParty enum)
+    party_str = "PARTY_A" if str(party).upper() in ("A", "PARTY_A") else "PARTY_B"
+    rec = eng.eod_monitor.declare_illegality(party_str, description, date.today())
+
+    eng.audit.log("TE_ILLEGALITY_DECLARED", {
+        "party": party_str, "description": description,
+        "waiting_period_end": str(rec.waiting_period_end),
+        "isda_reference": "§5(b)(i) ISDA 2002",
+    }, actor="CALCULATION_AGENT")
+
+    return {
+        "status": "TE_REGISTERED",
+        "te_type": "ILLEGALITY",
+        "party": party_str,
+        "waiting_period_end": str(rec.waiting_period_end),
+        "isda_ref": "§5(b)(i) ISDA 2002",
+        "human_gate": True,
+    }
+
+
+def api_declare_force_majeure(contract_id: str, data: dict) -> dict:
+    """
+    Declare a §5(b)(ii) Force Majeure Termination Event.
+
+    Required: party ('A'/'B'), description (str)
+    Waiting period: 8 Local Business Days. Payments are DEFERRED not cancelled.
+
+    ISDA ref: §5(b)(ii) ISDA 2002
+    """
+    if not _MODULES_OK:
+        _http_error(503, "MODULE_UNAVAILABLE", "Engine modules unavailable")
+    party = data.get("party")
+    description = data.get("description", "")
+    if not party:
+        _http_error(400, "MISSING_PARTY", "party is required")
+    if not description:
+        _http_error(400, "MISSING_DESCRIPTION",
+                    "description of the force majeure event is required",
+                    isda_ref="§5(b)(ii)")
+
+    eng = _get_engine(contract_id)
+    party_str = "PARTY_A" if str(party).upper() in ("A", "PARTY_A") else "PARTY_B"
+    rec = eng.eod_monitor.declare_force_majeure(party_str, description, date.today())
+
+    eng.audit.log("TE_FORCE_MAJEURE_DECLARED", {
+        "party": party_str, "description": description,
+        "waiting_period_end": str(rec.waiting_period_end),
+        "isda_reference": "§5(b)(ii) ISDA 2002",
+    }, actor="CALCULATION_AGENT")
+
+    return {
+        "status": "TE_REGISTERED",
+        "te_type": "FORCE_MAJEURE",
+        "party": party_str,
+        "waiting_period_end": str(rec.waiting_period_end),
+        "isda_ref": "§5(b)(ii) ISDA 2002",
+        "human_gate": True,
+        "note": "Payments are DEFERRED (not cancelled) during waiting period per §5(d).",
+    }
+
+
+def api_cure_eod(contract_id: str, data: dict) -> dict:
+    """
+    Cure (withdraw) a Potential Event of Default.
+
+    Required: eod_type (str, e.g. 'FAILURE_TO_PAY'), party ('A'/'B')
+
+    Only Potential EoDs can be cured via this endpoint. Full EoDs require
+    §6 close-out (designate ETD). Curing removes the §2(a)(iii) suspension
+    if no other EoDs remain active.
+
+    ISDA ref: §2(a)(iii) ISDA 2002
+    """
+    if not _MODULES_OK:
+        _http_error(503, "MODULE_UNAVAILABLE", "Engine modules unavailable")
+    eod_type_str = data.get("eod_type", "")
+    party = data.get("party", "")
+    if not eod_type_str:
+        _http_error(400, "MISSING_EOD_TYPE",
+                    "eod_type is required (e.g. 'FAILURE_TO_PAY')")
+    if not party:
+        _http_error(400, "MISSING_PARTY", "party is required")
+
+    try:
+        eod_type = EventOfDefault(eod_type_str.upper())
+    except ValueError:
+        valid = [e.value for e in EventOfDefault]
+        _http_error(400, "INVALID_EOD_TYPE",
+                    f"Unknown eod_type '{eod_type_str}'. Valid values: {valid}")
+
+    eng = _get_engine(contract_id)
+    dp = _resolve_defaulting_party(party)
+    cured = eng.eod_monitor.cure_potential_eod(eod_type, dp)
+
+    if not cured:
+        return {
+            "status": "NOT_FOUND",
+            "message": f"No uncured Potential EoD of type '{eod_type_str}' found "
+                       f"for party '{dp.value}'. Full EoDs require §6 close-out.",
+            "isda_ref": "§2(a)(iii) ISDA 2002",
+        }
+
+    eng.audit.log("EOD_POTENTIAL_CURED", {
+        "eod_type": eod_type.value, "party": dp.value,
+        "still_suspended": eng.eod_monitor.is_suspended,
+        "isda_reference": "§2(a)(iii) ISDA 2002",
+    }, actor="CALCULATION_AGENT")
+
+    if not eng.eod_monitor.is_suspended and eng.state == ContractState.SUSPENDED:
+        eng.state = ContractState.ACTIVE
+        eng.audit.log("CONTRACT_REACTIVATED", {
+            "reason": "All PEoDs cured — §2(a)(iii) condition precedent now satisfied",
+            "isda_reference": "§2(a)(iii) ISDA 2002",
+        }, actor="SYSTEM")
+
+    return {
+        "status": "CURED",
+        "eod_type": eod_type.value,
+        "party": dp.value,
+        "contract_suspended": eng.eod_monitor.is_suspended,
+        "contract_state": eng.state.value,
+        "isda_ref": "§2(a)(iii) ISDA 2002",
+    }
+
+
+def api_eod_status(contract_id: str) -> dict:
+    """
+    Return the current EoD / TE status for a contract.
+
+    Lists all active EoDs (full + potential), all TEs, and the suspension flag.
+    """
+    if not _MODULES_OK:
+        _http_error(503, "MODULE_UNAVAILABLE", "Engine modules unavailable")
+    eng = _get_engine(contract_id)
+    summary = eng.eod_monitor.summary()
+    eods = []
+    for rec in eng.eod_monitor.active_eods:
+        eods.append({
+            "eod_type": rec.eod_type.value,
+            "party": rec.affected_party.value,
+            "detected_date": str(rec.detected_date),
+            "is_potential_eod": rec.is_potential_eod,
+            "cured": rec.cured,
+            "grace_period_end": str(rec.grace_period_end) if rec.grace_period_end else None,
+            "description": rec.description,
+        })
+    tes = []
+    for te in eng.eod_monitor.active_tes:
+        tes.append({
+            "te_type": te.te_type.value,
+            "party": te.affected_party,
+            "detected_date": str(te.detected_date),
+            "waiting_period_end": str(te.waiting_period_end) if te.waiting_period_end else None,
+            "description": te.description,
+        })
+    return {
+        "contract_id": contract_id,
+        "suspended": summary["suspended"],
+        "contract_state": eng.state.value,
+        "eods": eods,
+        "termination_events": tes,
+        "summary": summary,
+        "isda_ref": "§5 ISDA 2002",
     }
 
 
