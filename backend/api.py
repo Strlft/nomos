@@ -1178,6 +1178,17 @@ def api_generate_notice(contract_id: str, notice_type: str, details: dict) -> di
     eng = _get_engine(contract_id)
     p = eng.params
 
+    # Resolve single-letter party identifiers ("A", "B") to full names so that
+    # template variables like {party_defaulting} render "Beta Fund Ltd" not "B".
+    # If the caller already passed the full name, leave it unchanged.
+    _party_map = {"A": p.party_a.name, "B": p.party_b.name}
+    resolved_details = {
+        k: _party_map.get(str(v), v) if k in ("party_defaulting", "party_affected",
+                                               "party_sending", "party_receiving")
+        else v
+        for k, v in details.items()
+    }
+
     try:
         _ensure_outputs()
         pdf_path, notice_hash = generate_notice_pdf(
@@ -1185,7 +1196,7 @@ def api_generate_notice(contract_id: str, notice_type: str, details: dict) -> di
             from_party=p.party_a.name,
             to_party=p.party_b.name,
             contract_id=contract_id,
-            details=details,
+            details=resolved_details,
             governing_law=p.governing_law,
         )
     except KeyError as e:
