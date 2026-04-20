@@ -56,7 +56,7 @@
 
   "notice_failure_to_pay_body": "We hereby give notice that an Event of Default has arisen under §5(a)(i) of the Agreement. {party_defaulting} has failed to make a payment of {currency} {amount} that fell due on {due_date} in respect of Transaction {contract_id}. The applicable grace period of {grace_period} expired on {grace_end} without payment having been received.",
 
-  "notice_failure_to_pay_consequence": "By reason of the occurrence and continuation of this Event of Default, we are exercising our right under §2(a)(iii) to suspend all further payments due from us under the Agreement with immediate effect. We preserve all rights available to us under the Agreement, including our right to designate an Early Termination Date under §6(a).",
+  "notice_failure_to_pay_consequence": "By reason of the occurrence and continuation of this Event of Default, the condition precedent in Section 2(a)(iii) of the Agreement is not satisfied and accordingly payment obligations due from us under the Agreement do not arise. We preserve all rights available to us under the Agreement, including the right to designate an Early Termination Date pursuant to Section 6(a).",
 
   "notice_breach_body": "We hereby give notice that a breach has arisen under §5(a)(ii) of the Agreement. {party_defaulting} has failed to comply with or perform the obligation identified below:\n\nObligation: {obligation}\nDue date: {due_date}\nSection: {section}",
 
