@@ -402,9 +402,13 @@ def _get_workflow_status(contract_id: str, eng) -> str:
         return state
 
     if mode == "peer_to_peer":
-        if meta.get("party_b_signed") and not meta.get("party_a_signed"):
-            return "PENDING_INITIATOR"      # B signed, A must countersign
-        return "PENDING_COUNTERPARTY"       # waiting for B to sign first
+        pa = meta.get("party_a_signed", False)
+        pb = meta.get("party_b_signed", False)
+        if pa and not pb:
+            return "PENDING_PARTY_B"        # A signed, waiting for B
+        if pb and not pa:
+            return "PENDING_PARTY_A"        # B signed, waiting for A
+        return "PENDING_BOTH_PARTIES"       # neither has signed yet
 
     if mode == "dual_advisor":
         if not meta.get("advisor_b_approved"):
@@ -424,7 +428,8 @@ def _get_workflow_status(contract_id: str, eng) -> str:
 def _mode_label(mode: str) -> str:
     return {
         "advisor_managed": "Advisor Managed",
-        "peer_to_peer":    "Peer-to-Peer",
+        "peer_to_peer":    "Bilateral (Peer-to-Peer)",
+        "bilateral":       "Bilateral (Peer-to-Peer)",
         "dual_advisor":    "Dual Advisor",
     }.get(mode, mode)
 
@@ -759,7 +764,11 @@ def api_create_contract(data: dict) -> dict:
         _get_or_create_entity_store(params.party_b.name)
 
     # Store mode metadata
+    # "bilateral" is a supported alias for "peer_to_peer" (clearer naming for
+    # two-party direct signing without an advisor managing both sides).
     mode = str(data.get("contract_mode", "advisor_managed"))
+    if mode == "bilateral":
+        mode = "peer_to_peer"
     if mode not in ("advisor_managed", "peer_to_peer", "dual_advisor"):
         mode = "advisor_managed"
     _contract_meta[cid] = {
