@@ -2159,9 +2159,15 @@ class ComplianceMonitor:
             auth_due = date(y, effective_date.month, min(effective_date.day, 28))
             if auth_due >= effective_date and auth_due <= termination_date:
                 for party in ["PARTY_A", "PARTY_B"]:
-                    self.schedule_obligation(
+                    ob = self.schedule_obligation(
                         "§4(b)", f"Authorisations Confirmation {y}",
                         party, auth_due)
+                    # Pre-signing obligation: the contract reaching ACTIVE state
+                    # means authorisations were confirmed at execution. Auto-deliver
+                    # to prevent false §5(a)(ii) escalations after signing.
+                    if auth_due == effective_date:
+                        ob.status = self.ObligationStatus.DELIVERED
+                        ob.delivered_date = effective_date
 
         print(f"  [COMPLIANCE] Scheduled {len(self.obligations)} recurring obligations "
               f"({effective_date} → {termination_date})")
@@ -2191,8 +2197,11 @@ class ComplianceMonitor:
 
             for party in parties:
                 if "upon execution" in deadline.lower():
-                    # One-time delivery at effective date
-                    self.schedule_obligation(section, name, party, effective_date)
+                    # Pre-signing obligation — auto-delivered: reaching ACTIVE state
+                    # means all pre-signing documents were validated before signing.
+                    ob = self.schedule_obligation(section, name, party, effective_date)
+                    ob.status = self.ObligationStatus.DELIVERED
+                    ob.delivered_date = effective_date
                 elif "annually" in deadline.lower() or "fiscal year" in deadline.lower() \
                         or "financial statements" in deadline.lower():
                     # Annual recurring — 120 days after FY end (31 Dec)
