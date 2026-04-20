@@ -955,10 +955,15 @@ def api_sign_contract(contract_id: str, signed_by: str = "PARTY_B",
     }
 
 
-def api_execute_period(contract_id: str, period: int = None) -> dict:
+def api_execute_period(contract_id: str, period: int = None,
+                        rate_override: float = None) -> dict:
     """
     Run a calculation cycle for one period.
     Contract must be ACTIVE (not PENDING_SIGNATURE or SUSPENDED).
+
+    rate_override: optional float (e.g. 0.03875). If supplied, bypasses the
+    oracle and uses this EURIBOR 3M rate directly. Recorded in the audit trail.
+    Intended for regression testing and demo scenarios only.
     """
     if not _MODULES_OK:
         _http_error(503, "MODULE_UNAVAILABLE", "Engine modules unavailable")
@@ -1036,7 +1041,9 @@ def api_execute_period(contract_id: str, period: int = None) -> dict:
 
     # Run calculation
     try:
-        result = eng.run_calculation_cycle(period)
+        from decimal import Decimal as _Dec
+        _rate = _Dec(str(rate_override)) if rate_override is not None else None
+        result = eng.run_calculation_cycle(period, rate_override=_rate)
     except Exception as e:
         logger.error(f"[{contract_id}] Period {period} calc error: {e}\n{traceback.format_exc()}")
         _http_error(500, "CALCULATION_ERROR", f"Calculation failed: {e}")

@@ -77,10 +77,11 @@ class ContractState(Enum):
 
 class OracleStatus(Enum):
     """Status of the ECB oracle rate fetch."""
-    PENDING   = "PENDING"
-    CONFIRMED = "CONFIRMED"    # Live rate from ECB SDW
-    FALLBACK  = "FALLBACK"     # ECB unreachable — ISDA 2021 fallback applied
-    CHALLENGED = "CHALLENGED"  # Rate challenged by a party (>5bps threshold)
+    PENDING       = "PENDING"
+    CONFIRMED     = "CONFIRMED"      # Live rate from ECB SDW
+    FALLBACK      = "FALLBACK"       # ECB unreachable — ISDA 2021 fallback applied
+    CHALLENGED    = "CHALLENGED"     # Rate challenged by a party (>5bps threshold)
+    RATE_OVERRIDE = "RATE_OVERRIDE"  # Manual override — testing/demo only
 
 
 class NetPayer(Enum):
@@ -2955,17 +2956,22 @@ class IRSExecutionEngine:
                 self.params.effective_date, self.params.termination_date)
 
     def run_calculation_cycle(self, period_number: int,
-                               today: Optional[date] = None) -> Optional[dict]:
+                               today: Optional[date] = None,
+                               rate_override: Optional[Decimal] = None) -> Optional[dict]:
         """
         Run a single calculation cycle for one payment period.
 
         Steps:
         1. Check §2(a)(iii) conditions precedent
-        2. Fetch oracle rate
+        2. Fetch oracle rate (or use rate_override for testing/demo)
         3. Calculate fixed and floating amounts
         4. Apply §2(c) netting
         5. Check for Failure to Pay on previous periods
         6. Issue Payment Instruction (pending human approval)
+
+        rate_override: if supplied, bypasses oracle fetch and uses this rate
+        directly. The audit trail records it as RATE_OVERRIDE with the supplied
+        value. Intended for regression testing and demo scenarios only.
         """
         if today is None:
             today = date.today()
@@ -2991,8 +2997,25 @@ class IRSExecutionEngine:
             print(f"  ⛔ Contract state: {self.state.value} — no calculations")
             return None
 
-        # ── Oracle Fetch ─────────────────────────────────────────────────────
-        oracle = self.oracle.fetch()
+        # ── Oracle Fetch (or rate override) ──────────────────────────────────
+        if rate_override is not None:
+            oracle = OracleReading(
+                rate=Decimal(str(rate_override)),
+                status=OracleStatus.RATE_OVERRIDE,
+                source="RATE_OVERRIDE",
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                raw_value=str(rate_override),
+                fallback_used=False,
+                challenge_flag=False,
+            )
+            self.audit.log("ORACLE_RATE_OVERRIDE", {
+                "period": period_number,
+                "rate_override": str(rate_override),
+                "warning": "Rate override bypasses oracle — for testing/demo only"
+            })
+            print(f"  [ORACLE] RATE OVERRIDE: {float(rate_override)*100:.3f}% (oracle bypassed)")
+        else:
+            oracle = self.oracle.fetch()
         period.oracle_reading = oracle
 
         # ── Calculations ─────────────────────────────────────────────────────
