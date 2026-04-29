@@ -1,0 +1,2070 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light" data-jargon="meta" data-density="comfortable">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Nomos · Redesign</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Nomos v2 · Editorial light aesthetic */
+:root {
+  /* Paper palette — warm, off-white */
+  --paper: #f7f4ee;
+  --paper-2: #f1ede5;
+  --card: #fdfbf6;
+  --ink: #1a1814;
+  --ink-2: #46423a;
+  --ink-3: #807968;
+  --ink-4: #b4ad9c;
+  --hair: #e4dfd3;
+  --hair-2: #d7d1c2;
+
+  /* Accents — muted, one ochre, one green, one red */
+  --ochre: #8a5a2b;
+  --ochre-bg: #f3e6d4;
+  --ochre-soft: #b58350;
+  --green: #3f6b3f;
+  --green-bg: #e1ead9;
+  --red: #94322a;
+  --red-bg: #f1dcd6;
+  --blue: #2d4d78;
+  --blue-bg: #dde6f0;
+
+  /* Type */
+  --display: "Newsreader", "Source Serif Pro", Georgia, serif;
+  --sans: "Geist", "Inter", -apple-system, system-ui, sans-serif;
+  --mono: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+
+  /* Rhythm */
+  --r-xs: 4px; --r-sm: 6px; --r-md: 10px; --r-lg: 14px;
+}
+
+/* Dark variant */
+[data-theme="dark"] {
+  --paper: #13110e;
+  --paper-2: #1a1813;
+  --card: #1f1c17;
+  --ink: #f0ebe0;
+  --ink-2: #c4bea9;
+  --ink-3: #8a8373;
+  --ink-4: #4e4a40;
+  --hair: #2a2620;
+  --hair-2: #35302a;
+  --ochre: #d4a872;
+  --ochre-bg: rgba(212,168,114,.1);
+  --ochre-soft: #a87a48;
+  --green: #7fa77f;
+  --green-bg: rgba(127,167,127,.1);
+  --red: #d47a6e;
+  --red-bg: rgba(212,122,110,.1);
+  --blue: #8aacd2;
+  --blue-bg: rgba(138,172,210,.1);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01", "cv11";
+}
+a { color: inherit; text-decoration: none; }
+button { font: inherit; cursor: pointer; }
+
+::selection { background: var(--ochre-bg); color: var(--ink); }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--hair-2); border-radius: 4px; }
+
+/* Display / text */
+.display { font-family: var(--display); font-weight: 400; letter-spacing: -0.02em; line-height: 1.02; }
+.display-italic { font-family: var(--display); font-style: italic; font-weight: 400; }
+.mono { font-family: var(--mono); font-feature-settings: "ss01", "ss02"; }
+.label { font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); font-weight: 500; }
+
+/* Primitives */
+.hair { height: 1px; background: var(--hair); border: 0; }
+.hair-v { width: 1px; background: var(--hair); }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 8px; border-radius: 20px;
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .02em;
+  background: var(--paper-2); color: var(--ink-2);
+  border: 1px solid var(--hair);
+  white-space: nowrap;
+}
+.chip-ochre { background: var(--ochre-bg); color: var(--ochre); border-color: transparent; }
+.chip-green { background: var(--green-bg); color: var(--green); border-color: transparent; }
+.chip-red { background: var(--red-bg); color: var(--red); border-color: transparent; }
+.chip-blue { background: var(--blue-bg); color: var(--blue); border-color: transparent; }
+.chip .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 16px; border-radius: var(--r-sm);
+  font-size: 13px; font-weight: 500; letter-spacing: -0.005em;
+  background: transparent; color: var(--ink);
+  border: 1px solid var(--hair-2);
+  transition: background .15s, border-color .15s, transform .1s;
+}
+.btn:hover { background: var(--paper-2); border-color: var(--ink-3); }
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.btn-primary:hover { background: var(--ink-2); border-color: var(--ink-2); }
+.btn-ochre { background: var(--ochre); color: #fff; border-color: var(--ochre); }
+.btn-ochre:hover { background: var(--ochre-soft); border-color: var(--ochre-soft); }
+.btn-ghost { border-color: transparent; color: var(--ink-2); }
+.btn-ghost:hover { background: var(--paper-2); color: var(--ink); border-color: transparent; }
+.btn-sm { padding: 5px 11px; font-size: 12px; }
+.btn:disabled { opacity: .4; pointer-events: none; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--hair);
+  border-radius: var(--r-lg);
+  padding: 22px 26px;
+}
+.card-plain { background: transparent; border: 1px solid var(--hair); border-radius: var(--r-lg); padding: 22px 26px; }
+
+/* Section heading, editorial style */
+.section-h {
+  display: flex; align-items: baseline; gap: 14px;
+  padding-bottom: 12px; margin-bottom: 20px;
+  border-bottom: 1px solid var(--hair);
+}
+.section-num { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+.section-title { font-family: var(--display); font-size: 22px; letter-spacing: -0.015em; }
+.section-sub { font-size: 12px; color: var(--ink-3); margin-left: auto; }
+
+/* Input */
+.input {
+  width: 100%;
+  background: var(--paper);
+  border: 1px solid var(--hair-2);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  font: inherit;
+  color: var(--ink);
+  font-size: 13px;
+  transition: border-color .15s, background .15s;
+}
+.input:focus { outline: none; border-color: var(--ochre); background: var(--card); }
+.input::placeholder { color: var(--ink-4); }
+textarea.input { resize: vertical; min-height: 70px; font-family: var(--sans); }
+select.input { appearance: none; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23807968' stroke-width='2'><polyline points='6 9 12 15 18 9'/></svg>"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 34px; }
+
+.field-label { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 6px; }
+
+/* Jargon tag: small §-ref that sits inline */
+.jargon {
+  font-family: var(--mono); font-size: 10px;
+  color: var(--ink-4); letter-spacing: .02em;
+  padding: 1px 5px; border-radius: 3px;
+  background: transparent;
+  border: 1px solid var(--hair);
+  white-space: nowrap;
+}
+[data-jargon="hidden"] .jargon { display: none; }
+[data-jargon="plain"] .jargon-only { display: none; }
+
+/* Timeline (contract spine) */
+.spine { position: relative; display: flex; align-items: flex-start; gap: 0; overflow-x: auto; padding: 20px 0 8px; }
+.spine::before {
+  content: ''; position: absolute; top: 28px; left: 4%; right: 4%;
+  height: 1px; background: var(--hair-2);
+}
+.spine-node { flex: 1; min-width: 96px; display: flex; flex-direction: column; align-items: center; position: relative; }
+.spine-dot {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--card); border: 1.5px solid var(--hair-2);
+  position: relative; z-index: 1; margin-top: 21px;
+  transition: all .25s;
+}
+.spine-node.done .spine-dot { background: var(--ink); border-color: var(--ink); }
+.spine-node.cur .spine-dot {
+  background: var(--ochre); border-color: var(--ochre);
+  box-shadow: 0 0 0 5px var(--ochre-bg);
+  width: 14px; height: 14px; margin-top: 20px;
+}
+.spine-label { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); margin-top: 10px; }
+.spine-node.cur .spine-label { color: var(--ochre); font-weight: 600; }
+.spine-node.done .spine-label { color: var(--ink-2); }
+.spine-date { font-size: 10px; color: var(--ink-4); margin-top: 3px; font-family: var(--mono); }
+
+/* Avatar */
+.avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--paper-2); border: 1px solid var(--hair);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--display); font-size: 13px; color: var(--ink-2);
+  flex-shrink: 0;
+}
+.avatar-lg { width: 44px; height: 44px; font-size: 17px; }
+.avatar-sm { width: 24px; height: 24px; font-size: 10px; font-family: var(--mono); }
+
+/* Subtle fade-in for routed content */
+@keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.fade-up { animation: fadeUp .35s ease-out both; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.fade-in { animation: fadeIn .3s ease-out both; }
+
+/* Utilities */
+.row { display: flex; align-items: center; gap: 12px; }
+.col { display: flex; flex-direction: column; gap: 12px; }
+.grow { flex: 1; }
+.center { display: flex; align-items: center; justify-content: center; }
+.muted { color: var(--ink-3); }
+.dim { color: var(--ink-4); }
+.strong { font-weight: 600; color: var(--ink); }
+
+/* Nav top */
+.topbar {
+  height: 56px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 28px; border-bottom: 1px solid var(--hair);
+  background: var(--paper); position: sticky; top: 0; z-index: 40;
+}
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo-mark {
+  width: 24px; height: 24px; border-radius: 5px;
+  background: var(--ink); color: var(--paper);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--display); font-size: 14px; font-weight: 500;
+}
+.logo-word { font-family: var(--display); font-size: 19px; letter-spacing: -0.015em; }
+.nav-links { display: flex; gap: 2px; }
+.nav-link {
+  padding: 7px 12px; border-radius: var(--r-sm);
+  font-size: 13px; color: var(--ink-3);
+  transition: background .15s, color .15s;
+}
+.nav-link:hover { color: var(--ink); background: var(--paper-2); }
+.nav-link.active { color: var(--ink); background: var(--paper-2); }
+
+/* Table */
+.table { width: 100%; border-collapse: collapse; }
+.table th {
+  font-family: var(--mono); font-size: 10px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3);
+  text-align: left; padding: 10px 14px;
+  border-bottom: 1px solid var(--hair);
+}
+.table td {
+  padding: 14px 14px;
+  border-bottom: 1px solid var(--hair);
+  font-size: 13px; color: var(--ink-2);
+}
+.table tbody tr { transition: background .1s; cursor: pointer; }
+.table tbody tr:hover { background: var(--paper-2); }
+.table tbody tr:last-child td { border-bottom: none; }
+
+/* Modal */
+.modal-bg { position: fixed; inset: 0; background: rgba(20,18,14,.45); backdrop-filter: blur(6px); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 32px; }
+.modal-bg.dark-bg { background: rgba(5,4,3,.6); }
+.modal {
+  background: var(--card); border-radius: var(--r-lg);
+  width: 100%; max-width: 640px; max-height: 90vh; overflow: hidden;
+  border: 1px solid var(--hair);
+  box-shadow: 0 24px 80px rgba(0,0,0,.25);
+  display: flex; flex-direction: column;
+}
+.modal-h { padding: 24px 28px 18px; border-bottom: 1px solid var(--hair); }
+.modal-b { padding: 24px 28px; overflow-y: auto; }
+.modal-f { padding: 16px 28px; border-top: 1px solid var(--hair); display: flex; justify-content: space-between; gap: 12px; }
+
+/* Tweaks panel */
+.tweaks {
+  position: fixed; bottom: 20px; right: 20px; z-index: 200;
+  background: var(--card); border: 1px solid var(--hair);
+  border-radius: var(--r-lg); padding: 14px 16px;
+  min-width: 240px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.15);
+  font-size: 12px;
+}
+.tweaks h5 { font-family: var(--display); font-size: 14px; margin-bottom: 12px; }
+.tweak-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; gap: 12px; }
+.tweak-row + .tweak-row { border-top: 1px solid var(--hair); padding-top: 10px; margin-top: 4px; }
+.tweak-label { font-size: 11px; color: var(--ink-3); font-family: var(--mono); }
+.tweak-opts { display: flex; gap: 4px; }
+.tweak-opt {
+  padding: 3px 9px; border-radius: 4px;
+  font-size: 10.5px; font-family: var(--mono);
+  color: var(--ink-3); border: 1px solid var(--hair);
+  background: transparent;
+}
+.tweak-opt.on { color: var(--ink); background: var(--paper-2); border-color: var(--ink-3); }
+
+/* Toast */
+.toast-stack { position: fixed; bottom: 28px; left: 28px; z-index: 300; display: flex; flex-direction: column; gap: 8px; }
+.toast {
+  background: var(--ink); color: var(--paper);
+  padding: 10px 16px; border-radius: var(--r-md);
+  font-size: 12.5px; box-shadow: 0 10px 30px rgba(0,0,0,.25);
+  animation: fadeUp .25s ease-out;
+}
+
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script type="text/babel" data-file="app/state.jsx">
+/* global React */
+const { useState, useEffect, useMemo, createContext, useContext } = React;
+
+// ======================
+// MOCK DATA
+// ======================
+const DATA = {
+  me: {
+    client: { name: "Elena Marchetti", role: "Treasurer", org: "Novus Corp", initials: "EM" },
+    advisor: { name: "Arthur Vance", role: "Partner · Derivatives", org: "Kessler & Lang LLP", initials: "AV" },
+  },
+  contracts: [
+    {
+      id: "SLC-IRS-EUR-014",
+      nick: "Novus / Banque Helvetia · EUR 50M IRS",
+      status: "live",
+      stage: "in-flight",
+      parties: ["Novus Corp", "Banque Helvetia"],
+      notional: 50_000_000,
+      ccy: "EUR",
+      fixed: 3.215,
+      floating: "EURIBOR 3M",
+      effective: "2025-09-15",
+      maturity: "2030-09-15",
+      nextPayment: { date: "2026-04-22", net: 7_200, direction: "pay", counterparty: "Banque Helvetia" },
+      health: "green",
+      alertCount: 0,
+    },
+    {
+      id: "SLC-IRS-EUR-013",
+      nick: "Novus / Crédit Atlantique · EUR 25M IRS",
+      status: "live",
+      stage: "in-flight",
+      parties: ["Novus Corp", "Crédit Atlantique"],
+      notional: 25_000_000,
+      ccy: "EUR",
+      fixed: 2.890,
+      floating: "EURIBOR 3M",
+      effective: "2024-06-10",
+      maturity: "2029-06-10",
+      nextPayment: { date: "2026-06-10", net: 3_420, direction: "receive", counterparty: "Crédit Atlantique" },
+      health: "amber",
+      alertCount: 1,
+    },
+    {
+      id: "SLC-IRS-EUR-015",
+      nick: "Novus / Banque Helvetia · EUR 30M IRS",
+      status: "drafting",
+      stage: "review",
+      parties: ["Novus Corp", "Banque Helvetia"],
+      notional: 30_000_000,
+      ccy: "EUR",
+      fixed: 3.410,
+      floating: "EURIBOR 3M",
+      effective: "2026-05-01",
+      maturity: "2031-05-01",
+      nextPayment: null,
+      health: "pending",
+      alertCount: 2,
+    },
+  ],
+  alerts: [
+    { id: "a1", level: "amber", contract: "SLC-IRS-EUR-013", title: "Annual financial statements overdue", plain: "Part 3 statements for FY2025 were due 6 days ago.", legal: "§4(a)(ii)", clockTo: "§5(a)(ii) EoD rec", daysLeft: 24, raised: "6 days ago" },
+    { id: "a2", level: "info", contract: "SLC-IRS-EUR-014", title: "Payment instruction pending approval", plain: "Next payment of €7,200 net, due 22 Apr. Advisor approval required.", legal: "§2(c)", clockTo: "Payment date", daysLeft: 2, raised: "2h ago" },
+    { id: "a3", level: "info", contract: "SLC-IRS-EUR-015", title: "Counterparty requested clause change", plain: "Banque Helvetia proposed an edit to Threshold Amount (Part 1.3).", legal: "Schedule Part 1", clockTo: "Response window", daysLeft: 5, raised: "1 day ago" },
+  ],
+  oracle: {
+    rate: 3.724,
+    ts: "2026-04-20 09:15:32 CET",
+    source: "ECB SDW",
+    waterfall: [
+      { step: 1, source: "ECB SDW (Statistical Data Warehouse)", status: "ok", value: 3.724, note: "Primary" },
+      { step: 2, source: "EMMI EURIBOR panel", status: "standby", value: 3.726, note: "2bp drift, within tolerance" },
+      { step: 3, source: "€STR + 0.0959% compounded", status: "standby", value: 3.719, note: "Fallback spread" },
+      { step: 4, source: "Last confirmed reading", status: "standby", value: 3.718, note: "24h old" },
+      { step: 5, source: "Static fallback (Schedule 5.4)", status: "standby", value: 3.700, note: "Never touched" },
+    ],
+  },
+  timeline: [
+    { k: "drafted", label: "Drafted", date: "2025-07-12", done: true },
+    { k: "negotiated", label: "Negotiated", date: "2025-08-30", done: true },
+    { k: "signed", label: "Signed", date: "2025-09-08", done: true },
+    { k: "effective", label: "Effective", date: "2025-09-15", done: true },
+    { k: "in-flight", label: "In-flight", date: "Now", done: false, cur: true },
+    { k: "mature", label: "Matures", date: "2030-09-15", done: false },
+    { k: "closed", label: "Closed", date: "—", done: false },
+  ],
+  auditLog: [
+    { t: "2026-04-20 09:15:32", ev: "Oracle fetch · EURIBOR 3M = 3.724% · source=ECB SDW · hash=0x7a4f…b21c" },
+    { t: "2026-04-20 09:15:33", ev: "Period 006 · calc floating = €43,712.50 · fixed = €40,187.50 · net=€7,200" },
+    { t: "2026-04-20 09:15:33", ev: "§3 representations verified (7/7)" },
+    { t: "2026-04-20 09:15:34", ev: "§4 obligations ok (statements outstanding: 0)" },
+    { t: "2026-04-20 09:15:34", ev: "Payment instruction PI-0062 drafted · awaiting advisor approval" },
+  ],
+};
+
+// ======================
+// APP CONTEXT
+// ======================
+const AppCtx = createContext(null);
+const useApp = () => useContext(AppCtx);
+
+function AppProvider({ children }) {
+  const [route, setRoute] = useState(() => localStorage.getItem("nomos_route") || "/welcome");
+  const [role, setRole] = useState(() => localStorage.getItem("nomos_role") || null);
+  const [toasts, setToasts] = useState([]);
+
+  const nav = (r) => { setRoute(r); localStorage.setItem("nomos_route", r); window.scrollTo(0, 0); };
+  const loginAs = (r) => { setRole(r); localStorage.setItem("nomos_role", r); nav(r === "advisor" ? "/advisor" : "/client"); };
+  const logout = () => { localStorage.removeItem("nomos_role"); localStorage.removeItem("nomos_route"); setRole(null); setRoute("/welcome"); };
+  const toast = (msg) => {
+    const id = Math.random().toString(36).slice(2);
+    setToasts(t => [...t, { id, msg }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3000);
+  };
+
+  return (
+    <AppCtx.Provider value={{ route, nav, role, loginAs, logout, toast, data: DATA }}>
+      {children}
+      <div className="toast-stack">
+        {toasts.map(t => <div key={t.id} className="toast">{t.msg}</div>)}
+      </div>
+    </AppCtx.Provider>
+  );
+}
+
+window.AppCtx = AppCtx;
+window.useApp = useApp;
+window.AppProvider = AppProvider;
+window.DATA = DATA;
+
+</script>
+
+<script type="text/babel" data-file="app/shared.jsx">
+/* global React */
+const { useState, useEffect, useMemo } = React;
+
+// ======================
+// SHARED COMPONENTS
+// ======================
+function Topbar({ variant }) {
+  const { role, nav, logout, data } = useApp();
+  const me = role ? data.me[role] : null;
+  return (
+    <div className="topbar">
+      <div className="logo" style={{ cursor: 'pointer' }} onClick={() => nav(role === 'advisor' ? '/advisor' : role === 'client' ? '/client' : '/welcome')}>
+        <div className="logo-mark">N</div>
+        <div className="logo-word">Nomos</div>
+        {role && <span className="chip" style={{ marginLeft: 10 }}>{role === 'advisor' ? 'Advisor' : 'Client'}</span>}
+      </div>
+      {role && (
+        <div className="nav-links">
+          {role === 'advisor' ? (
+            <>
+              <NavLink to="/advisor">Today</NavLink>
+              <NavLink to="/advisor/contracts">Contracts</NavLink>
+              <NavLink to="/advisor/counterparties">Counterparties</NavLink>
+              <NavLink to="/advisor/library">Library</NavLink>
+              <NavLink to="/advisor/audit">Audit</NavLink>
+            </>
+          ) : (
+            <>
+              <NavLink to="/client">Today</NavLink>
+              <NavLink to="/client/contracts">Contracts</NavLink>
+              <NavLink to="/client/documents">Documents</NavLink>
+              <NavLink to="/client/audit">Audit</NavLink>
+            </>
+          )}
+        </div>
+      )}
+      <div className="row" style={{ gap: 14 }}>
+        {role && (
+          <>
+            <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+              <span className="chip chip-green"><span className="dot"></span>Oracle live</span>
+            </span>
+            <div className="row" style={{ gap: 8 }}>
+              <div className="avatar">{me.initials}</div>
+              <div style={{ lineHeight: 1.2 }}>
+                <div style={{ fontSize: 12, fontWeight: 500 }}>{me.name}</div>
+                <div style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>{me.org}</div>
+              </div>
+            </div>
+            <button className="btn btn-ghost btn-sm" onClick={logout}>Sign out</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function NavLink({ to, children }) {
+  const { route, nav } = useApp();
+  const active = route === to || (to !== '/advisor' && to !== '/client' && route.startsWith(to));
+  return (
+    <a className={`nav-link ${active ? 'active' : ''}`} onClick={() => nav(to)}>{children}</a>
+  );
+}
+
+function Page({ children, title, sub, kicker, actions }) {
+  return (
+    <div className="fade-up" style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 40px 80px' }}>
+      {(title || kicker) && (
+        <div style={{ marginBottom: 36 }}>
+          {kicker && <div className="label" style={{ marginBottom: 12 }}>{kicker}</div>}
+          <div className="row" style={{ alignItems: 'flex-end', justifyContent: 'space-between', gap: 20 }}>
+            <div>
+              {title && <h1 className="display" style={{ fontSize: 44, lineHeight: 1.05 }}>{title}</h1>}
+              {sub && <p style={{ color: 'var(--ink-3)', fontSize: 15, marginTop: 10, maxWidth: 640 }}>{sub}</p>}
+            </div>
+            {actions}
+          </div>
+        </div>
+      )}
+      {children}
+    </div>
+  );
+}
+
+function SectionH({ num, title, sub, right }) {
+  return (
+    <div className="section-h">
+      {num && <span className="section-num">{num}</span>}
+      <span className="section-title">{title}</span>
+      {sub && <span className="section-sub">{sub}</span>}
+      {right && <div style={{ marginLeft: 'auto' }}>{right}</div>}
+    </div>
+  );
+}
+
+function Jargon({ cite, children }) {
+  // plain text preferred; legal ref shown as inline metadata
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      {children && <span>{children}</span>}
+      {cite && <span className="jargon">{cite}</span>}
+    </span>
+  );
+}
+
+function Spine({ nodes }) {
+  return (
+    <div className="spine">
+      {nodes.map((n, i) => (
+        <div key={i} className={`spine-node ${n.done ? 'done' : ''} ${n.cur ? 'cur' : ''}`}>
+          <div className="spine-dot" />
+          <div className="spine-label">{n.label}</div>
+          <div className="spine-date">{n.date}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ContractRow({ c, onClick }) {
+  const health = c.health === 'green' ? 'chip-green' : c.health === 'amber' ? 'chip-ochre' : c.health === 'pending' ? 'chip-blue' : '';
+  const healthLabel = c.health === 'green' ? 'Healthy' : c.health === 'amber' ? 'Attention' : c.health === 'pending' ? 'In review' : '—';
+  return (
+    <tr onClick={onClick}>
+      <td><span className="mono" style={{ color: 'var(--ochre)', fontSize: 11 }}>{c.id}</span></td>
+      <td style={{ color: 'var(--ink)' }}>{c.nick}</td>
+      <td>{c.parties[0]} · {c.parties[1]}</td>
+      <td><span className="mono">{(c.notional / 1e6).toFixed(1)}M {c.ccy}</span></td>
+      <td><span className="mono" style={{ fontSize: 11 }}>{c.effective} → {c.maturity}</span></td>
+      <td><span className={`chip ${health}`}><span className="dot"></span>{healthLabel}</span></td>
+    </tr>
+  );
+}
+
+function Tweaks() {
+  const [on, setOn] = useState(false);
+  const [theme, setTheme] = useState(() => localStorage.getItem('nomos_theme') || 'light');
+  const [jargon, setJargon] = useState(() => localStorage.getItem('nomos_jargon') || 'meta');
+  const [density, setDensity] = useState(() => localStorage.getItem('nomos_density') || 'comfortable');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('nomos_theme', theme);
+  }, [theme]);
+  useEffect(() => {
+    document.documentElement.setAttribute('data-jargon', jargon);
+    localStorage.setItem('nomos_jargon', jargon);
+  }, [jargon]);
+  useEffect(() => {
+    document.documentElement.setAttribute('data-density', density);
+    localStorage.setItem('nomos_density', density);
+  }, [density]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.data?.type === '__activate_edit_mode') setOn(true);
+      if (e.data?.type === '__deactivate_edit_mode') setOn(false);
+    };
+    window.addEventListener('message', handler);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  if (!on) return null;
+  const Opts = ({ v, set, opts }) => (
+    <div className="tweak-opts">
+      {opts.map(o => (
+        <button key={o.k} className={`tweak-opt ${v === o.k ? 'on' : ''}`} onClick={() => set(o.k)}>{o.l}</button>
+      ))}
+    </div>
+  );
+  return (
+    <div className="tweaks">
+      <h5>Tweaks</h5>
+      <div className="tweak-row">
+        <span className="tweak-label">Theme</span>
+        <Opts v={theme} set={setTheme} opts={[{ k: 'light', l: 'Light' }, { k: 'dark', l: 'Dark' }]} />
+      </div>
+      <div className="tweak-row">
+        <span className="tweak-label">Jargon (§)</span>
+        <Opts v={jargon} set={setJargon} opts={[{ k: 'plain', l: 'Hidden' }, { k: 'meta', l: 'As metadata' }, { k: 'all', l: 'All visible' }]} />
+      </div>
+      <div className="tweak-row">
+        <span className="tweak-label">Density</span>
+        <Opts v={density} set={setDensity} opts={[{ k: 'comfortable', l: 'Comfy' }, { k: 'compact', l: 'Compact' }]} />
+      </div>
+    </div>
+  );
+}
+
+// ======================
+// Export
+// ======================
+Object.assign(window, { Topbar, NavLink, Page, SectionH, Jargon, Spine, ContractRow, Tweaks });
+
+</script>
+
+<script type="text/babel" data-file="app/welcome.jsx">
+/* global React */
+const { useState, useEffect, useMemo } = React;
+
+// ======================
+// WELCOME (Login)
+// ======================
+function Welcome() {
+  const { loginAs, nav } = useApp();
+  return (
+    <div className="fade-up" style={{ minHeight: 'calc(100vh - 56px)', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '80px 48px 40px', width: '100%' }}>
+        <div className="label" style={{ marginBottom: 20 }}>Smart Legal Contracts · ISDA 2002</div>
+        <h1 className="display" style={{ fontSize: 88, lineHeight: 0.98, maxWidth: 920, letterSpacing: '-0.03em' }}>
+          The contract is the <em className="display-italic">system of record</em>.
+          <br/> The code is the <em className="display-italic">operator</em>.
+        </h1>
+        <p style={{ fontSize: 17, color: 'var(--ink-2)', maxWidth: 580, marginTop: 28, lineHeight: 1.55 }}>
+          Nomos executes OTC derivative contracts clause by clause. It watches covenants, calculates payments, detects defaults, and prepares decision packages — while the legal text always prevails.
+        </p>
+
+        <div style={{ marginTop: 72, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, maxWidth: 860 }}>
+          <RoleCard
+            kicker="For Corporates · Treasury · Family Offices"
+            title="Client"
+            body="Sign, pay, and monitor your derivative positions without spreadsheets. See what is due, why it is due, and what your advisor has approved."
+            points={["Portfolio at a glance", "Payment calendar", "Sign in the browser", "Shared audit trail"]}
+            onClick={() => loginAs('client')}
+            cta="Enter as client"
+          />
+          <RoleCard
+            kicker="For Derivatives Counsel · Magic Circle · Regional"
+            title="Advisor"
+            body="Draft contracts clause by clause, approve payment instructions, monitor §3 / §4 / §5 for every client, and generate §12 notices with one click."
+            points={["Clause builder", "Intake & onboarding", "Event-of-default engine", "Notice drafting"]}
+            onClick={() => loginAs('advisor')}
+            cta="Enter as advisor"
+            featured
+          />
+        </div>
+      </div>
+
+      <div style={{ marginTop: 'auto', borderTop: '1px solid var(--hair)', padding: '20px 48px', display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--ink-3)' }} className="mono">
+        <span>§1(b) — Confirmation prevails over Schedule prevails over Master Agreement prevails over Code.</span>
+        <span>Prototype · Not for production · Not legal advice</span>
+      </div>
+    </div>
+  );
+}
+
+function RoleCard({ kicker, title, body, points, onClick, cta, featured }) {
+  return (
+    <div
+      className="card"
+      onClick={onClick}
+      style={{
+        cursor: 'pointer',
+        padding: '34px 34px 28px',
+        borderColor: featured ? 'var(--ink-2)' : 'var(--hair)',
+        background: featured ? 'var(--card)' : 'var(--card)',
+        transition: 'transform .2s, border-color .2s, box-shadow .2s',
+        position: 'relative',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 12px 40px rgba(0,0,0,.08)'; }}
+      onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
+    >
+      <div className="label" style={{ marginBottom: 14 }}>{kicker}</div>
+      <h2 className="display" style={{ fontSize: 42, letterSpacing: '-0.02em' }}>{title}</h2>
+      <p style={{ marginTop: 12, color: 'var(--ink-2)', fontSize: 14, lineHeight: 1.6 }}>{body}</p>
+      <ul style={{ marginTop: 18, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {points.map((p, i) => (
+          <li key={i} style={{ fontSize: 12.5, color: 'var(--ink-3)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ width: 14, height: 1, background: 'var(--ink-4)' }} />
+            {p}
+          </li>
+        ))}
+      </ul>
+      <div style={{ marginTop: 28, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 500, color: featured ? 'var(--ochre)' : 'var(--ink)' }}>
+        {cta} <span style={{ marginLeft: 4 }}>→</span>
+      </div>
+    </div>
+  );
+}
+
+window.Welcome = Welcome;
+
+</script>
+
+<script type="text/babel" data-file="app/client.jsx">
+/* global React */
+const { useState, useEffect, useMemo } = React;
+
+// ======================
+// CLIENT TODAY
+// ======================
+function ClientToday() {
+  const { data, nav, toast } = useApp();
+  const me = data.me.client;
+  const contract = data.contracts[0];
+  const pay = contract.nextPayment;
+  const daysUntil = 2;
+
+  return (
+    <Page
+      kicker={`Tuesday · 20 April 2026`}
+      title={<>Good morning, <em className="display-italic">Elena</em>.</>}
+      sub="Three things need your attention today. Your advisor has prepared each one."
+    >
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24 }}>
+        <div>
+          {/* HERO: Payment Tuesday */}
+          <div className="card" style={{ padding: '32px 36px', marginBottom: 16, position: 'relative', overflow: 'hidden' }}>
+            <div className="row" style={{ justifyContent: 'space-between', marginBottom: 24 }}>
+              <span className="label">Payment · due in {daysUntil} days</span>
+              <span className="chip chip-ochre"><span className="dot"></span>Action needed</span>
+            </div>
+            <div style={{ fontSize: 15, color: 'var(--ink-2)' }}>On <strong className="strong">Thursday 22 April</strong>, you will</div>
+            <div className="display" style={{ fontSize: 54, marginTop: 6, lineHeight: 1.05 }}>
+              pay <em className="display-italic">€7,200</em> net
+            </div>
+            <div style={{ fontSize: 15, color: 'var(--ink-2)', marginTop: 6 }}>to <strong className="strong">Banque Helvetia</strong>, for {contract.nick.split('·')[1]}.</div>
+
+            {/* breakdown */}
+            <div style={{ marginTop: 28, padding: '18px 20px', background: 'var(--paper-2)', borderRadius: 10, border: '1px solid var(--hair)' }}>
+              <div className="label" style={{ marginBottom: 12 }}>Why €7,200</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
+                <Breakdown label="You pay (fixed 3.215%)" value="€40,187.50" sub="Notional × 3.215% × 90/360" />
+                <Breakdown label="You receive (EURIBOR 3M 3.724%)" value="€43,712.50" sub="Notional × 3.724% × 91/360" positive />
+                <Breakdown label="Netted" value="€7,200.00 (you owe)" sub={<>The smaller flow is offset <Jargon cite="§2(c)" /></>} />
+              </div>
+            </div>
+
+            <div className="row" style={{ marginTop: 24, gap: 10 }}>
+              <button className="btn btn-ochre" onClick={() => toast('Bank instruction generated · ready to download')}>Download bank instruction</button>
+              <button className="btn" onClick={() => nav('/client/contracts/SLC-IRS-EUR-014')}>See full calculation</button>
+              <span style={{ fontSize: 12, color: 'var(--ink-3)', marginLeft: 'auto' }} className="mono">Your advisor approved PI-0062 · 1h ago</span>
+            </div>
+          </div>
+
+          {/* Pending signatures */}
+          <SectionH num="02" title="Awaiting your signature" sub="1 contract" />
+          <div className="card" style={{ marginBottom: 12 }} onClick={() => nav('/client/contracts/SLC-IRS-EUR-015')} role="button">
+            <div className="row" style={{ justifyContent: 'space-between' }}>
+              <div>
+                <div className="row" style={{ gap: 10, marginBottom: 6 }}>
+                  <span className="mono" style={{ fontSize: 11, color: 'var(--ochre)' }}>SLC-IRS-EUR-015 · Draft v3</span>
+                  <span className="chip chip-ochre"><span className="dot"></span>Ready to sign</span>
+                </div>
+                <div className="display" style={{ fontSize: 22, letterSpacing: '-0.01em' }}>EUR 30M Interest Rate Swap · Banque Helvetia</div>
+                <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 8 }}>
+                  Arthur Vance (Kessler &amp; Lang) has resolved 4 of 4 of your comments. Counter-party signed at 08:42 CET.
+                </div>
+              </div>
+              <button className="btn btn-primary">Review &amp; sign →</button>
+            </div>
+          </div>
+
+          {/* Compliance */}
+          <SectionH num="03" title="Outstanding obligations" sub="One item overdue" />
+          <AlertRow alert={data.alerts[0]} onClick={() => nav('/client/contracts/SLC-IRS-EUR-013')} />
+        </div>
+
+        {/* RIGHT RAIL */}
+        <div>
+          <div className="card" style={{ marginBottom: 16, padding: 22 }}>
+            <div className="label" style={{ marginBottom: 10 }}>Portfolio</div>
+            <div className="display" style={{ fontSize: 40, letterSpacing: '-0.02em' }}>€75.0M</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>Aggregate notional · 2 live swaps</div>
+            <hr className="hair" style={{ margin: '16px 0' }} />
+            <Stat label="This quarter net" value="€14,830" positive />
+            <Stat label="Next 90 days out" value="€7,200" />
+            <Stat label="Health" value={<span className="chip chip-green"><span className="dot" /> 1 healthy · 1 attention</span>} raw />
+          </div>
+
+          <div className="card" style={{ padding: 22 }}>
+            <div className="row" style={{ justifyContent: 'space-between', marginBottom: 14 }}>
+              <span className="label">Oracle</span>
+              <span className="chip chip-green"><span className="dot"></span>Live</span>
+            </div>
+            <div className="display" style={{ fontSize: 40, letterSpacing: '-0.02em' }}>3.724<span style={{ fontSize: 20, color: 'var(--ink-3)' }}>%</span></div>
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>EURIBOR 3M · ECB SDW · 09:15:32</div>
+            <hr className="hair" style={{ margin: '14px 0' }} />
+            <div style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+              Sourced from ECB Statistical Data Warehouse. Four fallbacks stand by.
+            </div>
+            <button className="btn btn-sm btn-ghost" style={{ marginTop: 10, padding: 0 }} onClick={() => nav('/client/oracle')}>How this rate is sourced →</button>
+          </div>
+
+          <div style={{ marginTop: 16, padding: '14px 18px', borderLeft: '2px solid var(--ochre)', background: 'var(--paper-2)', borderRadius: 4 }}>
+            <div className="label" style={{ marginBottom: 6 }}>From your advisor</div>
+            <div style={{ fontSize: 12.5, lineHeight: 1.6, color: 'var(--ink-2)' }}>
+              "The Banque Helvetia draft is clean. I flagged Part 1.3 threshold — we're at €2M, they proposed €1M. Tell me which way you want to lean."
+            </div>
+            <div className="mono" style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 8 }}>— Arthur Vance · 1h ago</div>
+          </div>
+        </div>
+      </div>
+    </Page>
+  );
+}
+
+function Breakdown({ label, value, sub, positive }) {
+  return (
+    <div>
+      <div className="label" style={{ marginBottom: 8 }}>{label}</div>
+      <div className="mono" style={{ fontSize: 18, color: positive ? 'var(--green)' : 'var(--ink)' }}>{value}</div>
+      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}>{sub}</div>
+    </div>
+  );
+}
+
+function Stat({ label, value, positive, raw }) {
+  return (
+    <div className="row" style={{ justifyContent: 'space-between', padding: '6px 0' }}>
+      <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{label}</span>
+      {raw ? value : <span className="mono" style={{ fontSize: 13, color: positive ? 'var(--green)' : 'var(--ink)' }}>{value}</span>}
+    </div>
+  );
+}
+
+function AlertRow({ alert, onClick }) {
+  const levelClass = alert.level === 'amber' ? 'chip-ochre' : alert.level === 'red' ? 'chip-red' : 'chip-blue';
+  return (
+    <div className="card" onClick={onClick} role="button" style={{ cursor: 'pointer', borderLeft: `2px solid var(--${alert.level === 'amber' ? 'ochre' : alert.level === 'red' ? 'red' : 'blue'})` }}>
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <div>
+          <div className="row" style={{ gap: 10, marginBottom: 4 }}>
+            <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>{alert.contract}</span>
+            <span className="jargon">{alert.legal}</span>
+            <span className={`chip ${levelClass}`}><span className="dot"></span>{alert.level === 'amber' ? 'Overdue' : alert.level}</span>
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 500 }}>{alert.title}</div>
+          <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 4 }}>{alert.plain}</div>
+        </div>
+        <div style={{ textAlign: 'right', minWidth: 180 }}>
+          <div className="label">{alert.clockTo}</div>
+          <div className="display" style={{ fontSize: 24, color: alert.level === 'amber' ? 'var(--ochre)' : 'var(--ink)' }}>{alert.daysLeft}<span style={{ fontSize: 12, color: 'var(--ink-3)', marginLeft: 4 }}>days</span></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ======================
+// CLIENT CONTRACTS LIST
+// ======================
+function ClientContracts() {
+  const { data, nav } = useApp();
+  return (
+    <Page kicker="Your positions" title="Contracts" sub="Every derivative you have signed through Nomos, plus anything in negotiation.">
+      <div className="card-plain" style={{ padding: 0, overflow: 'hidden' }}>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Ref</th><th>Contract</th><th>Parties</th><th>Notional</th><th>Period</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.contracts.map(c => <ContractRow key={c.id} c={c} onClick={() => nav(`/client/contracts/${c.id}`)} />)}
+          </tbody>
+        </table>
+      </div>
+    </Page>
+  );
+}
+
+// ======================
+// CLIENT CONTRACT DETAIL
+// ======================
+function ClientContractDetail({ id }) {
+  const { data, nav, toast } = useApp();
+  const c = data.contracts.find(x => x.id === id) || data.contracts[0];
+  const [tab, setTab] = useState('overview');
+  const isDrafting = c.status === 'drafting';
+
+  return (
+    <Page>
+      <div className="label" style={{ marginBottom: 10 }}>
+        <a onClick={() => nav('/client/contracts')} style={{ cursor: 'pointer' }}>← All contracts</a>
+      </div>
+      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 10 }}>
+        <div>
+          <div className="row" style={{ gap: 10, marginBottom: 8 }}>
+            <span className="mono" style={{ color: 'var(--ochre)', fontSize: 12 }}>{c.id}</span>
+            <span className={`chip ${c.status === 'live' ? 'chip-green' : 'chip-ochre'}`}><span className="dot"></span>{c.status === 'live' ? 'Live' : 'Drafting'}</span>
+          </div>
+          <h1 className="display" style={{ fontSize: 38, letterSpacing: '-0.02em' }}>{c.nick}</h1>
+          <div style={{ color: 'var(--ink-3)', fontSize: 13, marginTop: 6 }}>
+            {c.parties[0]} ↔ {c.parties[1]} · EUR {(c.notional / 1e6).toFixed(0)}M notional · Fixed {c.fixed}% vs {c.floating}
+          </div>
+        </div>
+        <div className="row" style={{ gap: 8 }}>
+          {isDrafting && <button className="btn btn-ochre" onClick={() => toast('Opening signing room…')}>Sign now</button>}
+          <button className="btn">Download PDF</button>
+        </div>
+      </div>
+
+      {/* Spine */}
+      <div style={{ margin: '30px 0 10px' }}>
+        <Spine nodes={data.timeline.map(n => ({
+          label: n.label, date: n.date,
+          done: isDrafting ? ['drafted'].includes(n.k) : n.done,
+          cur: isDrafting ? n.k === 'negotiated' : n.cur,
+        }))} />
+      </div>
+
+      {/* Tabs */}
+      <div className="row" style={{ gap: 4, marginTop: 16, borderBottom: '1px solid var(--hair)' }}>
+        {[
+          ['overview', 'Overview'],
+          ['schedule', 'Payment schedule'],
+          ['obligations', 'Your obligations'],
+          ['documents', 'Documents'],
+          ['comments', 'Comments & changes'],
+        ].map(([k, l]) => (
+          <button key={k} className="nav-link" onClick={() => setTab(k)} style={{ padding: '10px 14px', borderBottom: tab === k ? '2px solid var(--ink)' : '2px solid transparent', borderRadius: 0, color: tab === k ? 'var(--ink)' : 'var(--ink-3)', background: 'transparent' }}>{l}</button>
+        ))}
+      </div>
+
+      <div style={{ marginTop: 28 }}>
+        {tab === 'overview' && <ContractOverview c={c} />}
+        {tab === 'schedule' && <PaymentSchedule c={c} />}
+        {tab === 'obligations' && <Obligations />}
+        {tab === 'documents' && <Docs />}
+        {tab === 'comments' && <Comments />}
+      </div>
+    </Page>
+  );
+}
+
+function ContractOverview({ c }) {
+  const pay = c.nextPayment;
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24 }}>
+      <div>
+        <SectionH num="01" title="What this contract does, in one sentence" />
+        <p style={{ fontSize: 17, color: 'var(--ink-2)', lineHeight: 1.65, fontFamily: 'var(--display)' }}>
+          Every quarter for five years, you and {c.parties[1]} exchange interest on a notional of <strong>{(c.notional / 1e6).toFixed(0)} million euros</strong>. You pay <em className="display-italic">fixed at {c.fixed}%</em>, they pay floating at EURIBOR 3M. Only the net difference moves.
+        </p>
+
+        {pay && (
+          <>
+            <SectionH num="02" title="Next cash flow" right={<span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>Period 006 of 020</span>} />
+            <div style={{ padding: '20px 24px', background: 'var(--paper-2)', borderRadius: 10, border: '1px solid var(--hair)' }}>
+              <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                <div>
+                  <div className="label">{pay.direction === 'pay' ? 'You pay on' : 'You receive on'} {pay.date}</div>
+                  <div className="display" style={{ fontSize: 44, color: pay.direction === 'receive' ? 'var(--green)' : 'var(--ink)' }}>€{pay.net.toLocaleString()}</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>Advisor PI-0062 · approved</div>
+                  <div className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>Audit: 0x7a4f…b21c</div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        <SectionH num="03" title="How payments are computed" right={<Jargon cite="§2(a)(i) · §2(c)" />} />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <LegCard kind="Fixed leg (you)" rate={`${c.fixed}%`} day="30/360 Bond Basis" role="Payer" />
+          <LegCard kind="Floating leg (counterparty)" rate="EURIBOR 3M" day="ACT/360" role="Payer" />
+        </div>
+      </div>
+
+      <div>
+        <div className="card" style={{ marginBottom: 14 }}>
+          <div className="label" style={{ marginBottom: 10 }}>Key terms</div>
+          <KV k="Effective" v={c.effective} />
+          <KV k="Maturity" v={c.maturity} />
+          <KV k="Notional" v={`EUR ${(c.notional / 1e6).toFixed(0)}M`} />
+          <KV k="Payment freq." v="Quarterly" />
+          <KV k="Netting" v="Yes · §2(c)" last />
+        </div>
+        <div className="card">
+          <div className="label" style={{ marginBottom: 10 }}>Your advisor</div>
+          <div className="row">
+            <div className="avatar avatar-lg">AV</div>
+            <div>
+              <div style={{ fontWeight: 500 }}>Arthur Vance</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>Partner · Kessler &amp; Lang LLP</div>
+            </div>
+          </div>
+          <button className="btn btn-sm" style={{ width: '100%', marginTop: 14, justifyContent: 'center' }}>Message Arthur</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LegCard({ kind, rate, day, role }) {
+  return (
+    <div className="card-plain" style={{ padding: 18 }}>
+      <div className="label" style={{ marginBottom: 8 }}>{kind}</div>
+      <div className="display" style={{ fontSize: 24 }}>{rate}</div>
+      <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 10 }}>Day count: <span className="mono">{day}</span></div>
+    </div>
+  );
+}
+
+function KV({ k, v, last }) {
+  return (
+    <div className="row" style={{ justifyContent: 'space-between', padding: '8px 0', borderBottom: last ? 'none' : '1px solid var(--hair)' }}>
+      <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{k}</span>
+      <span style={{ fontSize: 12.5, fontFamily: 'var(--mono)' }}>{v}</span>
+    </div>
+  );
+}
+
+function PaymentSchedule({ c }) {
+  const periods = Array.from({ length: 8 }, (_, i) => ({
+    n: String(i + 1).padStart(3, '0'),
+    start: '2025-09-15',
+    end: `2026-${String(((i + 1) * 3) % 12 || 12).padStart(2, '0')}-15`,
+    pay: '2026-04-22',
+    rate: (3.700 + (i * 0.01)).toFixed(3),
+    fixed: 40187.50,
+    floating: (43712 + i * 50).toFixed(2),
+    net: (3525 + i * 100).toFixed(2),
+    status: i < 5 ? 'settled' : i === 5 ? 'pending' : 'future',
+  }));
+  return (
+    <div className="card-plain" style={{ padding: 0, overflow: 'hidden' }}>
+      <table className="table">
+        <thead>
+          <tr><th>Period</th><th>Payment date</th><th>EURIBOR</th><th>Fixed out</th><th>Floating in</th><th>Net</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          {periods.map(p => (
+            <tr key={p.n}>
+              <td><span className="mono" style={{ color: 'var(--ochre)' }}>{p.n}</span></td>
+              <td><span className="mono">{p.pay}</span></td>
+              <td><span className="mono">{p.rate}%</span></td>
+              <td><span className="mono">€{Number(p.fixed).toLocaleString()}</span></td>
+              <td><span className="mono" style={{ color: 'var(--green)' }}>€{Number(p.floating).toLocaleString()}</span></td>
+              <td><span className="mono strong">€{Number(p.net).toLocaleString()}</span></td>
+              <td>
+                {p.status === 'settled' && <span className="chip chip-green"><span className="dot"></span>Settled</span>}
+                {p.status === 'pending' && <span className="chip chip-ochre"><span className="dot"></span>Pending</span>}
+                {p.status === 'future' && <span className="chip"><span className="dot"></span>Future</span>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function Obligations() {
+  const items = [
+    { title: "Annual audited financial statements", plain: "Due within 120 days of fiscal year end", status: 'overdue', ref: '§4(a)(ii)', when: '6 days overdue' },
+    { title: "Confirm tax residency", plain: "W-8BEN or equivalent — upload once per year", status: 'ok', ref: '§4(a)(iii)', when: 'Filed 12 Jan 2026' },
+    { title: "Maintain representations", plain: "The 7 core representations must remain true each quarter", status: 'ok', ref: '§3', when: 'Verified automatically' },
+    { title: "Notify material changes", plain: "Mergers, credit downgrades, new financial indebtedness above threshold", status: 'ok', ref: '§4(a)(iv)', when: 'Nothing to report' },
+  ];
+  return (
+    <div className="col" style={{ gap: 10 }}>
+      {items.map((it, i) => (
+        <div key={i} className="card" style={{ borderLeft: `2px solid var(--${it.status === 'overdue' ? 'ochre' : 'green'})` }}>
+          <div className="row" style={{ justifyContent: 'space-between' }}>
+            <div>
+              <div className="row" style={{ gap: 10 }}>
+                <span style={{ fontWeight: 500 }}>{it.title}</span>
+                <span className="jargon">{it.ref}</span>
+              </div>
+              <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 4 }}>{it.plain}</div>
+            </div>
+            <div className="row" style={{ gap: 12 }}>
+              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{it.when}</span>
+              <span className={`chip ${it.status === 'overdue' ? 'chip-ochre' : 'chip-green'}`}><span className="dot"></span>{it.status === 'overdue' ? 'Overdue' : 'On track'}</span>
+              {it.status === 'overdue' && <button className="btn btn-sm btn-ochre">Upload now</button>}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Docs() {
+  const files = [
+    { name: "Confirmation PDF", ref: "§1(b) prevailing", size: "214 KB", ts: "2025-09-08 14:32", hash: "0xae12…7b01" },
+    { name: "Schedule to the Master Agreement", ref: "Part 1–5 · CSA", size: "412 KB", ts: "2025-09-08 14:32", hash: "0x39c7…f442" },
+    { name: "ISDA 2002 Master Agreement", ref: "Standard form", size: "1.2 MB", ts: "2025-09-08 14:32", hash: "0x5d8e…cc19" },
+  ];
+  return (
+    <div className="col">
+      {files.map((f, i) => (
+        <div key={i} className="card row" style={{ justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontWeight: 500 }}>{f.name}</div>
+            <div className="row" style={{ gap: 12, marginTop: 6 }}>
+              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{f.ref}</span>
+              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)' }}>{f.size} · {f.ts}</span>
+              <span className="mono" style={{ fontSize: 11, color: 'var(--ochre)' }}>sha256: {f.hash}</span>
+            </div>
+          </div>
+          <button className="btn btn-sm">Download</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Comments() {
+  const [text, setText] = useState('');
+  const items = [
+    { author: 'Arthur Vance', role: 'advisor', initials: 'AV', t: '2h ago', text: 'Part 1.3 threshold: they came back at €1M. We can meet at €1.5M and hold on cross-default clause. Your call.', open: true, ref: 'Schedule Part 1.3' },
+    { author: 'Elena Marchetti', role: 'client', initials: 'EM', t: '1h ago', text: 'Let’s go €1.5M but keep cross-default strict. Push back on them, they had the aggressive opening.', open: true, ref: 'Schedule Part 1.3' },
+    { author: 'Arthur Vance', role: 'advisor', initials: 'AV', t: '14 min ago', text: 'Sent to Banque Helvetia. Expect response today.', resolved: true, ref: 'Schedule Part 1.3' },
+  ];
+  return (
+    <div>
+      <div className="col" style={{ gap: 10, marginBottom: 20 }}>
+        {items.map((c, i) => (
+          <div key={i} className="card" style={{ padding: 16, borderLeft: `2px solid var(--${c.resolved ? 'green' : 'ochre'})`, opacity: c.resolved ? 0.7 : 1 }}>
+            <div className="row" style={{ gap: 10, marginBottom: 6 }}>
+              <div className="avatar avatar-sm">{c.initials}</div>
+              <span style={{ fontSize: 12, fontWeight: 500 }}>{c.author}</span>
+              <span className="chip">{c.role}</span>
+              <span className="jargon">{c.ref}</span>
+              <span className="mono" style={{ fontSize: 10.5, color: 'var(--ink-3)', marginLeft: 'auto' }}>{c.t}</span>
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.55 }}>{c.text}</div>
+          </div>
+        ))}
+      </div>
+      <div className="card" style={{ padding: 14 }}>
+        <textarea className="input" placeholder="Reply… your advisor sees this thread in real time" value={text} onChange={e => setText(e.target.value)} />
+        <div className="row" style={{ justifyContent: 'space-between', marginTop: 10 }}>
+          <span className="mono" style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>Comments are cryptographically linked to the contract version they reference.</span>
+          <button className="btn btn-primary btn-sm">Post reply</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { ClientToday, ClientContracts, ClientContractDetail });
+
+</script>
+
+<script type="text/babel" data-file="app/advisor.jsx">
+/* global React */
+const { useState, useEffect, useMemo } = React;
+
+// ======================
+// ADVISOR TODAY
+// ======================
+function AdvisorToday() {
+  const { data, nav, toast } = useApp();
+  return (
+    <Page
+      kicker="Advisor desk · Tuesday 20 April 2026"
+      title={<>Good morning, <em className="display-italic">Arthur</em>.</>}
+      sub="Four things on your desk. Two are time-sensitive."
+    >
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24 }}>
+        <div>
+          {/* Intake */}
+          <div className="card" style={{ padding: '28px 32px', marginBottom: 16, background: 'linear-gradient(180deg, var(--paper-2), var(--card))' }}>
+            <div className="row" style={{ justifyContent: 'space-between', marginBottom: 14 }}>
+              <span className="label">New intake · requires your drafting</span>
+              <span className="chip chip-ochre"><span className="dot"></span>Priority</span>
+            </div>
+            <div className="display" style={{ fontSize: 30, letterSpacing: '-0.015em' }}>
+              Novus Corp requested a new <em className="display-italic">EUR 30M</em> IRS with Banque Helvetia.
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 8 }}>
+              Elena Marchetti submitted the term sheet at 08:14. KYC passed. You can draft the Schedule now.
+            </div>
+            <div className="row" style={{ marginTop: 20, gap: 8 }}>
+              <button className="btn btn-ochre" onClick={() => nav('/advisor/draft/new')}>Start drafting →</button>
+              <button className="btn">View term sheet</button>
+              <button className="btn btn-ghost">Delegate</button>
+            </div>
+          </div>
+
+          <SectionH num="02" title="Awaiting your approval" sub="Clock is ticking on each" />
+          <ApprovalItem
+            title="PI-0062 · Novus Corp pays €7,200 net"
+            meta="SLC-IRS-EUR-014 · Due 22 Apr · Computed 09:15:33"
+            detail={<>Fixed €40,187.50 / Floating €43,712.50 → Net €7,200 payable to Banque Helvetia. §2(c) netted. §3 reps verified. §4 obligations clean.</>}
+            actions={<>
+              <button className="btn btn-ochre btn-sm" onClick={() => toast('PI-0062 approved · client notified')}>Approve & sign</button>
+              <button className="btn btn-sm">Inspect calc</button>
+              <button className="btn btn-sm btn-ghost">Challenge oracle</button>
+            </>}
+          />
+          <ApprovalItem
+            title="§4(a)(ii) breach · Crédit Atlantique / Novus Corp"
+            ochre
+            meta="SLC-IRS-EUR-013 · Grace clock: 24 of 30 LBDs remaining"
+            detail={<>Annual FY2025 statements overdue by 6 days. If unresolved by 14 May, auto-escalation to §5(a)(ii) EoD recommendation. Decision package ready.</>}
+            actions={<>
+              <button className="btn btn-sm" onClick={() => nav('/advisor/contracts/SLC-IRS-EUR-013')}>Open decision package</button>
+              <button className="btn btn-sm btn-ghost">Send cure reminder to client</button>
+              <button className="btn btn-sm btn-ghost">Waive grace</button>
+            </>}
+          />
+          <ApprovalItem
+            title="Clause change proposal · Banque Helvetia counsel"
+            meta="SLC-IRS-EUR-015 draft · Part 1.3 Threshold Amount"
+            detail={<>They propose €1M (we opened at €2M). Client signalled €1.5M acceptable with strict cross-default. You can mark up directly in the draft.</>}
+            actions={<>
+              <button className="btn btn-sm" onClick={() => nav('/advisor/draft/new')}>Open in clause builder</button>
+              <button className="btn btn-sm btn-ghost">Copy client note</button>
+            </>}
+          />
+        </div>
+
+        <div>
+          {/* Book metrics */}
+          <div className="card" style={{ marginBottom: 14, padding: 22 }}>
+            <div className="label" style={{ marginBottom: 10 }}>Your book</div>
+            <Stat label="Live contracts" value="14" />
+            <Stat label="In drafting" value="3" />
+            <Stat label="Aggregate notional" value="€642M" />
+            <Stat label="Needs attention" value={<span className="chip chip-ochre"><span className="dot"/> 2</span>} raw />
+          </div>
+
+          {/* Oracle — compact */}
+          <div className="card" style={{ padding: 22, marginBottom: 14 }}>
+            <div className="row" style={{ justifyContent: 'space-between', marginBottom: 10 }}>
+              <span className="label">Oracle · EURIBOR 3M</span>
+              <span className="chip chip-green"><span className="dot"></span>Live</span>
+            </div>
+            <div className="display" style={{ fontSize: 34 }}>3.724<span style={{ fontSize: 18, color: 'var(--ink-3)' }}>%</span></div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }} className="mono">ECB SDW · 09:15:32 · Waterfall step 1/5</div>
+            <hr className="hair" style={{ margin: '14px 0' }} />
+            <div style={{ fontSize: 12, color: 'var(--ink-2)' }}>All 14 contracts referencing EURIBOR 3M are receiving this rate. Anomaly threshold: ±50bps.</div>
+          </div>
+
+          <div className="card" style={{ padding: 22 }}>
+            <div className="label" style={{ marginBottom: 12 }}>This week</div>
+            <WeekItem day="WED 21" text="Payment approvals × 3 across 2 clients" />
+            <WeekItem day="THU 22" text="Settlement day · PI-0062 posts to SWIFT" />
+            <WeekItem day="FRI 24" text="Quarterly §3 rep check · 12 contracts" />
+            <WeekItem day="MON 27" text="Board call · book review" last />
+          </div>
+        </div>
+      </div>
+    </Page>
+  );
+}
+
+function ApprovalItem({ title, meta, detail, actions, ochre }) {
+  return (
+    <div className="card" style={{ marginBottom: 10, padding: 22, borderLeft: `2px solid var(--${ochre ? 'ochre' : 'ink-3'})` }}>
+      <div className="row" style={{ justifyContent: 'space-between', marginBottom: 6 }}>
+        <div style={{ fontWeight: 500, fontSize: 14 }}>{title}</div>
+        <span className="mono" style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>{meta}</span>
+      </div>
+      <div style={{ fontSize: 12.5, color: 'var(--ink-3)', lineHeight: 1.6 }}>{detail}</div>
+      <div className="row" style={{ marginTop: 14, gap: 8, flexWrap: 'wrap' }}>{actions}</div>
+    </div>
+  );
+}
+
+function WeekItem({ day, text, last }) {
+  return (
+    <div className="row" style={{ padding: '10px 0', borderBottom: last ? 'none' : '1px solid var(--hair)', gap: 14 }}>
+      <span className="mono" style={{ fontSize: 10.5, color: 'var(--ochre)', minWidth: 48 }}>{day}</span>
+      <span style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>{text}</span>
+    </div>
+  );
+}
+
+// ======================
+// ADVISOR CONTRACTS
+// ======================
+function AdvisorContracts() {
+  const { data, nav } = useApp();
+  return (
+    <Page
+      kicker="14 live · 3 drafting"
+      title="Contracts"
+      sub="Every contract you oversee. Sorted by the nearest decision."
+      actions={<button className="btn btn-ochre" onClick={() => nav('/advisor/draft/new')}>+ New contract</button>}
+    >
+      <div className="card-plain" style={{ padding: 0, overflow: 'hidden' }}>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Ref</th><th>Contract</th><th>Parties</th><th>Notional</th><th>Period</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.contracts.map(c => <ContractRow key={c.id} c={c} onClick={() => nav(`/advisor/contracts/${c.id}`)} />)}
+          </tbody>
+        </table>
+      </div>
+    </Page>
+  );
+}
+
+// ======================
+// ADVISOR CONTRACT DETAIL (decision package)
+// ======================
+function AdvisorContractDetail({ id }) {
+  const { data, nav } = useApp();
+  const c = data.contracts.find(x => x.id === id) || data.contracts[0];
+  const [tab, setTab] = useState(c.health === 'amber' ? 'decision' : 'overview');
+
+  return (
+    <Page>
+      <div className="label" style={{ marginBottom: 10 }}>
+        <a onClick={() => nav('/advisor/contracts')} style={{ cursor: 'pointer' }}>← All contracts</a>
+      </div>
+      <div className="row" style={{ justifyContent: 'space-between', marginBottom: 14 }}>
+        <div>
+          <div className="row" style={{ gap: 10, marginBottom: 8 }}>
+            <span className="mono" style={{ color: 'var(--ochre)', fontSize: 12 }}>{c.id}</span>
+            <span className={`chip ${c.status === 'live' ? 'chip-green' : 'chip-ochre'}`}><span className="dot"></span>{c.status === 'live' ? 'Live' : 'Drafting'}</span>
+            {c.health === 'amber' && <span className="chip chip-ochre"><span className="dot"></span>Decision required</span>}
+          </div>
+          <h1 className="display" style={{ fontSize: 34 }}>{c.nick}</h1>
+        </div>
+        <div className="row" style={{ gap: 8 }}>
+          <button className="btn">Clause builder</button>
+          <button className="btn">§12 notice</button>
+          <button className="btn btn-primary">Generate package</button>
+        </div>
+      </div>
+
+      <div className="row" style={{ gap: 4, borderBottom: '1px solid var(--hair)', marginBottom: 28 }}>
+        {[['overview', 'Overview'], ['decision', 'Decision package'], ['clauses', 'Clauses §3/§4/§5'], ['payments', 'Payments & PI'], ['audit', 'Audit trail']].map(([k, l]) => (
+          <button key={k} className="nav-link" onClick={() => setTab(k)} style={{ padding: '10px 14px', borderBottom: tab === k ? '2px solid var(--ink)' : '2px solid transparent', borderRadius: 0, color: tab === k ? 'var(--ink)' : 'var(--ink-3)', background: 'transparent' }}>{l}</button>
+        ))}
+      </div>
+
+      {tab === 'decision' && <DecisionPackage c={c} />}
+      {tab === 'overview' && <AdvisorOverview c={c} />}
+      {tab === 'clauses' && <ClauseMonitor />}
+      {tab === 'payments' && <AdvisorPayments />}
+      {tab === 'audit' && <AuditTrail />}
+    </Page>
+  );
+}
+
+function AdvisorOverview({ c }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24 }}>
+      <div>
+        <SectionH num="01" title="Counterparty exposure" sub="Mark-to-market, indicative" />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+          <MTMCard label="Current MTM" value="+€128,400" positive />
+          <MTMCard label="Threshold (CSA)" value="€2,000,000" />
+          <MTMCard label="Collateral posted" value="€0" />
+        </div>
+
+        <SectionH num="02" title="Compliance · real-time" />
+        <div className="col" style={{ gap: 8 }}>
+          <ComplianceRow ok title="§3 Representations" meta="7 of 7 verified · automatic per payment date" />
+          <ComplianceRow ok title="§4 Obligations · this contract" meta="Statements current, tax forms current" />
+          <ComplianceRow ok title="§5(a) Events of Default · 8 monitored" meta="None triggered · last scan 09:15:34" />
+          <ComplianceRow ok title="EMIR reporting · T+1" meta="Last report: 2026-04-19 22:00" />
+          <ComplianceRow ok title="AML / sanctions screen" meta="Quarterly · last run 2026-04-01" />
+        </div>
+      </div>
+      <div>
+        <div className="card" style={{ marginBottom: 14 }}>
+          <div className="label" style={{ marginBottom: 10 }}>Parties</div>
+          <PartyRow initials="NC" name="Novus Corp" role="Party A · Fixed Payer" />
+          <PartyRow initials="BH" name="Banque Helvetia" role="Party B · Floating Payer" last />
+        </div>
+        <div className="card">
+          <div className="label" style={{ marginBottom: 10 }}>Next scheduled actions</div>
+          <WeekItem day="TODAY" text="Approve PI-0062" />
+          <WeekItem day="THU 22" text="Settlement posts" />
+          <WeekItem day="FRI 24" text="§3 rep re-check" last />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MTMCard({ label, value, positive }) {
+  return (
+    <div className="card-plain" style={{ padding: 16 }}>
+      <div className="label" style={{ marginBottom: 8 }}>{label}</div>
+      <div className="display" style={{ fontSize: 22, color: positive ? 'var(--green)' : 'var(--ink)' }}>{value}</div>
+    </div>
+  );
+}
+
+function ComplianceRow({ ok, title, meta }) {
+  return (
+    <div className="card row" style={{ padding: '14px 18px', justifyContent: 'space-between' }}>
+      <div>
+        <div style={{ fontWeight: 500 }}>{title}</div>
+        <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 3 }}>{meta}</div>
+      </div>
+      <span className={`chip ${ok ? 'chip-green' : 'chip-ochre'}`}><span className="dot"></span>{ok ? 'Clear' : 'Attention'}</span>
+    </div>
+  );
+}
+
+function PartyRow({ initials, name, role, last }) {
+  return (
+    <div className="row" style={{ padding: '10px 0', borderBottom: last ? 'none' : '1px solid var(--hair)', gap: 10 }}>
+      <div className="avatar">{initials}</div>
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 500 }}>{name}</div>
+        <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{role}</div>
+      </div>
+    </div>
+  );
+}
+
+function DecisionPackage({ c }) {
+  return (
+    <div>
+      <div className="card" style={{ padding: '28px 32px', marginBottom: 20, borderLeft: '3px solid var(--ochre)' }}>
+        <div className="label" style={{ marginBottom: 10 }}>Decision package · auto-assembled</div>
+        <div className="display" style={{ fontSize: 28, letterSpacing: '-0.015em' }}>
+          §4(a)(ii) <em className="display-italic">breach</em> has occurred, but is curable.
+        </div>
+        <p style={{ marginTop: 10, color: 'var(--ink-2)', fontSize: 14, maxWidth: 720, lineHeight: 1.6 }}>
+          Annual FY2025 audited statements were due 2026-04-14 and have not been received. The system has logged the breach, started the 30-LBD grace clock, and prepared a draft cure reminder. No auto-escalation occurs without your signature.
+        </p>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div className="card">
+          <div className="label" style={{ marginBottom: 10 }}>Clock to §5(a)(ii) EoD recommendation</div>
+          <div className="display" style={{ fontSize: 56, color: 'var(--ochre)' }}>24<span style={{ fontSize: 18, color: 'var(--ink-3)', marginLeft: 6 }}>LBDs</span></div>
+          <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 8 }}>Grace began 2026-04-14. TARGET2 + London calendar. Next LBD: 2026-04-21.</div>
+        </div>
+        <div className="card">
+          <div className="label" style={{ marginBottom: 10 }}>Options you can take now</div>
+          <div className="col" style={{ gap: 8 }}>
+            <OptionRow label="Send cure reminder to client" sub="Ready-drafted · plain language" recommended />
+            <OptionRow label="Waive grace (discretionary)" sub="Logged to audit · §9(b) consent" />
+            <OptionRow label="Escalate to §5(a)(ii) EoD rec" sub="Generates §12 notice draft · signature required" />
+          </div>
+        </div>
+      </div>
+
+      <SectionH num="02" title="Context & evidence" />
+      <div className="col" style={{ gap: 10 }}>
+        <EvidenceRow k="Obligation source" v="Schedule Part 3(b)(i) · Annual audited statements within 120 days of FYE" />
+        <EvidenceRow k="Grace period source" v="§5(a)(ii) · 30 Local Business Days" />
+        <EvidenceRow k="Last client contact" v="Email reminder 2026-03-28 · 'statements in final review'" />
+        <EvidenceRow k="Client history" v="No prior §4 breaches · 3 on-time prior filings" />
+        <EvidenceRow k="Peer benchmark" v="12 similar clients · mean grace consumption: 8 LBDs" />
+      </div>
+    </div>
+  );
+}
+
+function OptionRow({ label, sub, recommended }) {
+  return (
+    <div className="row" style={{ padding: '10px 12px', borderRadius: 6, border: `1px solid ${recommended ? 'var(--ochre-soft)' : 'var(--hair)'}`, background: recommended ? 'var(--ochre-bg)' : 'transparent', justifyContent: 'space-between' }}>
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 500 }}>{label} {recommended && <span className="chip chip-ochre" style={{ marginLeft: 6 }}>recommended</span>}</div>
+        <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{sub}</div>
+      </div>
+      <button className="btn btn-sm">Take action</button>
+    </div>
+  );
+}
+
+function EvidenceRow({ k, v }) {
+  return (
+    <div className="card row" style={{ padding: '12px 18px', gap: 16 }}>
+      <span className="label" style={{ minWidth: 180 }}>{k}</span>
+      <span style={{ fontSize: 13, color: 'var(--ink-2)' }}>{v}</span>
+    </div>
+  );
+}
+
+function ClauseMonitor() {
+  const clauses = [
+    { num: '§3', title: 'Representations · 7 core', ok: true, meta: 'Verified 2026-04-20 09:15' },
+    { num: '§4(a)(i)', title: 'Furnish specified info', ok: true, meta: 'Tax forms current' },
+    { num: '§4(a)(ii)', title: 'Financial statements', ok: false, meta: 'Overdue · clock 24/30' },
+    { num: '§4(a)(iii)', title: 'Tax residency', ok: true, meta: 'W-8BEN filed Jan 2026' },
+    { num: '§4(a)(iv)', title: 'Material change notice', ok: true, meta: 'None reported' },
+    { num: '§5(a)(i)', title: 'Failure to pay', ok: true, meta: 'Monitoring · grace 3 LBDs' },
+    { num: '§5(a)(ii)', title: 'Breach of agreement', ok: true, meta: '§4(a)(ii) escalation candidate' },
+    { num: '§5(a)(iii)', title: 'Credit support default', ok: true, meta: 'No CSA triggered' },
+    { num: '§5(a)(iv)', title: 'Misrepresentation', ok: true, meta: 'No signals' },
+    { num: '§5(a)(v)', title: 'Default under Spec. Txn', ok: true, meta: 'Cross-default off' },
+    { num: '§5(a)(vi)', title: 'Cross-default', ok: true, meta: 'Threshold €2M · clear' },
+    { num: '§5(a)(vii)', title: 'Bankruptcy', ok: true, meta: 'External credit scan clean' },
+    { num: '§5(a)(viii)', title: 'Merger without assumption', ok: true, meta: 'No filings' },
+  ];
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+      {clauses.map((cl, i) => (
+        <div key={i} className="card" style={{ padding: '14px 16px' }}>
+          <div className="row" style={{ justifyContent: 'space-between', marginBottom: 6 }}>
+            <span className="mono" style={{ fontSize: 11, color: cl.ok ? 'var(--ink-3)' : 'var(--ochre)' }}>{cl.num}</span>
+            <span className={`chip ${cl.ok ? 'chip-green' : 'chip-ochre'}`} style={{ fontSize: 10 }}><span className="dot"></span>{cl.ok ? 'OK' : 'Breach'}</span>
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 500 }}>{cl.title}</div>
+          <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 3 }}>{cl.meta}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AdvisorPayments() {
+  return (
+    <div>
+      <div className="card-plain" style={{ padding: 0, overflow: 'hidden' }}>
+        <table className="table">
+          <thead>
+            <tr><th>PI</th><th>Period</th><th>Direction</th><th>Amount</th><th>Oracle source</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span className="mono" style={{ color: 'var(--ochre)' }}>PI-0062</span></td><td>006</td><td>Out to BH</td><td className="mono">€7,200.00</td><td className="mono">ECB SDW · 3.724%</td><td><span className="chip chip-ochre"><span className="dot"></span>Pending</span></td><td><button className="btn btn-sm btn-ochre">Approve</button></td></tr>
+            <tr><td><span className="mono">PI-0061</span></td><td>005</td><td>Out to BH</td><td className="mono">€6,820.00</td><td className="mono">ECB SDW · 3.690%</td><td><span className="chip chip-green"><span className="dot"></span>Settled</span></td><td></td></tr>
+            <tr><td><span className="mono">PI-0060</span></td><td>004</td><td>In from BH</td><td className="mono">€2,140.00</td><td className="mono">ECB SDW · 3.250%</td><td><span className="chip chip-green"><span className="dot"></span>Settled</span></td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function AuditTrail() {
+  const { data } = useApp();
+  return (
+    <div className="card" style={{ padding: 0 }}>
+      <div className="row" style={{ justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1px solid var(--hair)' }}>
+        <span className="label">SHA-256 chained · tamper-evident · both parties hold identical copy</span>
+        <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>chain head: 0x7a4f…b21c</span>
+      </div>
+      <div style={{ padding: '0 20px' }}>
+        {data.auditLog.map((l, i) => (
+          <div key={i} className="row" style={{ gap: 16, padding: '12px 0', borderBottom: i === data.auditLog.length - 1 ? 'none' : '1px solid var(--hair)' }}>
+            <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)', minWidth: 160 }}>{l.t}</span>
+            <span style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>{l.ev}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { AdvisorToday, AdvisorContracts, AdvisorContractDetail });
+
+</script>
+
+<script type="text/babel" data-file="app/flows.jsx">
+/* global React */
+const { useState, useEffect } = React;
+
+// ======================
+// ONBOARDING (Client first-time intake)
+// ======================
+function ClientOnboarding() {
+  const { nav, toast, loginAs } = useApp();
+  const [step, setStep] = useState(1);
+  const [form, setForm] = useState({
+    org: 'Novus Corp', role: 'Treasurer', name: 'Elena Marchetti', email: 'elena@novus.com',
+    entity: 'Non-financial counterparty', country: 'France', lei: '969500VYBYHK9I8FQU12',
+    purpose: 'hedge', volume: '2-5', experience: 'moderate',
+  });
+  const steps = ['Identity', 'Entity profile', 'Your advisor', 'Review'];
+
+  const next = () => step < 4 ? setStep(step + 1) : (loginAs('client'), toast('Welcome to Nomos. Your advisor has been notified.'));
+
+  return (
+    <div className="fade-up" style={{ maxWidth: 720, margin: '0 auto', padding: '60px 32px' }}>
+      <div className="label" style={{ marginBottom: 14 }}>Invited by Arthur Vance · Kessler & Lang LLP</div>
+      <h1 className="display" style={{ fontSize: 44, letterSpacing: '-0.02em', lineHeight: 1.05 }}>
+        Welcome, Elena. <em className="display-italic">Four short steps</em> and you're in.
+      </h1>
+      <p style={{ marginTop: 14, color: 'var(--ink-3)', fontSize: 15 }}>
+        We need the same information any ISDA counterparty would ask. No re-keying later.
+      </p>
+
+      <div className="row" style={{ gap: 2, marginTop: 36, marginBottom: 24 }}>
+        {steps.map((s, i) => (
+          <div key={i} style={{ flex: 1 }}>
+            <div style={{ height: 2, background: step > i + 1 ? 'var(--ink)' : step === i + 1 ? 'var(--ochre)' : 'var(--hair)', marginBottom: 8 }} />
+            <div className="mono" style={{ fontSize: 10, color: step >= i + 1 ? 'var(--ink)' : 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{String(i + 1).padStart(2, '0')} · {s}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="card" style={{ padding: '32px 36px' }}>
+        {step === 1 && <>
+          <h2 className="display" style={{ fontSize: 24, marginBottom: 18 }}>Tell us who you are</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <Field label="Full name"><input className="input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></Field>
+            <Field label="Your role"><input className="input" value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} /></Field>
+            <Field label="Work email"><input className="input" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></Field>
+            <Field label="Organisation"><input className="input" value={form.org} onChange={e => setForm({ ...form, org: e.target.value })} /></Field>
+          </div>
+        </>}
+        {step === 2 && <>
+          <h2 className="display" style={{ fontSize: 24, marginBottom: 18 }}>Your entity under EMIR</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <Field label="Classification">
+              <select className="input" value={form.entity} onChange={e => setForm({ ...form, entity: e.target.value })}>
+                <option>Non-financial counterparty</option>
+                <option>Non-financial counterparty above threshold</option>
+                <option>Financial counterparty</option>
+              </select>
+            </Field>
+            <Field label="Country of incorporation"><input className="input" value={form.country} onChange={e => setForm({ ...form, country: e.target.value })} /></Field>
+            <Field label="LEI (Legal Entity Identifier)" hint="We verified this against GLEIF."><input className="input" value={form.lei} onChange={e => setForm({ ...form, lei: e.target.value })} /></Field>
+            <Field label="Primary purpose">
+              <select className="input" value={form.purpose} onChange={e => setForm({ ...form, purpose: e.target.value })}>
+                <option value="hedge">Hedging commercial risk</option>
+                <option value="trade">Proprietary trading</option>
+                <option value="mixed">Mixed</option>
+              </select>
+            </Field>
+          </div>
+          <div className="card-plain" style={{ marginTop: 18, padding: '14px 16px', display: 'flex', gap: 10, alignItems: 'center' }}>
+            <span className="chip chip-green"><span className="dot"></span>GLEIF matched</span>
+            <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>Novus Corp SA · FR · LEI active until 2027-03-11 · no sanctions flags</span>
+          </div>
+        </>}
+        {step === 3 && <>
+          <h2 className="display" style={{ fontSize: 24, marginBottom: 8 }}>Your advisor is already waiting</h2>
+          <p style={{ color: 'var(--ink-3)', fontSize: 13.5, marginBottom: 18 }}>Arthur Vance invited you. You can add colleagues and secondary contacts later.</p>
+          <div className="row" style={{ padding: '18px 20px', background: 'var(--paper-2)', borderRadius: 10, border: '1px solid var(--hair)' }}>
+            <div className="avatar avatar-lg">AV</div>
+            <div style={{ marginLeft: 4 }}>
+              <div style={{ fontWeight: 500, fontSize: 15 }}>Arthur Vance</div>
+              <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>Partner · Derivatives · Kessler &amp; Lang LLP</div>
+              <div style={{ fontSize: 11.5, color: 'var(--ink-4)', marginTop: 4 }} className="mono">15 years · 87 ISDA MAs · av@kesslerlang.com</div>
+            </div>
+            <button className="btn btn-sm" style={{ marginLeft: 'auto' }}>Change</button>
+          </div>
+          <Field label="Authority for binding signatures" style={{ marginTop: 18 }}>
+            <select className="input" defaultValue="sole">
+              <option value="sole">Sole signatory (me)</option>
+              <option value="joint">Joint (two signatures required)</option>
+              <option value="board">Board resolution on file</option>
+            </select>
+          </Field>
+        </>}
+        {step === 4 && <>
+          <h2 className="display" style={{ fontSize: 24, marginBottom: 18 }}>Confirm &amp; enter</h2>
+          <ReviewRow k="You" v={`${form.name} · ${form.role} · ${form.email}`} />
+          <ReviewRow k="Entity" v={`${form.org} · ${form.entity} · ${form.country}`} />
+          <ReviewRow k="LEI" v={form.lei} />
+          <ReviewRow k="Purpose" v="Hedging commercial risk" />
+          <ReviewRow k="Advisor" v="Arthur Vance (Kessler & Lang LLP)" last />
+          <p style={{ marginTop: 18, color: 'var(--ink-3)', fontSize: 12 }} className="mono">
+            By entering, you consent to the Nomos platform terms and the shared audit trail. You remain bound by your ISDA Master Agreement once signed; Nomos does not replace it.
+          </p>
+        </>}
+      </div>
+
+      <div className="row" style={{ justifyContent: 'space-between', marginTop: 20 }}>
+        <button className="btn btn-ghost" onClick={() => step > 1 ? setStep(step - 1) : nav('/welcome')}>← Back</button>
+        <button className="btn btn-primary" onClick={next}>{step === 4 ? 'Enter Nomos →' : 'Continue →'}</button>
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, hint, children, style }) {
+  return (
+    <label style={{ display: 'block', ...style }}>
+      <span className="field-label">{label}</span>
+      {children}
+      {hint && <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>{hint}</div>}
+    </label>
+  );
+}
+function ReviewRow({ k, v, last }) {
+  return <div className="row" style={{ padding: '10px 0', borderBottom: last ? 'none' : '1px solid var(--hair)', justifyContent: 'space-between' }}>
+    <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{k}</span>
+    <span style={{ fontSize: 13 }}>{v}</span>
+  </div>;
+}
+
+// ======================
+// DRAFT NEW CONTRACT (Advisor clause builder flow)
+// ======================
+function DraftNew() {
+  const { nav, toast } = useApp();
+  const [step, setStep] = useState(1);
+  const [terms, setTerms] = useState({
+    clientName: 'Novus Corp',
+    counterparty: 'Banque Helvetia',
+    notional: 30_000_000,
+    fixed: 3.410,
+    maturity: '2031-05-01',
+    effective: '2026-05-01',
+    threshold: 1_500_000,
+  });
+
+  const steps = ['Economics', 'Schedule elections', 'Clause review', 'Send to parties'];
+  return (
+    <div className="fade-up" style={{ maxWidth: 980, margin: '0 auto', padding: '40px 40px 80px' }}>
+      <div className="label" style={{ marginBottom: 10 }}>
+        <a onClick={() => nav('/advisor')} style={{ cursor: 'pointer' }}>← Back to desk</a>
+      </div>
+      <h1 className="display" style={{ fontSize: 38 }}>New contract · <em className="display-italic">EUR IRS</em></h1>
+      <p style={{ color: 'var(--ink-3)', fontSize: 14, marginTop: 6 }}>Drafting for Novus Corp. The client sees the plain-language version in parallel.</p>
+
+      <div className="row" style={{ gap: 2, marginTop: 28, marginBottom: 24 }}>
+        {steps.map((s, i) => (
+          <div key={i} style={{ flex: 1 }}>
+            <div style={{ height: 2, background: step > i + 1 ? 'var(--ink)' : step === i + 1 ? 'var(--ochre)' : 'var(--hair)', marginBottom: 8 }} />
+            <div className="mono" style={{ fontSize: 10, color: step >= i + 1 ? 'var(--ink)' : 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{String(i + 1).padStart(2, '0')} · {s}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20 }}>
+        <div className="card" style={{ padding: '28px 32px' }}>
+          {step === 1 && <Step1 terms={terms} setTerms={setTerms} />}
+          {step === 2 && <Step2 terms={terms} setTerms={setTerms} />}
+          {step === 3 && <Step3 terms={terms} />}
+          {step === 4 && <Step4 terms={terms} />}
+        </div>
+
+        <div>
+          <div className="card" style={{ padding: 22, marginBottom: 14, position: 'sticky', top: 80 }}>
+            <div className="label" style={{ marginBottom: 10 }}>Client's view · live</div>
+            <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.65, fontFamily: 'var(--display)' }}>
+              Every quarter for <strong>{Math.round((new Date(terms.maturity) - new Date(terms.effective)) / (1000 * 86400 * 365))} years</strong>, Novus Corp and {terms.counterparty} exchange interest on <strong>€{(terms.notional / 1e6).toFixed(0)}M</strong>. Novus pays <em>fixed at {terms.fixed}%</em>, {terms.counterparty} pays floating at EURIBOR 3M. Only the net difference moves.
+            </div>
+            <hr className="hair" style={{ margin: '14px 0' }} />
+            <div className="label" style={{ marginBottom: 8 }}>What the client sees</div>
+            <div style={{ fontSize: 11.5, color: 'var(--ink-3)', lineHeight: 1.5 }}>
+              Elena has read-only access as you draft. She can comment, not edit. She gets notified when you finish the draft.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="row" style={{ justifyContent: 'space-between', marginTop: 20 }}>
+        <button className="btn btn-ghost" onClick={() => step > 1 ? setStep(step - 1) : nav('/advisor')}>← Back</button>
+        <div className="row" style={{ gap: 8 }}>
+          <button className="btn">Save draft</button>
+          <button className="btn btn-primary" onClick={() => step < 4 ? setStep(step + 1) : (toast('Draft sent to Elena Marchetti & Banque Helvetia counsel'), nav('/advisor'))}>{step === 4 ? 'Send to parties →' : 'Continue →'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Step1({ terms, setTerms }) {
+  return <>
+    <SectionH num="01" title="Economic terms" />
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+      <Field label="Client (Party A)"><input className="input" value={terms.clientName} readOnly /></Field>
+      <Field label="Counterparty (Party B)"><input className="input" value={terms.counterparty} onChange={e => setTerms({ ...terms, counterparty: e.target.value })} /></Field>
+      <Field label="Notional (EUR)"><input className="input" type="number" value={terms.notional} onChange={e => setTerms({ ...terms, notional: +e.target.value })} /></Field>
+      <Field label="Fixed rate (%)"><input className="input" type="number" step="0.001" value={terms.fixed} onChange={e => setTerms({ ...terms, fixed: +e.target.value })} /></Field>
+      <Field label="Effective date"><input className="input" type="date" value={terms.effective} onChange={e => setTerms({ ...terms, effective: e.target.value })} /></Field>
+      <Field label="Termination date"><input className="input" type="date" value={terms.maturity} onChange={e => setTerms({ ...terms, maturity: e.target.value })} /></Field>
+    </div>
+    <SectionH num="02" title="Conventions" />
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+      <Field label="Fixed leg day count"><select className="input" defaultValue="30/360"><option>30/360 Bond Basis</option><option>ACT/365</option></select></Field>
+      <Field label="Floating leg day count"><select className="input" defaultValue="ACT/360"><option>ACT/360</option><option>ACT/365</option></select></Field>
+      <Field label="Business day"><select className="input" defaultValue="Modified Following"><option>Modified Following</option><option>Following</option></select></Field>
+    </div>
+  </>;
+}
+
+function Step2({ terms, setTerms }) {
+  return <>
+    <SectionH num="01" title="Schedule elections · Part 1" sub="Collateral · Threshold · Independent Amount" />
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+      <Field label="Threshold Amount (EUR)" hint="CP opened €1M, client wants €2M. Negotiating point."><input className="input" type="number" value={terms.threshold} onChange={e => setTerms({ ...terms, threshold: +e.target.value })} /></Field>
+      <Field label="Minimum Transfer Amount"><input className="input" defaultValue="€100,000" /></Field>
+    </div>
+    <SectionH num="02" title="Part 3 · Information covenants" />
+    <ToggleRow label="Annual audited financial statements" sub="Within 120 days of fiscal year end · §4(a)(ii)" on />
+    <ToggleRow label="Quarterly management accounts" sub="Within 45 days · §4(a)(ii)" />
+    <ToggleRow label="Material change notice" sub="5 BD on mergers, downgrades, new indebtedness · §4(a)(iv)" on />
+    <ToggleRow label="Compliance certificate" sub="Signed officer certificate quarterly" />
+    <SectionH num="03" title="Part 5 · Elections" />
+    <ToggleRow label="Automatic Early Termination" sub="Off — matches market practice for NFC" />
+    <ToggleRow label="Cross-default threshold" sub="Applies · 3% of shareholders' equity or €10M, whichever lower" on />
+  </>;
+}
+
+function ToggleRow({ label, sub, on: initialOn }) {
+  const [on, setOn] = useState(!!initialOn);
+  return (
+    <div className="row" style={{ padding: '12px 0', borderBottom: '1px solid var(--hair)', justifyContent: 'space-between', gap: 16 }}>
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 500 }}>{label}</div>
+        <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{sub}</div>
+      </div>
+      <button onClick={() => setOn(!on)} style={{ width: 38, height: 22, borderRadius: 999, background: on ? 'var(--ochre)' : 'var(--hair-2)', border: 'none', cursor: 'pointer', position: 'relative' }}>
+        <span style={{ position: 'absolute', top: 2, left: on ? 18 : 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left .15s' }} />
+      </button>
+    </div>
+  );
+}
+
+function Step3({ terms }) {
+  return <>
+    <SectionH num="01" title="Generated prose · §3 Representations" right={<span className="chip">7 reps</span>} />
+    <div style={{ fontFamily: 'var(--display)', fontSize: 15, color: 'var(--ink-2)', lineHeight: 1.75, padding: '14px 18px', background: 'var(--paper-2)', borderRadius: 10 }}>
+      Each Party represents that … it is duly organised and validly existing under the laws of its jurisdiction of incorporation; it has the power to execute and deliver this Agreement; this Agreement constitutes its legal, valid and binding obligation; no Event of Default has occurred and is continuing …
+    </div>
+    <SectionH num="02" title="Generated prose · §5(a)(ii)" />
+    <div style={{ fontFamily: 'var(--display)', fontSize: 15, color: 'var(--ink-2)', lineHeight: 1.75, padding: '14px 18px', background: 'var(--paper-2)', borderRadius: 10 }}>
+      Failure by the party to comply with or perform any agreement or obligation (other than §2(a)(i), §2(e), §4(a)(i) or §4(a)(iii)) to be complied with or performed by the party in accordance with this Agreement if such failure is not remedied on or before the thirtieth day after notice of such failure is given to the party.
+    </div>
+    <div className="card-plain" style={{ padding: '14px 16px', marginTop: 16, display: 'flex', gap: 10 }}>
+      <span className="chip chip-green"><span className="dot"></span>Lint clean</span>
+      <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>No cross-reference errors. Definitions all resolved. Prose matches ISDA 2002 standard form.</span>
+    </div>
+  </>;
+}
+
+function Step4({ terms }) {
+  return <>
+    <SectionH num="01" title="Recipients" />
+    <div className="card-plain" style={{ padding: '14px 18px', marginBottom: 10 }}>
+      <div className="row"><div className="avatar">EM</div><div style={{ marginLeft: 10 }}><div style={{ fontWeight: 500 }}>Elena Marchetti</div><div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Novus Corp · Treasurer · sole signatory</div></div><span className="chip chip-green" style={{ marginLeft: 'auto' }}>Ready to sign</span></div>
+    </div>
+    <div className="card-plain" style={{ padding: '14px 18px', marginBottom: 20 }}>
+      <div className="row"><div className="avatar">FK</div><div style={{ marginLeft: 10 }}><div style={{ fontWeight: 500 }}>Fabian Koch</div><div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Banque Helvetia · Derivatives counsel · bank-side</div></div><span className="chip" style={{ marginLeft: 'auto' }}>Awaiting</span></div>
+    </div>
+    <SectionH num="02" title="Signing ceremony" />
+    <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+      Both parties will see the live signing room. Elena signs first (she initiated). Banque Helvetia countersigns. At that moment, the contract becomes LIVE and the audit trail is sealed with the genesis hash.
+    </div>
+    <div className="card-plain" style={{ padding: 14, marginTop: 16 }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <input type="checkbox" defaultChecked /> <span style={{ fontSize: 12.5 }}>Attach advisor memo (will be shared with client only)</span>
+      </label>
+    </div>
+  </>;
+}
+
+// ======================
+// ORACLE TRANSPARENCY PAGE
+// ======================
+function OraclePage() {
+  const { data, nav } = useApp();
+  return (
+    <Page
+      kicker="Rate transparency"
+      title={<>Where the rate <em className="display-italic">actually comes from</em></>}
+      sub="Every calculation on Nomos uses a waterfall of five sources. You always know which one answered."
+    >
+      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr', gap: 28 }}>
+        <div className="card" style={{ padding: 28 }}>
+          <div className="label" style={{ marginBottom: 10 }}>Current reading · EURIBOR 3M</div>
+          <div className="display" style={{ fontSize: 72, lineHeight: 1 }}>3.724<span style={{ fontSize: 24, color: 'var(--ink-3)' }}>%</span></div>
+          <div className="mono" style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 10 }}>2026-04-20 09:15:32 CET</div>
+          <hr className="hair" style={{ margin: '18px 0' }} />
+          <Stat label="Source answering" value="ECB SDW (step 1)" />
+          <Stat label="Anomaly threshold" value="±50 bps" />
+          <Stat label="Timestamp hash" value="0x7a4f…b21c" />
+          <Stat label="Next poll" value="in 12 min" raw />
+        </div>
+
+        <div>
+          <div className="label" style={{ marginBottom: 14 }}>Waterfall · top to bottom</div>
+          <div className="col" style={{ gap: 8 }}>
+            {data.oracle.waterfall.map(w => (
+              <div key={w.step} className="card row" style={{ padding: '16px 20px', justifyContent: 'space-between', borderLeft: `2px solid var(--${w.status === 'ok' ? 'green' : 'hair-2'})` }}>
+                <div className="row" style={{ gap: 16 }}>
+                  <span className="mono" style={{ fontSize: 20, color: 'var(--ink-4)' }}>{w.step}</span>
+                  <div>
+                    <div style={{ fontWeight: 500 }}>{w.source}</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{w.note}</div>
+                  </div>
+                </div>
+                <div className="row" style={{ gap: 16 }}>
+                  <span className="mono" style={{ fontSize: 13 }}>{w.value}%</span>
+                  <span className={`chip ${w.status === 'ok' ? 'chip-green' : ''}`}><span className="dot"></span>{w.status === 'ok' ? 'Answering' : 'Standby'}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mono" style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 14, lineHeight: 1.7 }}>
+            If step 1 and step 2 diverge by more than 50 bps, the system pauses and flags a HUMAN GATE for advisor review. No calculation goes live without reconciled sources.
+          </p>
+        </div>
+      </div>
+    </Page>
+  );
+}
+
+// ======================
+// AUDIT FULL
+// ======================
+function AuditPage() {
+  const { data } = useApp();
+  const entries = [
+    ...data.auditLog,
+    { t: '2026-04-19 22:00:01', ev: 'EMIR T+1 report filed · batch 2026-04-19 · 14 trades · accepted by DTCC' },
+    { t: '2026-04-19 14:32:44', ev: 'Advisor A. Vance signed PI-0061 · €6,820 · SLC-IRS-EUR-014 · chain=0x2b…' },
+    { t: '2026-04-14 00:00:00', ev: '§4(a)(ii) grace clock started · SLC-IRS-EUR-013 · obligation=FY2025 statements' },
+    { t: '2026-04-08 10:11:02', ev: '§3 rep scan clean · 7/7 · all live contracts' },
+    { t: '2026-04-01 09:00:00', ev: 'Quarterly AML/sanctions screen clean · 12 counterparties' },
+  ];
+  return (
+    <Page kicker="Tamper-evident · SHA-256 chained" title="Audit trail" sub="Every action on every contract. Both parties and the advisor hold identical copies. No edits, only appends.">
+      <div className="card" style={{ padding: 0 }}>
+        <div className="row" style={{ padding: '16px 22px', borderBottom: '1px solid var(--hair)', justifyContent: 'space-between' }}>
+          <div className="row" style={{ gap: 10 }}>
+            <input className="input" placeholder="Filter by contract, party, event…" style={{ width: 320 }} />
+            <select className="input" style={{ width: 180 }}><option>All events</option><option>Payments</option><option>Compliance</option><option>Oracle</option></select>
+          </div>
+          <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>chain head · 0x7a4f…b21c</span>
+        </div>
+        <div style={{ padding: '0 22px' }}>
+          {entries.map((e, i) => (
+            <div key={i} className="row" style={{ gap: 16, padding: '14px 0', borderBottom: i === entries.length - 1 ? 'none' : '1px solid var(--hair)' }}>
+              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)', minWidth: 170 }}>{e.t}</span>
+              <span style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>{e.ev}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Page>
+  );
+}
+
+// ======================
+// PLACEHOLDER PAGES
+// ======================
+function Placeholder({ title, sub }) {
+  return (
+    <Page kicker="Coming soon" title={title} sub={sub}>
+      <div className="card" style={{ padding: 60, textAlign: 'center' }}>
+        <div className="display" style={{ fontSize: 32, color: 'var(--ink-3)' }}>§</div>
+        <p style={{ color: 'var(--ink-3)', marginTop: 14 }}>This view is stubbed for the prototype. Focus of this pass is the core workflow.</p>
+      </div>
+    </Page>
+  );
+}
+
+Object.assign(window, { ClientOnboarding, DraftNew, OraclePage, AuditPage, Placeholder });
+
+</script>
+
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+function Router() {
+  const { route, role } = useApp();
+
+  // Route matching
+  let page;
+  if (route === '/welcome' || !role && route === '/') page = <Welcome />;
+  else if (route === '/onboarding/client') page = <ClientOnboarding />;
+  else if (route === '/client') page = <ClientToday />;
+  else if (route === '/client/contracts') page = <ClientContracts />;
+  else if (route.startsWith('/client/contracts/')) page = <ClientContractDetail id={route.split('/').pop()} />;
+  else if (route === '/client/documents') page = <Placeholder title="Documents" sub="Contracts, schedules, confirmations, notices — all signed, all hashed." />;
+  else if (route === '/client/audit') page = <AuditPage />;
+  else if (route === '/client/oracle') page = <OraclePage />;
+  else if (route === '/advisor') page = <AdvisorToday />;
+  else if (route === '/advisor/contracts') page = <AdvisorContracts />;
+  else if (route.startsWith('/advisor/contracts/')) page = <AdvisorContractDetail id={route.split('/').pop()} />;
+  else if (route === '/advisor/draft/new') page = <DraftNew />;
+  else if (route === '/advisor/counterparties') page = <Placeholder title="Counterparties" sub="Banks, funds, bilateral exposure — where your clients sit in the market." />;
+  else if (route === '/advisor/library') page = <Placeholder title="Clause library" sub="Reusable elections, definitions, and negotiated positions across the book." />;
+  else if (route === '/advisor/audit') page = <AuditPage />;
+  else if (role === 'advisor') page = <AdvisorToday />;
+  else if (role === 'client') page = <ClientToday />;
+  else page = <Welcome />;
+
+  const showTopbar = !!role && route !== '/welcome' && route !== '/onboarding/client';
+  return (
+    <>
+      {showTopbar && <Topbar />}
+      {page}
+      <Tweaks />
+    </>
+  );
+}
+
+function App() {
+  return <AppProvider><Router /></AppProvider>;
+}
+
+// Wait for babel scripts to attach their exports, then render
+const boot = () => {
+  if (!window.Welcome || !window.ClientToday || !window.AdvisorToday || !window.DraftNew) {
+    return setTimeout(boot, 40);
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+};
+boot();
+</script>
+
+<!-- Tweak defaults (host can rewrite) -->
+<script>
+/*EDITMODE-BEGIN*/const TWEAK_DEFAULTS = {
+  "theme": "light",
+  "jargon": "meta",
+  "density": "comfortable"
+}/*EDITMODE-END*/;
+</script>
+</body>
+</html>

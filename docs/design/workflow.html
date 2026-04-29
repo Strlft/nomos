@@ -1,0 +1,1047 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1440" />
+<title>Nomos — Workflow Atlas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F6F1E8;
+    --paper-2: #EFE8DB;
+    --ink: #1C1A16;
+    --ink-2: #2E2A22;
+    --ink-3: #6B6456;
+    --ink-4: #958D7C;
+    --rule: #D9D1BE;
+    --rule-2: #C7BEA8;
+    --ochre: #B8853A;
+    --ochre-2: #8F6423;
+    --red: #A8442A;
+    --green: #4E6A3A;
+    --card: #FBF7EE;
+
+    --serif: 'Newsreader', Georgia, serif;
+    --sans: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    --mono: 'Geist Mono', ui-monospace, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: 120px;
+  }
+
+  .wrap { max-width: 1320px; margin: 0 auto; padding: 0 40px; }
+
+  /* Header */
+  header.top {
+    padding: 64px 0 36px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--ink-3);
+  }
+  h1.title {
+    font-family: var(--serif); font-weight: 400;
+    font-size: 64px; line-height: 1.02; letter-spacing: -.02em;
+    margin: 14px 0 18px;
+    max-width: 900px;
+  }
+  h1.title em { font-style: italic; color: var(--ochre-2); font-weight: 500; }
+  .lede {
+    font-family: var(--serif); font-size: 19px; line-height: 1.5;
+    color: var(--ink-2); max-width: 720px; margin: 0;
+  }
+  .toc {
+    display: flex; gap: 28px; flex-wrap: wrap;
+    margin-top: 40px; padding-top: 24px; border-top: 1px dashed var(--rule-2);
+  }
+  .toc a {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--ink-2); text-decoration: none;
+    padding-bottom: 2px; border-bottom: 1px solid transparent;
+  }
+  .toc a:hover { border-color: var(--ochre); color: var(--ochre-2); }
+  .toc a .num { color: var(--ink-4); margin-right: 8px; }
+
+  /* Section */
+  section { padding: 80px 0 20px; border-bottom: 1px solid var(--rule); }
+  .section-head {
+    display: grid; grid-template-columns: 120px 1fr; gap: 40px;
+    align-items: baseline; margin-bottom: 40px;
+  }
+  .section-head .num {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .14em;
+    color: var(--ink-4); text-transform: uppercase;
+  }
+  h2.section-title {
+    font-family: var(--serif); font-weight: 400; font-size: 38px;
+    letter-spacing: -.015em; margin: 0 0 8px;
+  }
+  .section-sub {
+    font-family: var(--serif); font-style: italic; font-size: 16px;
+    color: var(--ink-3); margin: 0;
+  }
+
+  /* Content columns */
+  .grid-inset { display: grid; grid-template-columns: 120px 1fr; gap: 40px; align-items: start; }
+  .grid-inset .gutter { font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-4); padding-top: 4px; }
+
+  /* Actors */
+  .actors { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+  .actor {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 22px 22px 20px;
+    position: relative;
+    min-height: 340px;
+  }
+  .actor .role-tag {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--ochre-2);
+    padding: 3px 8px; background: rgba(184,133,58,.1);
+    border-radius: 3px; display: inline-block;
+  }
+  .actor h3 {
+    font-family: var(--serif); font-weight: 500; font-size: 24px;
+    margin: 14px 0 2px; letter-spacing: -.01em;
+  }
+  .actor .who { font-size: 12.5px; color: var(--ink-3); margin-bottom: 18px; font-style: italic; font-family: var(--serif); }
+  .actor dl { margin: 0; }
+  .actor dt {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--ink-4); margin-top: 12px;
+  }
+  .actor dd { margin: 3px 0 0; font-size: 13px; color: var(--ink-2); line-height: 1.5; }
+  .actor.primary { background: #2E2A22; color: #EEE6D2; border-color: #2E2A22; }
+  .actor.primary .role-tag { background: rgba(184,133,58,.2); color: #E2B978; }
+  .actor.primary .who { color: #BFB6A1; }
+  .actor.primary dt { color: #8C826E; }
+  .actor.primary dd { color: #E6DFCC; }
+
+  /* First-page anatomy */
+  .anatomy { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 24px; }
+  .screen {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+  }
+  .screen .screen-label {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--rule);
+    display: flex; align-items: baseline; justify-content: space-between;
+    background: var(--paper-2);
+  }
+  .screen .screen-label .name {
+    font-family: var(--serif); font-size: 18px; font-weight: 500;
+  }
+  .screen .screen-label .role {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--ink-3);
+  }
+  .screen-body { padding: 22px 24px 26px; font-size: 13px; }
+  .annot {
+    display: grid; grid-template-columns: 36px 1fr; gap: 14px;
+    padding: 11px 0;
+    border-bottom: 1px dashed var(--rule-2);
+  }
+  .annot:last-child { border-bottom: none; }
+  .annot .pin {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .06em;
+    color: var(--ochre-2); font-weight: 500;
+    border: 1px solid var(--ochre); border-radius: 3px;
+    padding: 3px 0; text-align: center;
+    height: 22px; line-height: 16px;
+  }
+  .annot .body { color: var(--ink-2); line-height: 1.5; }
+  .annot .body .term {
+    font-family: var(--serif); font-weight: 500; font-size: 14px;
+    margin-right: 8px; color: var(--ink);
+  }
+  .annot .body .why {
+    display: block; color: var(--ink-3); font-style: italic;
+    font-family: var(--serif); font-size: 13px; margin-top: 3px;
+  }
+
+  /* Swim-lane diagrams */
+  .flow {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 28px 32px 32px;
+    margin-top: 18px;
+    overflow-x: auto;
+  }
+  .flow h3 {
+    font-family: var(--serif); font-weight: 500; font-size: 22px;
+    margin: 0 0 4px; letter-spacing: -.01em;
+  }
+  .flow .sub {
+    font-family: var(--serif); font-style: italic; font-size: 14px;
+    color: var(--ink-3); margin: 0 0 22px;
+  }
+  .flow svg { display: block; max-width: 100%; }
+
+  /* SVG text style helpers */
+  svg text { font-family: var(--sans); fill: var(--ink-2); }
+  svg .lane-label { font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; fill: var(--ink-3); }
+  svg .step-title { font-family: var(--serif); font-size: 13px; font-weight: 500; fill: var(--ink); }
+  svg .step-meta { font-family: var(--mono); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; fill: var(--ink-3); }
+  svg .edge-label { font-family: var(--mono); font-size: 9.5px; letter-spacing: .04em; fill: var(--ink-3); }
+  svg .trigger { font-family: var(--mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; fill: var(--ochre-2); }
+
+  /* Communication matrix */
+  .matrix {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 0;
+    overflow: hidden;
+  }
+  .matrix table {
+    width: 100%; border-collapse: collapse;
+    font-size: 13px;
+  }
+  .matrix th, .matrix td {
+    padding: 16px 18px; text-align: left; vertical-align: top;
+    border-bottom: 1px solid var(--rule);
+    border-right: 1px solid var(--rule);
+  }
+  .matrix th {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--ink-3);
+    background: var(--paper-2); font-weight: 400;
+  }
+  .matrix th:first-child { width: 200px; }
+  .matrix td:first-child {
+    font-family: var(--serif); font-weight: 500; font-size: 15px;
+    color: var(--ink); background: var(--paper-2);
+    border-right: 1px solid var(--rule);
+  }
+  .matrix td:last-child, .matrix th:last-child { border-right: none; }
+  .matrix tr:last-child td, .matrix tr:last-child th { border-bottom: none; }
+  .surface {
+    display: inline-block;
+    font-family: var(--mono); font-size: 10px; letter-spacing: .04em;
+    color: var(--ochre-2); background: rgba(184,133,58,.1);
+    padding: 2px 8px; border-radius: 3px; margin-right: 6px; margin-bottom: 4px;
+  }
+  .matrix td .d { color: var(--ink-2); line-height: 1.5; margin-top: 6px; }
+  .matrix td .d em { font-style: italic; color: var(--ink-3); font-family: var(--serif); }
+
+  /* Click map screen */
+  .clickmap {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 0;
+    overflow: hidden;
+    position: relative;
+  }
+  .cm-head {
+    padding: 14px 22px; border-bottom: 1px solid var(--rule);
+    display: flex; justify-content: space-between; align-items: baseline;
+    background: var(--paper-2);
+  }
+  .cm-head .name { font-family: var(--serif); font-size: 18px; font-weight: 500; }
+  .cm-head .meta { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+  .cm-body { display: grid; grid-template-columns: 1.25fr 1fr; }
+  .cm-mock { padding: 26px 28px; border-right: 1px solid var(--rule); position: relative; background: var(--paper); }
+  .cm-legend { padding: 26px 28px; font-size: 13px; }
+  .cm-legend h4 {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--ink-3); margin: 0 0 14px; font-weight: 400;
+  }
+  .legend-row {
+    display: grid; grid-template-columns: 30px 1fr; gap: 12px;
+    padding: 10px 0; border-bottom: 1px dashed var(--rule-2);
+  }
+  .legend-row:last-child { border-bottom: none; }
+  .legend-row .num {
+    font-family: var(--mono); font-size: 10px; font-weight: 500;
+    color: var(--ochre-2); border: 1px solid var(--ochre); border-radius: 3px;
+    padding: 2px 0; text-align: center; height: 22px; line-height: 16px;
+  }
+  .legend-row .term { font-family: var(--serif); font-weight: 500; font-size: 14px; }
+  .legend-row .what { color: var(--ink-3); font-style: italic; font-family: var(--serif); font-size: 13px; margin-top: 3px; }
+
+  /* Mock widgets inside click map */
+  .mockrow {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border: 1px solid var(--rule); border-radius: 4px;
+    background: var(--card); font-size: 12.5px; position: relative;
+    margin-bottom: 10px;
+  }
+  .mockrow .title { font-family: var(--serif); font-weight: 500; font-size: 14px; flex: 1; }
+  .mockrow .jg { font-family: var(--mono); font-size: 10px; color: var(--ink-4); letter-spacing: .04em; }
+  .mockrow .chip {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .04em;
+    padding: 3px 7px; border-radius: 3px;
+    background: rgba(168,68,42,.1); color: var(--red);
+  }
+  .pin-abs {
+    position: absolute; left: -14px; top: 50%; transform: translate(-100%, -50%);
+    font-family: var(--mono); font-size: 10px; font-weight: 500; color: var(--ochre-2);
+    border: 1px solid var(--ochre); background: var(--paper);
+    border-radius: 3px; padding: 2px 5px; white-space: nowrap;
+  }
+  .mocktop {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px; border: 1px solid var(--rule); border-radius: 4px;
+    background: var(--card); margin-bottom: 16px; font-size: 12.5px; position: relative;
+  }
+  .mocktop .brand { font-family: var(--serif); font-size: 15px; font-weight: 500; }
+  .mocktop .nav { display: flex; gap: 16px; font-family: var(--mono); font-size: 10px; letter-spacing: .06em; color: var(--ink-3); text-transform: uppercase; }
+  .mocktop .user { font-family: var(--mono); font-size: 10px; color: var(--ink-3); }
+  .hero-card {
+    background: #2E2A22; color: #EEE6D2;
+    border-radius: 6px; padding: 18px 20px; margin-bottom: 16px;
+    position: relative;
+  }
+  .hero-card .amt { font-family: var(--serif); font-size: 32px; font-weight: 400; letter-spacing: -.01em; }
+  .hero-card .dn { font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: #B8B0A0; }
+  .hero-card .cta {
+    position: absolute; right: 18px; top: 50%; transform: translateY(-50%);
+    font-family: var(--mono); font-size: 10px; letter-spacing: .06em;
+    padding: 8px 14px; border-radius: 4px; background: var(--ochre); color: #1C1A16;
+    text-transform: uppercase;
+  }
+
+  /* Closing note */
+  .closing {
+    padding: 56px 0 12px;
+    display: grid; grid-template-columns: 120px 1fr; gap: 40px;
+  }
+  .closing p {
+    font-family: var(--serif); font-size: 17px; line-height: 1.55;
+    max-width: 720px; color: var(--ink-2); margin: 0 0 12px;
+  }
+
+  /* Links */
+  a.ret {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em;
+    color: var(--ochre-2); text-decoration: none;
+    border-bottom: 1px solid var(--ochre);
+    text-transform: uppercase; padding-bottom: 1px;
+  }
+
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">Nomos · Workflow Atlas · Internal</div>
+    <h1 class="title">How the platform <em>actually works</em> — who starts, what they see, how they talk to each other.</h1>
+    <p class="lede">Four actors, one contract object, two lenses. This document is the canonical map: if a screen or message isn't on here, it probably shouldn't exist yet.</p>
+
+    <nav class="toc">
+      <a href="#actors"><span class="num">01</span>Actors &amp; initiation</a>
+      <a href="#today"><span class="num">02</span>The first page</a>
+      <a href="#flows"><span class="num">03</span>Core workflows</a>
+      <a href="#comms"><span class="num">04</span>Communication patterns</a>
+      <a href="#clickmap"><span class="num">05</span>Click map</a>
+      <a href="index.html" class="ret">← Back to prototype</a>
+    </nav>
+  </header>
+
+  <!-- ========================================================== -->
+  <!-- 01 ACTORS                                                  -->
+  <!-- ========================================================== -->
+  <section id="actors">
+    <div class="section-head">
+      <div class="num">§ 01</div>
+      <div>
+        <h2 class="section-title">Who initiates, who decides, who is notified</h2>
+        <p class="section-sub">Every workflow begins with one actor's intent or a system-detected event. Most disputes about "who owns this" disappear when the initiator is named.</p>
+      </div>
+    </div>
+
+    <div class="grid-inset">
+      <div class="gutter">Actors</div>
+      <div class="actors">
+        <div class="actor primary">
+          <span class="role-tag">Lead advisor</span>
+          <h3>The lawyer-of-record</h3>
+          <div class="who">Usually a senior associate or partner. Owns the client relationship.</div>
+          <dl>
+            <dt>Initiates</dt>
+            <dd>New contracts, amendments, breach responses, counterparty negotiations.</dd>
+            <dt>Decides</dt>
+            <dt></dt>
+            <dd>Which clauses to flag, what advice to send to client, how to respond to counterparty.</dd>
+            <dt>Is notified</dt>
+            <dd>Covenant breaches, client questions, counterparty markups, payment exceptions.</dd>
+          </dl>
+        </div>
+
+        <div class="actor">
+          <span class="role-tag">Client treasurer</span>
+          <h3>The decision maker</h3>
+          <div class="who">CFO, treasurer, or head of finance at the corporate. Signs and pays.</div>
+          <dl>
+            <dt>Initiates</dt>
+            <dd>Questions, amendment requests, payment confirmations, comments on advisor drafts.</dd>
+            <dt>Decides</dt>
+            <dd>Whether to sign, whether to fund, which option to pick on a breach.</dd>
+            <dt>Is notified</dt>
+            <dd>Payments due, obligations coming up, advisor recommendations, breach decisions.</dd>
+          </dl>
+        </div>
+
+        <div class="actor">
+          <span class="role-tag">Reviewing advisor</span>
+          <h3>The second pair of eyes</h3>
+          <div class="who">Partner reviewing associate's drafts. Read-mostly role.</div>
+          <dl>
+            <dt>Initiates</dt>
+            <dd>Markups and comments on draft clauses. Approvals. Escalations.</dd>
+            <dt>Decides</dt>
+            <dd>Sign-off to send draft to client; sign-off to send to counterparty.</dd>
+            <dt>Is notified</dt>
+            <dd>Draft ready for review, urgent clauses flagged, approval requested.</dd>
+          </dl>
+        </div>
+
+        <div class="actor">
+          <span class="role-tag">Counterparty</span>
+          <h3>The other side</h3>
+          <div class="who">Bank, supplier, or their counsel. May or may not be on Nomos.</div>
+          <dl>
+            <dt>Initiates</dt>
+            <dd>Term sheets, markups, payment notifications, amendment proposals.</dd>
+            <dt>Decides</dt>
+            <dd>Whether to accept proposed terms. Execution.</dd>
+            <dt>Is notified</dt>
+            <dd>Via Nomos link (if onboarded) or e-mail + PDF package (if not).</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================== -->
+  <!-- 02 FIRST PAGE                                              -->
+  <!-- ========================================================== -->
+  <section id="today">
+    <div class="section-head">
+      <div class="num">§ 02</div>
+      <div>
+        <h2 class="section-title">What you always see on the first page</h2>
+        <p class="section-sub">"Today" is the canonical landing surface for every role. Same structure, different emphasis. No KPI grid, no "welcome back" theatre — the first thing on screen should be the single most consequential action of the day.</p>
+      </div>
+    </div>
+
+    <div class="grid-inset">
+      <div class="gutter">Anatomy</div>
+      <div>
+        <div class="anatomy">
+
+          <!-- CLIENT TODAY -->
+          <div class="screen">
+            <div class="screen-label">
+              <span class="name">Client · Today</span>
+              <span class="role">Treasurer lens</span>
+            </div>
+            <div class="screen-body">
+              <div class="annot"><div class="pin">A</div><div class="body"><span class="term">Hero action</span> — the money moving today.<span class="why">"€7,200 due Tuesday" is bigger than anything else on the page. If there's no payment today, this slot shows the next decision needed.</span></div></div>
+              <div class="annot"><div class="pin">B</div><div class="body"><span class="term">Awaiting you</span> — asks from advisors, counterparties, the system.<span class="why">Grouped, not a raw inbox. Each item names the sender and the answer they need.</span></div></div>
+              <div class="annot"><div class="pin">C</div><div class="body"><span class="term">Upcoming obligations</span> — next 30 days.<span class="why">Covenant tests, reporting deadlines, resets. Plain-language labels; §-refs as metadata chips.</span></div></div>
+              <div class="annot"><div class="pin">D</div><div class="body"><span class="term">Active contracts</span> — one row per contract, status spine visible.<span class="why">Click a row to enter the contract's dedicated workspace.</span></div></div>
+              <div class="annot"><div class="pin">E</div><div class="body"><span class="term">Thread preview</span> — latest advisor message.<span class="why">Always visible; never more than two clicks from a reply.</span></div></div>
+            </div>
+          </div>
+
+          <!-- ADVISOR TODAY -->
+          <div class="screen">
+            <div class="screen-label">
+              <span class="name">Advisor · Today</span>
+              <span class="role">Lawyer lens</span>
+            </div>
+            <div class="screen-body">
+              <div class="annot"><div class="pin">A</div><div class="body"><span class="term">Decisions required</span> — what needs YOU before EOD.<span class="why">Each item has a proposed answer; the advisor is approving/adjusting, not authoring from scratch.</span></div></div>
+              <div class="annot"><div class="pin">B</div><div class="body"><span class="term">Client questions</span> — threaded, with context.<span class="why">Preview shows the client's exact wording plus the clause they're asking about.</span></div></div>
+              <div class="annot"><div class="pin">C</div><div class="body"><span class="term">Clauses drifting</span> — covenant monitor, oracle changes.<span class="why">Only items that crossed a threshold since you last checked. Not a dashboard.</span></div></div>
+              <div class="annot"><div class="pin">D</div><div class="body"><span class="term">In review / out for signature</span> — pipeline lanes.<span class="why">Kanban by stage of the contract spine, not by status colour.</span></div></div>
+              <div class="annot"><div class="pin">E</div><div class="body"><span class="term">Peer benchmark sidebar</span> — what other desks are seeing.<span class="why">Anonymised aggregates. Answers "is my client's situation unusual?"</span></div></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================== -->
+  <!-- 03 FLOWS                                                   -->
+  <!-- ========================================================== -->
+  <section id="flows">
+    <div class="section-head">
+      <div class="num">§ 03</div>
+      <div>
+        <h2 class="section-title">Four core workflows, end-to-end</h2>
+        <p class="section-sub">Read left → right. Each lane is an actor; each node is one surface in the product. Arrows are triggers (what makes the next step happen).</p>
+      </div>
+    </div>
+
+    <div class="grid-inset">
+      <div class="gutter">Swim lanes</div>
+      <div>
+
+        <!-- FLOW A: NEW CONTRACT -->
+        <div class="flow">
+          <h3>A · New contract — advisor-initiated</h3>
+          <p class="sub">From engagement letter to executed agreement. The most common origination path.</p>
+          <svg viewBox="0 0 1180 360" width="100%" height="360" xmlns="http://www.w3.org/2000/svg">
+            <!-- Lane backgrounds -->
+            <rect x="0" y="30" width="1180" height="80" fill="#EFE8DB" opacity=".5"/>
+            <rect x="0" y="190" width="1180" height="80" fill="#EFE8DB" opacity=".5"/>
+            <!-- Lane rules -->
+            <line x1="0" y1="30" x2="1180" y2="30" stroke="#D9D1BE"/>
+            <line x1="0" y1="110" x2="1180" y2="110" stroke="#D9D1BE"/>
+            <line x1="0" y1="190" x2="1180" y2="190" stroke="#D9D1BE"/>
+            <line x1="0" y1="270" x2="1180" y2="270" stroke="#D9D1BE"/>
+            <line x1="0" y1="350" x2="1180" y2="350" stroke="#D9D1BE"/>
+
+            <!-- Lane labels -->
+            <text x="14" y="22" class="lane-label">Lead advisor</text>
+            <text x="14" y="102" class="lane-label">Reviewing advisor</text>
+            <text x="14" y="182" class="lane-label">Client treasurer</text>
+            <text x="14" y="262" class="lane-label">Counterparty</text>
+
+            <!-- Step 1: Advisor drafts -->
+            <g transform="translate(140,45)">
+              <rect width="150" height="50" rx="5" fill="#FBF7EE" stroke="#2E2A22" stroke-width="1.5"/>
+              <text x="12" y="20" class="step-title">Drafts contract</text>
+              <text x="12" y="38" class="step-meta">Clause builder</text>
+            </g>
+
+            <!-- Step 2: Reviewing advisor -->
+            <g transform="translate(330,125)">
+              <rect width="150" height="50" rx="5" fill="#FBF7EE" stroke="#B8853A" stroke-width="1.5"/>
+              <text x="12" y="20" class="step-title">Reviews &amp; marks up</text>
+              <text x="12" y="38" class="step-meta">Review queue</text>
+            </g>
+
+            <!-- Step 3: Advisor sends to client -->
+            <g transform="translate(520,45)">
+              <rect width="150" height="50" rx="5" fill="#FBF7EE" stroke="#2E2A22" stroke-width="1.5"/>
+              <text x="12" y="20" class="step-title">Sends to client</text>
+              <text x="12" y="38" class="step-meta">With plain-lang summary</text>
+            </g>
+
+            <!-- Step 4: Client reviews -->
+            <g transform="translate(520,205)">
+              <rect width="150" height="50" rx="5" fill="#FBF7EE" stroke="#2E2A22" stroke-width="1.5"/>
+              <text x="12" y="20" class="step-title">Reviews contract</text>
+              <text x="12" y="38" class="step-meta">Contract workspace</text>
+            </g>
+
+            <!-- Step 5: Client comments/approves -->
+            <g transform="translate(710,205)">
+              <rect width="150" height="50" rx="5" fill="#FBF7EE" stroke="#2E2A22" stroke-width="1.5"/>
+              <text x="12" y="20" class="step-title">Comments / approves</text>
+              <text x="12" y="38" class="step-meta">Inline thread</text>
+            </g>
+
+            <!-- Step 6: Advisor sends to counterparty -->
+            <g transform="translate(900,45)">
+              <rect width="150" height="50" rx="5" fill="#FBF7EE" stroke="#2E2A22" stroke-width="1.5"/>
+              <text x="12" y="20" class="step-title">To counterparty</text>
+              <text x="12" y="38" class="step-meta">Nomos link or PDF</text>
+            </g>
+
+            <!-- Step 7: Counterparty signs -->
+            <g transform="translate(900,285)">
+              <rect width="150" height="50" rx="5" fill="#FBF7EE" stroke="#4E6A3A" stroke-width="1.5"/>
+              <text x="12" y="20" class="step-title">Executes</text>
+              <text x="12" y="38" class="step-meta">Signing ceremony</text>
+            </g>
+
+            <!-- Arrows -->
+            <defs>
+              <marker id="arrA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+                <path d="M0,0 L10,5 L0,10 z" fill="#6B6456"/>
+              </marker>
+            </defs>
+
+            <!-- 1→2 -->
+            <path d="M 290,70 L 330,70 L 330,150 L 330,150" fill="none" stroke="#6B6456" stroke-width="1.3" marker-end="url(#arrA)"/>
+            <text x="296" y="62" class="trigger">Request review</text>
+
+            <!-- 2→3 -->
+            <path d="M 480,150 L 520,150 L 520,95" fill="none" stroke="#6B6456" stroke-width="1.3" marker-end="url(#arrA)"/>
+            <text x="484" y="142" class="trigger">Approved</text>
+
+            <!-- 3→4 -->
+            <path d="M 595,95 L 595,205" fill="none" stroke="#6B6456" stroke-width="1.3" marker-end="url(#arrA)"/>
+            <text x="600" y="148" class="trigger">Shared</text>
+
+            <!-- 4→5 -->
+            <path d="M 670,230 L 710,230" fill="none" stroke="#6B6456" stroke-width="1.3" marker-end="url(#arrA)"/>
+
+            <!-- 5→6 -->
+            <path d="M 860,230 L 900,230 L 900,95" fill="none" stroke="#6B6456" stroke-width="1.3" marker-end="url(#arrA)"/>
+            <text x="868" y="222" class="trigger">Client approved</text>
+
+            <!-- 6→7 -->
+            <path d="M 975,95 L 975,285" fill="none" stroke="#6B6456" stroke-width="1.3" marker-end="url(#arrA)"/>
+            <text x="982" y="170" class="trigger">Sent</text>
+
+            <!-- Executed loop-back -->
+            <path d="M 900,310 L 760,310 L 760,205" fill="none" stroke="#6B6456" stroke-width="1.3" stroke-dasharray="3,3" marker-end="url(#arrA)"/>
+            <text x="762" y="302" class="trigger">Executed copy back</text>
+          </svg>
+        </div>
+
+        <!-- FLOW B: PAYMENT CYCLE -->
+        <div class="flow">
+          <h3>B · Payment cycle — system-initiated</h3>
+          <p class="sub">Recurring obligation. The system computes, the client confirms. The advisor only sees it if something is off.</p>
+          <svg viewBox="0 0 1180 360" width="100%" height="360" xmlns="http://www.w3.org/2000/svg">
+            <rect x="0" y="30" width="1180" height="80" fill="#EFE8DB" opacity=".5"/>
+            <rect x="0" y="190" width="1180" height="80" fill="#EFE8DB" opacity=".5"/>
+            <line x1="0" y1="30" x2="1180" y2="30" stroke="#D9D1BE"/>
+            <line x1="0" y1="110" x2="1180" y2="110" stroke="#D9D1BE"/>
+            <line x1="0" y1="190" x2="1180" y2="190" stroke="#D9D1BE"/>
+            <line x1="0" y1="270" x2="1180" y2="270" stroke="#D9D1BE"/>
+            <line x1="0" y1="350" x2="1180" y2="350" stroke="#D9D1BE"/>
+
+            <text x="14" y="22" class="lane-label">Nomos system</text>
+            <text x="14" y="102" class="lane-label">Lead advisor</text>
+            <text x="14" y="182" class="lane-label">Client treasurer</text>
+            <text x="14" y="262" class="lane-label">Counterparty (bank)</text>
+
+            <g transform="translate(100,45)">
+              <rect width="160" height="50" rx="5" fill="#FBF7EE" stroke="#B8853A" stroke-width="1.5"/>
+              <text x="12" y="20" class="step-title">Reads oracle rates</text>
+              <text x="12" y="38" class="step-meta">T-5 business days</text>
+            </g>
+
+            <g transform="translate(300,45)">
+              <rect width="150" height="50" rx="5" fill="#FBF7EE" stroke="#B8853A" stroke-width="1.5"/>
+              <text x="12" y="20" class="step-title">Computes net flow</text>
+              <text x="12" y="38" class="step-meta">Fixed − floating</text>
+            </g>
+
+            <g transform="translate(490,205)">
+              <rect width="160" height="50" rx="5" fill="#FBF7EE" stroke="#2E2A22" stroke-width="1.5"/>
+              <text x="12" y="20" class="step-title">"€7,200 due Tue"</text>
+              <text x="12" y="38" class="step-meta">Today hero card</text>
+            </g>
+
+            <g transform="translate(690,205)">
+              <rect width="160" height="50" rx="5" fill="#FBF7EE" stroke="#2E2A22" stroke-width="1.5"/>
+              <text x="12" y="20" class="step-title">Taps "Show math"</text>
+              <text x="12" y="38" class="step-meta">Breakdown modal</text>
+            </g>
+
+            <g transform="translate(890,205)">
+              <rect width="150" height="50" rx="5" fill="#FBF7EE" stroke="#4E6A3A" stroke-width="1.5"/>
+              <text x="12" y="20" class="step-title">Confirms &amp; wires</text>
+              <text x="12" y="38" class="step-meta">Bank integration</text>
+            </g>
+
+            <g transform="translate(890,285)">
+              <rect width="150" height="50" rx="5" fill="#FBF7EE" stroke="#4E6A3A" stroke-width="1.5"/>
+              <text x="12" y="20" class="step-title">Acks payment</text>
+              <text x="12" y="38" class="step-meta">SWIFT / API</text>
+            </g>
+
+            <!-- Exception -->
+            <g transform="translate(690,125)">
+              <rect width="160" height="50" rx="5" fill="#FBF7EE" stroke="#A8442A" stroke-width="1.5" stroke-dasharray="4,3"/>
+              <text x="12" y="20" class="step-title">If mismatch: flagged</text>
+              <text x="12" y="38" class="step-meta">Decision required</text>
+            </g>
+
+            <defs>
+              <marker id="arrB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+                <path d="M0,0 L10,5 L0,10 z" fill="#6B6456"/>
+              </marker>
+              <marker id="arrBred" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+                <path d="M0,0 L10,5 L0,10 z" fill="#A8442A"/>
+              </marker>
+            </defs>
+
+            <path d="M 260,70 L 300,70" fill="none" stroke="#6B6456" stroke-width="1.3" marker-end="url(#arrB)"/>
+            <path d="M 450,70 L 490,70 L 490,205" fill="none" stroke="#6B6456" stroke-width="1.3" marker-end="url(#arrB)"/>
+            <text x="456" y="62" class="trigger">Notify client</text>
+            <path d="M 650,230 L 690,230" fill="none" stroke="#6B6456" stroke-width="1.3" marker-end="url(#arrB)"/>
+            <path d="M 850,230 L 890,230" fill="none" stroke="#6B6456" stroke-width="1.3" marker-end="url(#arrB)"/>
+            <path d="M 965,255 L 965,285" fill="none" stroke="#6B6456" stroke-width="1.3" marker-end="url(#arrB)"/>
+            <path d="M 890,310 L 570,310 L 570,255" fill="none" stroke="#6B6456" stroke-width="1.3" stroke-dasharray="3,3" marker-end="url(#arrB)"/>
+            <text x="590" y="302" class="trigger">Settled — closes loop</text>
+
+            <path d="M 450,95 L 770,95 L 770,125" fill="none" stroke="#A8442A" stroke-width="1.3" marker-end="url(#arrBred)"/>
+            <text x="456" y="90" class="trigger" style="fill:#A8442A">On anomaly</text>
+          </svg>
+        </div>
+
+        <!-- FLOW C: BREACH -->
+        <div class="flow">
+          <h3>C · Covenant breach — system-detected</h3>
+          <p class="sub">Oracle input changes. System alerts advisor first (triage), advisor frames decision for client.</p>
+          <svg viewBox="0 0 1180 360" width="100%" height="360" xmlns="http://www.w3.org/2000/svg">
+            <rect x="0" y="30" width="1180" height="80" fill="#EFE8DB" opacity=".5"/>
+            <rect x="0" y="190" width="1180" height="80" fill="#EFE8DB" opacity=".5"/>
+            <line x1="0" y1="30" x2="1180" y2="30" stroke="#D9D1BE"/>
+            <line x1="0" y1="110" x2="1180" y2="110" stroke="#D9D1BE"/>
+            <line x1="0" y1="190" x2="1180" y2="190" stroke="#D9D1BE"/>
+            <line x1="0" y1="270" x2="1180" y2="270" stroke="#D9D1BE"/>
+            <line x1="0" y1="350" x2="1180" y2="350" stroke="#D9D1BE"/>
+
+            <text x="14" y="22" class="lane-label">Nomos system</text>
+            <text x="14" y="102" class="lane-label">Lead advisor</text>
+            <text x="14" y="182" class="lane-label">Client treasurer</text>
+            <text x="14" y="262" class="lane-label">Counterparty</text>
+
+            <g transform="translate(100,45)">
+              <rect width="160" height="50" rx="5" fill="#FBF7EE" stroke="#A8442A" stroke-width="1.5"/>
+              <text x="12" y="20" class="step-title">Ratio breaches test</text>
+              <text x="12" y="38" class="step-meta">EBITDA/Debt &gt; 4.5×</text>
+            </g>
+
+            <g transform="translate(300,125)">
+              <rect width="160" height="50" rx="5" fill="#FBF7EE" stroke="#A8442A" stroke-width="1.5"/>
+              <text x="12" y="20" class="step-title">Amber alert</text>
+              <text x="12" y="38" class="step-meta">Advisor's Today</text>
+            </g>
+
+            <g transform="translate(490,125)">
+              <rect width="160" height="50" rx="5" fill="#FBF7EE" stroke="#2E2A22" stroke-width="1.5"/>
+              <text x="12" y="20" class="step-title">Decision package</text>
+              <text x="12" y="38" class="step-meta">3 options + benchmark</text>
+            </g>
+
+            <g transform="translate(680,125)">
+              <rect width="160" height="50" rx="5" fill="#FBF7EE" stroke="#2E2A22" stroke-width="1.5"/>
+              <text x="12" y="20" class="step-title">Picks recommendation</text>
+              <text x="12" y="38" class="step-meta">With rationale note</text>
+            </g>
+
+            <g transform="translate(680,205)">
+              <rect width="160" height="50" rx="5" fill="#FBF7EE" stroke="#2E2A22" stroke-width="1.5"/>
+              <text x="12" y="20" class="step-title">Review &amp; approve</text>
+              <text x="12" y="38" class="step-meta">Plain-language brief</text>
+            </g>
+
+            <g transform="translate(880,125)">
+              <rect width="160" height="50" rx="5" fill="#FBF7EE" stroke="#2E2A22" stroke-width="1.5"/>
+              <text x="12" y="20" class="step-title">Sends waiver request</text>
+              <text x="12" y="38" class="step-meta">With exhibits</text>
+            </g>
+
+            <g transform="translate(880,285)">
+              <rect width="160" height="50" rx="5" fill="#FBF7EE" stroke="#4E6A3A" stroke-width="1.5"/>
+              <text x="12" y="20" class="step-title">Responds</text>
+              <text x="12" y="38" class="step-meta">Accept / negotiate</text>
+            </g>
+
+            <defs>
+              <marker id="arrC" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+                <path d="M0,0 L10,5 L0,10 z" fill="#6B6456"/>
+              </marker>
+            </defs>
+
+            <path d="M 260,70 L 300,70 L 300,125" fill="none" stroke="#6B6456" stroke-width="1.3" marker-end="url(#arrC)"/>
+            <text x="266" y="62" class="trigger">Detected</text>
+            <path d="M 460,150 L 490,150" fill="none" stroke="#6B6456" stroke-width="1.3" marker-end="url(#arrC)"/>
+            <path d="M 650,150 L 680,150" fill="none" stroke="#6B6456" stroke-width="1.3" marker-end="url(#arrC)"/>
+            <path d="M 760,175 L 760,205" fill="none" stroke="#6B6456" stroke-width="1.3" marker-end="url(#arrC)"/>
+            <text x="766" y="196" class="trigger">Brief for client</text>
+            <path d="M 840,230 L 955,230 L 955,175" fill="none" stroke="#6B6456" stroke-width="1.3" marker-end="url(#arrC)"/>
+            <text x="848" y="222" class="trigger">Client approved</text>
+            <path d="M 955,175 L 955,150 L 955,175" fill="none" stroke="#6B6456" stroke-width="0"/>
+            <path d="M 955,175 L 955,285" fill="none" stroke="#6B6456" stroke-width="1.3" stroke-dasharray="3,3" marker-end="url(#arrC)"/>
+          </svg>
+        </div>
+
+        <!-- FLOW D: AMENDMENT -->
+        <div class="flow">
+          <h3>D · Amendment request — client-initiated</h3>
+          <p class="sub">Client asks, advisor drafts, counterparty signs. The only flow where the client is the starting actor.</p>
+          <svg viewBox="0 0 1180 360" width="100%" height="360" xmlns="http://www.w3.org/2000/svg">
+            <rect x="0" y="30" width="1180" height="80" fill="#EFE8DB" opacity=".5"/>
+            <rect x="0" y="190" width="1180" height="80" fill="#EFE8DB" opacity=".5"/>
+            <line x1="0" y1="30" x2="1180" y2="30" stroke="#D9D1BE"/>
+            <line x1="0" y1="110" x2="1180" y2="110" stroke="#D9D1BE"/>
+            <line x1="0" y1="190" x2="1180" y2="190" stroke="#D9D1BE"/>
+            <line x1="0" y1="270" x2="1180" y2="270" stroke="#D9D1BE"/>
+            <line x1="0" y1="350" x2="1180" y2="350" stroke="#D9D1BE"/>
+
+            <text x="14" y="22" class="lane-label">Client treasurer</text>
+            <text x="14" y="102" class="lane-label">Lead advisor</text>
+            <text x="14" y="182" class="lane-label">Reviewing advisor</text>
+            <text x="14" y="262" class="lane-label">Counterparty</text>
+
+            <g transform="translate(100,45)">
+              <rect width="160" height="50" rx="5" fill="#FBF7EE" stroke="#2E2A22" stroke-width="1.5"/>
+              <text x="12" y="20" class="step-title">Asks a question</text>
+              <text x="12" y="38" class="step-meta">Inline on clause</text>
+            </g>
+
+            <g transform="translate(300,125)">
+              <rect width="160" height="50" rx="5" fill="#FBF7EE" stroke="#2E2A22" stroke-width="1.5"/>
+              <text x="12" y="20" class="step-title">Triages &amp; replies</text>
+              <text x="12" y="38" class="step-meta">Proposes amendment</text>
+            </g>
+
+            <g transform="translate(490,45)">
+              <rect width="160" height="50" rx="5" fill="#FBF7EE" stroke="#2E2A22" stroke-width="1.5"/>
+              <text x="12" y="20" class="step-title">Accepts proposal</text>
+              <text x="12" y="38" class="step-meta">One-click approval</text>
+            </g>
+
+            <g transform="translate(680,125)">
+              <rect width="160" height="50" rx="5" fill="#FBF7EE" stroke="#2E2A22" stroke-width="1.5"/>
+              <text x="12" y="20" class="step-title">Drafts amendment</text>
+              <text x="12" y="38" class="step-meta">Redline vs original</text>
+            </g>
+
+            <g transform="translate(680,205)">
+              <rect width="160" height="50" rx="5" fill="#FBF7EE" stroke="#B8853A" stroke-width="1.5"/>
+              <text x="12" y="20" class="step-title">Partner review</text>
+              <text x="12" y="38" class="step-meta">Approves / marks up</text>
+            </g>
+
+            <g transform="translate(880,285)">
+              <rect width="160" height="50" rx="5" fill="#FBF7EE" stroke="#4E6A3A" stroke-width="1.5"/>
+              <text x="12" y="20" class="step-title">Countersigns</text>
+              <text x="12" y="38" class="step-meta">Signing ceremony</text>
+            </g>
+
+            <defs>
+              <marker id="arrD" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+                <path d="M0,0 L10,5 L0,10 z" fill="#6B6456"/>
+              </marker>
+            </defs>
+
+            <path d="M 260,70 L 300,70 L 300,125" fill="none" stroke="#6B6456" stroke-width="1.3" marker-end="url(#arrD)"/>
+            <path d="M 460,150 L 570,150 L 570,95 L 570,95 L 490,95" fill="none" stroke="#6B6456" stroke-width="1.3" marker-end="url(#arrD)"/>
+            <text x="466" y="142" class="trigger">Reply + proposal</text>
+            <path d="M 650,70 L 680,70 L 680,125" fill="none" stroke="#6B6456" stroke-width="1.3" marker-end="url(#arrD)"/>
+            <text x="656" y="62" class="trigger">Approved</text>
+            <path d="M 760,175 L 760,205" fill="none" stroke="#6B6456" stroke-width="1.3" marker-end="url(#arrD)"/>
+            <path d="M 840,230 L 960,230 L 960,285" fill="none" stroke="#6B6456" stroke-width="1.3" marker-end="url(#arrD)"/>
+            <text x="848" y="222" class="trigger">Signed → sent</text>
+            <path d="M 880,310 L 180,310 L 180,95" fill="none" stroke="#6B6456" stroke-width="1.3" stroke-dasharray="3,3" marker-end="url(#arrD)"/>
+            <text x="200" y="302" class="trigger">Client confirmation &amp; new copy</text>
+          </svg>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================== -->
+  <!-- 04 COMMUNICATION MATRIX                                    -->
+  <!-- ========================================================== -->
+  <section id="comms">
+    <div class="section-head">
+      <div class="num">§ 04</div>
+      <div>
+        <h2 class="section-title">How people talk to each other</h2>
+        <p class="section-sub">Every conversation is anchored to a contract and a clause. There is no general "inbox" — messages live where the work is.</p>
+      </div>
+    </div>
+
+    <div class="grid-inset">
+      <div class="gutter">Matrix</div>
+      <div class="matrix">
+        <table>
+          <thead>
+            <tr>
+              <th></th>
+              <th>→ Client treasurer</th>
+              <th>→ Lead advisor</th>
+              <th>→ Reviewing advisor</th>
+              <th>→ Counterparty</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Client</td>
+              <td>—</td>
+              <td>
+                <span class="surface">Inline thread</span><span class="surface">Comment on clause</span>
+                <div class="d">Questions are posted on the clause they're about. Advisor sees them in context, not in a flat inbox. <em>"Why is my rate resetting at 3.72%?"</em></div>
+              </td>
+              <td>
+                <div class="d"><em>Never directly.</em> Reviewing advisor is a back-office role; client-visible replies always come from the lead.</div>
+              </td>
+              <td>
+                <span class="surface">Via advisor only</span>
+                <div class="d">Client never messages counterparty through Nomos. The advisor is the channel.</div>
+              </td>
+            </tr>
+            <tr>
+              <td>Lead advisor</td>
+              <td>
+                <span class="surface">Briefing</span><span class="surface">Decision package</span><span class="surface">Thread reply</span>
+                <div class="d">Advisor answers in plain language + §-ref as metadata. Long-form briefings attach to the contract, not the thread.</div>
+              </td>
+              <td>—</td>
+              <td>
+                <span class="surface">Request review</span><span class="surface">@mention</span>
+                <div class="d">Draft lands in reviewing advisor's queue with a specific ask. Can @mention on individual clauses for a second opinion without full review.</div>
+              </td>
+              <td>
+                <span class="surface">Sent package</span><span class="surface">Redline round</span>
+                <div class="d">If counterparty is on Nomos: shared workspace. If not: PDF + magic link, their markups come back as a diff.</div>
+              </td>
+            </tr>
+            <tr>
+              <td>Reviewing advisor</td>
+              <td>
+                <div class="d"><em>Never directly.</em> Comments route through the lead.</div>
+              </td>
+              <td>
+                <span class="surface">Markup</span><span class="surface">Approval</span><span class="surface">Escalation note</span>
+                <div class="d">Markups are clause-level. Approval is one button; escalation opens a note requiring lead's attention before sending.</div>
+              </td>
+              <td>—</td>
+              <td>
+                <div class="d"><em>Never directly.</em> Internal role only.</div>
+              </td>
+            </tr>
+            <tr>
+              <td>Counterparty</td>
+              <td>
+                <div class="d"><em>Never directly.</em> Client sees counterparty output (signed copy, payment notice) but not their messages.</div>
+              </td>
+              <td>
+                <span class="surface">Redline</span><span class="surface">Term sheet</span><span class="surface">Payment ack</span>
+                <div class="d">If on Nomos: native threads. If off: email ingested + parsed into the same thread view.</div>
+              </td>
+              <td>
+                <div class="d"><em>Never directly.</em></div>
+              </td>
+              <td>—</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="grid-inset" style="margin-top: 32px;">
+      <div class="gutter">Principles</div>
+      <div>
+        <ol style="margin: 0; padding-left: 20px; font-family: var(--serif); font-size: 16px; line-height: 1.55; color: var(--ink-2);">
+          <li style="margin-bottom: 10px;"><strong>One contract, one thread space.</strong> All messages about a contract live on that contract. The advisor's "Today" is a projection across contracts, not a parallel inbox.</li>
+          <li style="margin-bottom: 10px;"><strong>Comments anchor to clauses.</strong> A question about §4(a)(ii) lives on §4(a)(ii). Context is never lost.</li>
+          <li style="margin-bottom: 10px;"><strong>Client never talks to counterparty.</strong> Every external message is advisor-mediated, even if the advisor is just forwarding.</li>
+          <li style="margin-bottom: 10px;"><strong>Reviewing advisor is invisible to client.</strong> Internal review happens without the client ever seeing the back-and-forth.</li>
+          <li><strong>System speaks via advisor for legal matters, directly for operational ones.</strong> Breach detection → goes to advisor. Payment due → goes to client. Never reversed.</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================== -->
+  <!-- 05 CLICK MAP                                               -->
+  <!-- ========================================================== -->
+  <section id="clickmap">
+    <div class="section-head">
+      <div class="num">§ 05</div>
+      <div>
+        <h2 class="section-title">Where you can click — annotated</h2>
+        <p class="section-sub">The client's Today page, with every hit target numbered. Use this when checking that a flow is reachable in ≤ 2 clicks from landing.</p>
+      </div>
+    </div>
+
+    <div class="grid-inset">
+      <div class="gutter">Click map</div>
+      <div class="clickmap">
+        <div class="cm-head">
+          <span class="name">Client · Today</span>
+          <span class="meta">24 click targets</span>
+        </div>
+        <div class="cm-body">
+
+          <div class="cm-mock">
+            <div class="mocktop">
+              <span class="pin-abs">01</span>
+              <div class="brand">Nomos</div>
+              <div class="nav">
+                <span>Today</span><span>Contracts</span><span>Documents</span><span>Library</span>
+              </div>
+              <div class="user">RW ▾</div>
+            </div>
+
+            <div class="hero-card">
+              <div class="dn">Due Tuesday · Swap with Bank of Munich</div>
+              <div class="amt">€7,200.00</div>
+              <span class="cta">Review &amp; pay</span>
+              <span class="pin-abs" style="left:-14px; top:30px;">02</span>
+              <span class="pin-abs" style="left:auto; right:-14px; top:50%; transform:translate(100%, -50%);">03</span>
+            </div>
+
+            <div class="mockrow">
+              <span class="pin-abs">04</span>
+              <span class="title">Advisor requires: approve swap amendment</span>
+              <span class="jg">§5(b)</span>
+              <span class="chip">1 day left</span>
+            </div>
+
+            <div class="mockrow">
+              <span class="pin-abs">05</span>
+              <span class="title">Q3 financial statements — upload due</span>
+              <span class="jg">§4(a)(ii)</span>
+              <span class="chip">Overdue</span>
+            </div>
+
+            <div class="mockrow">
+              <span class="pin-abs">06</span>
+              <span class="title">Revolving credit — covenant test Mar 31</span>
+              <span class="jg">§6.1</span>
+            </div>
+
+            <div class="mockrow">
+              <span class="pin-abs">07</span>
+              <span class="title">Ana Costa replied on "Reset date mechanics"</span>
+              <span class="jg">§2(c)</span>
+            </div>
+          </div>
+
+          <div class="cm-legend">
+            <h4>What each pin does</h4>
+            <div class="legend-row"><div class="num">01</div><div><span class="term">Top nav · Today</span><div class="what">The home. Returns from any contract.</div></div></div>
+            <div class="legend-row"><div class="num">02</div><div><span class="term">Hero card body</span><div class="what">Opens payment breakdown — fixed leg, floating leg, netting math.</div></div></div>
+            <div class="legend-row"><div class="num">03</div><div><span class="term">Review &amp; pay</span><div class="what">Primary CTA. Confirmation flow → wire.</div></div></div>
+            <div class="legend-row"><div class="num">04</div><div><span class="term">Amendment ask</span><div class="what">Opens the amendment with a plain-language brief + advisor's recommendation.</div></div></div>
+            <div class="legend-row"><div class="num">05</div><div><span class="term">Upload obligation</span><div class="what">Drag-and-drop for financial statements. Auto-flags the obligation as satisfied.</div></div></div>
+            <div class="legend-row"><div class="num">06</div><div><span class="term">Upcoming obligation</span><div class="what">Opens contract → §6.1 with full test definition and last result.</div></div></div>
+            <div class="legend-row"><div class="num">07</div><div><span class="term">Thread preview</span><div class="what">Opens inline thread anchored to §2(c). Reply without leaving context.</div></div></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="closing">
+    <div class="eyebrow">Close</div>
+    <div>
+      <p>The product's shape is: <em>one contract object, two lenses, clause-anchored conversations, advisor-mediated externals, system-initiated operational events.</em> If a new feature can't be placed on this map, it probably belongs on a different map.</p>
+      <p style="margin-top: 18px;"><a class="ret" href="index.html">← Back to the prototype</a></p>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,2 @@
+{"as_of": "2026-04-28", "attestation_id": "2421a005-f943-4eb0-b21a-7742427683b7", "attestations_created": 1, "collected_metrics": ["ESTR"], "indeterminate_rules": 0, "missing_metrics": [], "source_failures": 0, "trigger_event_ids": [], "triggers_emitted": 0}
+{"as_of": "2026-04-29", "attestation_id": null, "attestations_created": 0, "collected_metrics": [], "indeterminate_rules": 0, "missing_metrics": ["ESTR"], "source_failures": 1, "trigger_event_ids": [], "triggers_emitted": 0}

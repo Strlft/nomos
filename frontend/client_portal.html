@@ -1,1724 +1,1090 @@
-<!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Nomos · Client</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
-<style>
-:root{
-  --bg:#08090c;--s1:#0e1013;--s2:#141618;--s3:#1a1d21;
-  --b0:rgba(255,255,255,.06);--b1:rgba(255,255,255,.11);--b2:rgba(255,255,255,.18);
-  --warm:#c4956a;--warm2:#a07350;--wBg:rgba(196,149,106,.07);
-  --g:#4ade80;   --gBg:rgba(74,222,128,.07);
-  --r:#f87171;   --rBg:rgba(248,113,113,.07);
-  --bl:#60a5fa;  --blBg:rgba(96,165,250,.07);
-  --vi:#a78bfa;  --viBg:rgba(167,139,250,.07);
-  --gy:#6b7280;  --gyBg:rgba(107,114,128,.07);
-  --t1:#e4e4e7;--t2:#8b8d94;--t3:#44464d;
-  --ff:'Inter',system-ui,sans-serif;
-  --fm:'JetBrains Mono',monospace;
-  --rad:12px;
-  --trans:.18s ease;
-}
-*{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;overflow:hidden}
-body{background:var(--bg);color:var(--t1);font-family:var(--ff);font-size:13px;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
-::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--b1);border-radius:2px}
+<!doctype html>
+<html lang="en" data-theme="light" data-jargon="meta">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nomos · Client</title>
+  <link rel="stylesheet" href="/static/assets/nomos.css">
+  <style>
+    /* Page-local layout only. All component styles come from nomos.css. */
+    html, body { overflow: hidden; }
+    .shell { display: flex; height: 100vh; overflow: hidden; }
+    .sidebar { width: 210px; flex-shrink: 0; padding: 24px 0; display: flex; flex-direction: column; border-right: 1px solid var(--hair); background: var(--paper); }
+    .side-group { padding: 14px 22px 4px; }
+    .side-group .label { color: var(--ink-4); }
+    .side-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 22px; font-size: 13.5px; color: var(--ink-2); cursor: pointer; border-left: 2px solid transparent; transition: background .12s, color .12s, border-color .12s; }
+    .side-item:hover { background: var(--paper-2); color: var(--ink); }
+    .side-item.on { color: var(--ink); background: var(--paper-2); border-left-color: var(--ochre); font-weight: 500; }
+    .side-item .badge { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); }
+    .side-foot { margin-top: auto; padding: 16px 22px; border-top: 1px solid var(--hair); font-size: 11.5px; color: var(--ink-3); line-height: 1.7; }
+    .main { flex: 1; overflow-y: auto; background: var(--paper); }
+    .demo-banner { display: none; padding: 9px 28px; background: var(--ochre-bg); color: var(--ochre); font-size: 12.5px; border-bottom: 1px solid var(--hair); }
+    .demo-banner.on { display: block; }
+    .page { max-width: 1100px; margin: 0 auto; padding: 32px 36px 96px; }
+    .page-h { display: grid; grid-template-columns: 1fr auto; gap: 18px; align-items: end; padding: 28px 0 20px; border-bottom: 1px solid var(--hair); margin-bottom: 28px; }
+    .page-h .num { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); }
+    .page-h h1 { font-family: var(--display); font-weight: 400; font-size: 56px; letter-spacing: -.02em; line-height: 1; margin: 8px 0 12px; }
+    .page-h .lede { font-family: var(--display); font-size: 17px; line-height: 1.5; color: var(--ink-2); max-width: 640px; }
+    .stack { display: flex; flex-direction: column; gap: 22px; }
+    .hero-para { font-family: var(--display); font-size: 21px; line-height: 1.45; color: var(--ink); max-width: 720px; padding: 4px 0 8px; }
+    .dp-tile { padding: 18px 22px; border: 1px solid var(--hair); border-radius: var(--r-md); background: var(--paper); display: flex; flex-direction: column; gap: 4px; }
+    .dp-tile .dp-value { font-family: var(--display); font-size: 30px; letter-spacing: -.01em; color: var(--ink); line-height: 1.05; margin: 4px 0 8px; }
+    .quick-links { display: flex; gap: 10px; flex-wrap: wrap; }
+    .tabs { display: flex; border-bottom: 1px solid var(--hair); margin-bottom: 22px; }
+    .tab { padding: 10px 16px; cursor: pointer; font-size: 13px; color: var(--ink-3); background: transparent; border: 0; border-bottom: 2px solid transparent; transition: color .15s, border-color .15s; }
+    .tab:hover { color: var(--ink); }
+    .tab.on { color: var(--ink); border-bottom-color: var(--ochre); font-weight: 500; }
+    .kv { display: grid; grid-template-columns: 180px 1fr; gap: 8px 16px; font-size: 13px; color: var(--ink-2); }
+    .kv dt { color: var(--ink-3); font-family: var(--mono); font-size: 11px; letter-spacing: .04em; padding-top: 2px; text-transform: uppercase; }
+    .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 20px; max-width: 720px; }
+    .profile-grid .full { grid-column: 1 / -1; }
+    .pdf-frame { width: 100%; height: 460px; border: 1px solid var(--hair); border-radius: var(--r-sm); background: var(--card); }
+    .id-cell { font-family: var(--mono); color: var(--ochre); cursor: pointer; }
+    .detail-back { background: transparent; border: 0; cursor: pointer; font-family: var(--mono); font-size: 11px; color: var(--ink-3); letter-spacing: .04em; text-transform: uppercase; padding: 4px 0 0; }
+    .detail-back:hover { color: var(--ink); }
+    @media (max-width: 860px) { .sidebar { display: none; } .page { padding: 22px 18px 80px; } .profile-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
 
-/* ── Top bar ── */
-.top{
-  height:54px;display:flex;align-items:center;justify-content:space-between;
-  padding:0 28px;border-bottom:1px solid var(--b0);flex-shrink:0;
-}
-.top-l{display:flex;align-items:center;gap:10px}
-.logo-mark{
-  width:28px;height:28px;border-radius:7px;flex-shrink:0;
-  background:linear-gradient(140deg,#c4956a,#a07350);
-  display:flex;align-items:center;justify-content:center;
-  font-family:var(--fm);font-weight:600;font-size:13px;color:#fff;
-  box-shadow:0 0 0 1px rgba(196,149,106,.25);
-}
-.logo-name{font-weight:600;font-size:14px;letter-spacing:-.2px}
-.role-pill{
-  padding:2px 9px;border-radius:20px;
-  background:var(--wBg);color:var(--warm);
-  border:1px solid rgba(196,149,106,.22);
-  font-size:10px;font-weight:500;font-family:var(--fm);
-  margin-left:4px;
-}
-.top-sep{width:1px;height:16px;background:var(--b1);margin:0 4px}
-.top-user{font-size:11px;color:var(--t2)}
-.top-r{display:flex;align-items:center;gap:18px;font-size:11px;color:var(--t3)}
-.status-dot{
-  display:inline-flex;align-items:center;gap:5px;
-  padding:3px 9px;border-radius:20px;border:1px solid var(--b0);
-  font-size:10px;font-family:var(--fm);transition:all var(--trans);
-}
-.status-dot.live{color:var(--g);border-color:rgba(74,222,128,.2);background:var(--gBg)}
-.status-dot.offline{color:var(--r);border-color:rgba(248,113,113,.2);background:var(--rBg)}
-.dot{width:6px;height:6px;border-radius:50%;background:currentColor}
-.top-clock{font-family:var(--fm);font-size:10px;color:var(--t3)}
-.sign-out{
-  font-size:10px;color:var(--t3);cursor:pointer;
-  padding:4px 10px;border-radius:6px;border:1px solid transparent;
-  transition:all var(--trans);
-}
-.sign-out:hover{color:var(--t1);border-color:var(--b1);background:var(--b0)}
-
-/* ── Layout ── */
-.wrap{flex:1;display:flex;overflow:hidden}
-.side{
-  width:210px;padding:20px 0;flex-shrink:0;
-  display:flex;flex-direction:column;border-right:1px solid var(--b0);
-}
-.side-g{margin-bottom:8px}
-.side-l{
-  font-size:10px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;
-  color:var(--t3);padding:0 24px;margin-bottom:4px;
-}
-.si{
-  padding:7px 24px;font-size:12px;color:var(--t2);cursor:pointer;
-  transition:all .12s;display:flex;justify-content:space-between;align-items:center;
-}
-.si:hover{color:var(--t1);background:var(--b0)}
-.si.on{color:var(--warm);background:rgba(196,149,106,.04)}
-.si-badge{
-  font-family:var(--fm);font-size:9px;padding:2px 6px;
-  border-radius:4px;background:var(--b0);color:var(--t3);
-  transition:all var(--trans);
-}
-.si-badge.al{color:var(--r);background:var(--rBg);border:1px solid rgba(248,113,113,.15)}
-.si-badge.ok{color:var(--g);background:var(--gBg);border:1px solid rgba(74,222,128,.15)}
-.side-ft{margin-top:auto;padding:16px 24px;border-top:1px solid var(--b0);font-size:10px;color:var(--t3);line-height:2}
-.side-ft span{color:var(--warm)}
-.ct{flex:1;overflow-y:auto;padding:32px 40px}
-
-/* ── Typography ── */
-.hd{font-size:20px;font-weight:600;margin-bottom:6px;letter-spacing:-.4px}
-.sub{font-size:11px;color:var(--t3);margin-bottom:28px}
-.sh{font-size:13px;font-weight:600;color:var(--t2);margin-bottom:12px;display:flex;align-items:center;gap:8px}
-.tag{font-size:9px;font-family:var(--fm);padding:3px 8px;border-radius:4px;font-weight:400}
-.tag-r{background:var(--rBg);color:var(--r)}
-.tag-g{background:var(--gBg);color:var(--g)}
-.tag-w{background:var(--wBg);color:var(--warm)}
-
-/* ── Status pill ── */
-.p{
-  display:inline-flex;align-items:center;gap:4px;
-  padding:3px 10px;border-radius:6px;font-size:10px;font-weight:500;
-  transition:background var(--trans),border-color var(--trans);
-}
-.p-g  {background:var(--gBg); color:var(--g);    border:1px solid rgba(74,222,128,.22)}
-.p-r  {background:var(--rBg); color:var(--r);    border:1px solid rgba(248,113,113,.22)}
-.p-w  {background:var(--wBg); color:var(--warm); border:1px solid rgba(196,149,106,.22)}
-.p-b  {background:var(--blBg);color:var(--bl);   border:1px solid rgba(96,165,250,.22)}
-.p-v  {background:var(--viBg);color:var(--vi);   border:1px solid rgba(167,139,250,.22)}
-.p-gy {background:var(--gyBg);color:var(--gy);   border:1px solid rgba(107,114,128,.22)}
-
-/* ── Card ── */
-.card{
-  background:var(--s1);border:1px solid var(--b0);border-radius:var(--rad);
-  padding:20px 24px;margin-bottom:16px;
-  transition:border-color var(--trans);
-}
-
-/* ── KPI row ── */
-.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:32px}
-.kpi{
-  background:var(--s1);border:1px solid var(--b0);border-radius:var(--rad);
-  padding:20px 22px;transition:border-color var(--trans),box-shadow var(--trans);
-}
-.kpi:hover{border-color:var(--b1);box-shadow:0 4px 20px rgba(0,0,0,.3)}
-.kpi-l{font-size:11px;color:var(--t3);margin-bottom:12px;font-weight:500;letter-spacing:.02em}
-.kpi-v{font-size:34px;font-weight:600;letter-spacing:-.5px;line-height:1}
-.kpi-s{font-size:11px;color:var(--t2);margin-top:10px}
-
-/* ── Tables ── */
-.tb{width:100%;border-collapse:collapse;margin-bottom:24px}
-.tb th{
-  font-size:10px;font-weight:500;letter-spacing:.05em;color:var(--t3);
-  text-align:left;padding:10px 12px;border-bottom:1px solid var(--b0);
-  text-transform:uppercase;
-}
-.tb td{padding:11px 12px;border-bottom:1px solid var(--b0);font-size:12px;color:var(--t2)}
-.tb tbody tr{transition:background var(--trans)}
-.tb tbody tr:nth-child(even){background:rgba(255,255,255,.018)}
-.tb tbody tr:hover{background:rgba(255,255,255,.032)!important}
-.tb .m{font-family:var(--fm);font-size:11px}
-.tb .id{color:var(--warm);cursor:pointer;font-family:var(--fm);font-size:11px}
-
-/* Schedule table (inside swap detail) */
-.st{width:100%;border-collapse:collapse}
-.st th{
-  font-family:var(--fm);font-size:9px;font-weight:400;letter-spacing:.08em;
-  color:var(--t3);text-align:right;padding:8px 10px;border-bottom:1px solid var(--b0);
-  text-transform:uppercase;
-}
-.st th:nth-child(-n+4){text-align:left}
-.st td{padding:10px;font-family:var(--fm);font-size:11px;color:var(--t2);text-align:right;border-bottom:1px solid rgba(255,255,255,.03)}
-.st td:nth-child(-n+4){text-align:left}
-.st tbody tr:nth-child(even){background:rgba(255,255,255,.015)}
-.st tbody tr:hover{background:rgba(255,255,255,.028)!important}
-
-/* ── Buttons ── */
-.btn{
-  font-size:10px;padding:6px 14px;border-radius:6px;cursor:pointer;
-  border:1px solid var(--b0);background:transparent;color:var(--t2);
-  font-family:var(--ff);transition:all var(--trans);
-}
-.btn:hover{background:var(--b0);color:var(--t1)}
-.btn:disabled{opacity:.35;cursor:not-allowed;pointer-events:none}
-.btn.pr{color:var(--warm);border-color:rgba(196,149,106,.25)}
-.btn.pr:hover{background:var(--wBg)}
-.btn.sign-btn{
-  color:#fff;background:rgba(196,149,106,.85);
-  border-color:var(--warm);font-weight:500;
-  padding:6px 16px;
-}
-.btn.sign-btn:hover{background:var(--warm);box-shadow:0 2px 12px rgba(196,149,106,.3)}
-.btn.sign-btn:disabled{background:rgba(196,149,106,.3)}
-
-/* ── Comments ── */
-.cmt{border:1px solid var(--b0);border-radius:8px;padding:10px 14px;margin-bottom:6px;background:var(--s1)}
-.cmt-open{border-left:2px solid var(--warm)}
-.cmt-resolved{border-left:2px solid var(--g);opacity:.75}
-.cmt-meta{font-size:9px;color:var(--t3);font-family:var(--fm);margin-bottom:4px;display:flex;gap:10px;align-items:center}
-.cmt-text{font-size:11px;color:var(--t2);line-height:1.6}
-.cmt-ta{width:100%;font-size:11px;padding:8px 10px;border:1px solid var(--b1);border-radius:6px;background:var(--s2);color:var(--t1);resize:vertical;min-height:60px;font-family:var(--ff);transition:border-color .15s}
-.cmt-ta:focus{outline:none;border-color:rgba(196,149,106,.4)}
-.pdf-frame{width:100%;height:420px;border:none;display:block;border-radius:0 0 6px 6px}
-
-/* ── Contract mode badges ── */
-.mode-p2p{font-size:9px;padding:2px 7px;border-radius:4px;background:rgba(167,139,250,.12);color:var(--vi);border:1px solid rgba(167,139,250,.25);font-family:var(--fm)}
-.mode-dual{font-size:9px;padding:2px 7px;border-radius:4px;background:rgba(96,165,250,.1);color:var(--bl);border:1px solid rgba(96,165,250,.2);font-family:var(--fm)}
-.mode-adv{font-size:9px;padding:2px 7px;border-radius:4px;background:var(--wBg);color:var(--warm);border:1px solid rgba(196,149,106,.2);font-family:var(--fm)}
-
-/* ── Direct contract modal ── */
-.dc-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
-.dc-modal{background:var(--s1);border:1px solid var(--b1);border-radius:16px;padding:32px;width:520px;max-width:96vw;max-height:90vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.5)}
-.dc-modal-h{font-size:16px;font-weight:600;margin-bottom:4px}
-.dc-modal-sub{font-size:11px;color:var(--t3);margin-bottom:24px;line-height:1.6}
-.dc-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
-.dc-field label{font-size:10px;color:var(--t3);letter-spacing:.05em;text-transform:uppercase;display:block;margin-bottom:5px}
-.dc-field input,.dc-field select{width:100%;font-size:12px;padding:8px 10px;border:1px solid var(--b1);border-radius:6px;background:var(--s2);color:var(--t1);font-family:var(--ff);transition:border-color .15s}
-.dc-field input:focus,.dc-field select:focus{outline:none;border-color:rgba(167,139,250,.4)}
-.dc-field-full{grid-column:1/-1}
-.dc-btn-row{display:flex;gap:8px;margin-top:20px}
-.btn.dc-primary{color:#fff;background:rgba(167,139,250,.85);border-color:var(--vi);font-weight:500;padding:8px 20px;font-size:11px}
-.btn.dc-primary:hover{background:var(--vi)}
-.dc-result{margin-top:16px;padding:12px 14px;border-radius:8px;font-size:11px;line-height:1.8}
-.dc-result.ok{background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.2);color:var(--g)}
-.dc-result.err{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);color:var(--r)}
-.dc-result.loading{background:var(--s2);border:1px solid var(--b1);color:var(--t3)}
-
-/* ── Alert items ── */
-.al{
-  border-radius:var(--rad);padding:16px 20px;margin-bottom:10px;
-  display:flex;gap:12px;border:1px solid var(--b0);background:var(--s1);
-  transition:border-color var(--trans);
-}
-.al.cr{border-left:2px solid var(--r)}.al.wr{border-left:2px solid var(--warm)}.al.inf{border-left:2px solid var(--bl)}
-.al-i{font-size:15px;margin-top:1px}
-.al-t{font-size:12px;font-weight:600;margin-bottom:3px}
-.al-d{font-size:11px;color:var(--t2);line-height:1.6}
-.al-r{font-family:var(--fm);font-size:9px;color:var(--t3);margin-top:6px}
-.al-a{margin-top:10px;display:flex;gap:6px}
-
-/* ── Oracle ── */
-.orc{display:flex;align-items:center;gap:32px}
-.orc-v{font-family:var(--fm);font-size:46px;font-weight:300;color:var(--warm);letter-spacing:-2px}
-.orc-m{font-size:11px;color:var(--t2);line-height:2.2}
-
-/* ── Contract accordion ── */
-.cpg{margin-bottom:20px}
-.cph{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:14px 20px;background:var(--s2);border:1px solid var(--b0);
-  border-radius:var(--rad) var(--rad) 0 0;cursor:pointer;
-  transition:background var(--trans);
-}
-.cph:hover{background:var(--s3)}
-.cpb{border:1px solid var(--b0);border-top:none;border-radius:0 0 var(--rad) var(--rad);overflow:hidden}
-.cpn{font-size:13px;font-weight:600}
-.cpm{font-family:var(--fm);font-size:10px;color:var(--t3);display:flex;gap:20px}
-
-/* ── Compliance cards ── */
-.cg{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
-.cc{background:var(--s1);border:1px solid var(--b0);border-radius:var(--rad);padding:16px 18px}
-.cc-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-.cc-t{font-size:11px;font-weight:600}
-.cc-i{font-size:11px;color:var(--t2);line-height:2.2}
-
-/* ── Animations ── */
-.pulse{animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
-
-/* ── Footer ── */
-.ft{
-  height:28px;display:flex;align-items:center;justify-content:center;
-  border-top:1px solid var(--b0);font-size:9px;color:var(--t3);
-  letter-spacing:.04em;flex-shrink:0;
-}
-
-/* ── Toast notifications ── */
-#toast-container{position:fixed;bottom:36px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:380px}
-.toast{padding:11px 16px;border-radius:10px;font-size:11px;line-height:1.5;pointer-events:auto;animation:toastIn .2s ease;display:flex;align-items:flex-start;gap:10px;background:var(--s2);border:1px solid var(--b1);box-shadow:0 8px 32px rgba(0,0,0,.6);color:var(--t1);word-break:break-word}
-.toast.ok{border-left:3px solid var(--g)}.toast.err{border-left:3px solid var(--r)}.toast.inf{border-left:3px solid var(--bl)}.toast.wr{border-left:3px solid var(--warm)}
-@keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-@keyframes toastOut{to{opacity:0;transform:translateY(8px)}}
-
-/* ── Mobile hamburger ── */
-.menu-btn{display:none;width:34px;height:34px;border-radius:7px;background:var(--b0);border:1px solid var(--b1);cursor:pointer;align-items:center;justify-content:center;flex-direction:column;gap:4px;padding:8px;flex-shrink:0}
-.menu-btn span{width:16px;height:1.5px;background:var(--t2);border-radius:1px;display:block}
-.side-overlay{display:none;position:fixed;inset:0;z-index:99;background:rgba(0,0,0,.45)}
-
-/* ── Contract detail timeline ── */
-.tl{display:flex;align-items:flex-start;overflow-x:auto;padding:8px 0 4px;gap:0}
-.tl-item{display:flex;flex-direction:column;align-items:center;flex:1;min-width:70px;position:relative}
-.tl-item:not(:last-child)::after{content:'';position:absolute;top:10px;left:50%;width:100%;height:2px;background:var(--b1);z-index:0}
-.tl-dot{width:20px;height:20px;border-radius:50%;border:2px solid var(--b1);background:var(--s2);z-index:1;position:relative;display:flex;align-items:center;justify-content:center;font-size:8px;flex-shrink:0}
-.tl-dot.done{border-color:var(--g);background:rgba(74,222,128,.12);color:var(--g)}
-.tl-dot.cur{border-color:var(--warm);background:rgba(196,149,106,.12);color:var(--warm);box-shadow:0 0 0 4px rgba(196,149,106,.08)}
-.tl-item.done:not(:last-child)::after{background:var(--g);opacity:.35}
-.tl-lbl{font-size:9px;color:var(--t3);margin-top:6px;text-align:center;max-width:68px;line-height:1.3;font-family:var(--fm)}
-.tl-lbl.done{color:var(--t2)}.tl-lbl.cur{color:var(--warm);font-weight:600}
-.tl-sub{font-size:8px;color:var(--t3);text-align:center;margin-top:2px;max-width:68px;line-height:1.3}
-
-/* ── Breadcrumb ── */
-.bc{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--t3);margin-bottom:18px;font-family:var(--fm)}
-.bc a{cursor:pointer;text-decoration:underline;text-underline-offset:2px;transition:color .15s}.bc a:hover{color:var(--t1)}
-
-/* ── Responsive ── */
-@media(max-width:860px){
-  .side{position:fixed;left:0;top:54px;bottom:28px;z-index:100;transform:translateX(-100%);transition:transform .22s ease;background:var(--s1);border-right:1px solid var(--b1);box-shadow:4px 0 28px rgba(0,0,0,.5)}
-  .side.open{transform:translateX(0)}
-  .side-overlay{display:block}
-  .menu-btn{display:flex}
-  .ct{padding:22px 18px}
-  .kpi-row{grid-template-columns:repeat(2,1fr)}
-  .cg{grid-template-columns:1fr 1fr}
-  .dc-modal{width:96vw;padding:24px 18px}
-  .dc-grid{grid-template-columns:1fr}
-}
-@media(max-width:540px){
-  .kpi-row{grid-template-columns:1fr 1fr}
-  .cg{grid-template-columns:1fr}
-  .top-user{display:none}
-  .top-sep{display:none}
-  .orc{flex-direction:column;gap:16px}
-}
-/* ── Demo mode ── */
-.demo-banner{
-  display:none;background:rgba(234,179,8,.08);border-bottom:1px solid rgba(234,179,8,.25);
-  padding:7px 28px;font-size:11px;color:#eab308;font-weight:500;letter-spacing:.01em;
-  flex-shrink:0;
-}
-.demo-banner.on{display:flex;align-items:center;gap:8px}
-</style></head><body>
-
-<div class="top">
-  <div class="top-l">
-    <div class="logo-mark">N</div>
-    <div class="logo-name">Nomos</div>
-    <span class="role-pill">Client</span>
-    <div class="top-sep"></div>
-    <span class="top-user">Alpha Corp S.A.</span>
-  </div>
-  <div class="top-r">
-    <span id="api-status" class="status-dot"><span class="dot pulse"></span>Connecting…</span>
-    <span class="top-clock" id="ck"></span>
-    <span class="sign-out" onclick="logout()">Sign out</span>
-    <div class="menu-btn" id="menu-btn" onclick="_toggleSide()"><span></span><span></span><span></span></div>
-  </div>
-</div>
-
-<div id="demo-banner" class="demo-banner">
-  <span>⚠</span>
-  <span>DEMO MODE — documents auto-validated for testing</span>
-</div>
-
-<div class="wrap">
-<div class="side">
-  <div class="side-g"><div class="side-l">Portfolio</div>
-    <div class="si on" onclick="N('d',this)">Dashboard</div>
-    <div class="si" onclick="N('s',this)">My Swaps <span class="si-badge" id="sb-swaps">—</span></div>
-    <div class="si" onclick="N('p',this)">Payments</div>
-    <div class="si" onclick="N('o',this)">Oracle <span class="si-badge ok" id="sb-oracle">●</span></div>
-    <div class="si" onclick="N('dc',this)">Documents <span class="si-badge al">!</span></div>
-    <div class="si" onclick="N('al',this)">Alerts <span class="si-badge al" id="sb-alerts">—</span></div>
-    <div class="si" onclick="N('pr',this)">Profile</div>
-  </div>
-  <div class="side-ft">Legal Advisor<br><span>Linklaters LLP</span><br><br>Calc. Agent · Party A</div>
-</div>
-<div class="ct" id="C"></div>
-</div>
-<div class="ft">§1(b) ISDA 2002 · Legal text prevails · Payment Instructions only · Live API ↻ 10s</div>
-
-<div id="toast-container"></div>
-<div class="side-overlay" id="side-overlay" onclick="_closeSide()"></div>
-
-<!-- ── Direct Contract Modal ── -->
-<div id="dc-bg" class="dc-modal-bg" style="display:none" onclick="if(event.target===this)closeDC()">
-<div class="dc-modal" onclick="event.stopPropagation()">
-  <div class="dc-modal-h">New Direct Contract</div>
-  <div class="dc-modal-sub">
-    Create a peer-to-peer interest rate swap directly with your counterparty.<br>
-    Standard ISDA 2002 defaults apply. Both parties must sign to activate.
-  </div>
-  <div class="dc-grid">
-    <div class="dc-field">
-      <label>Your Company Name</label>
-      <input id="dc-myname" placeholder="Alpha Corp S.A." />
+  <header class="topbar">
+    <div class="logo">
+      <div class="logo-mark">N</div>
+      <div class="logo-word">Nomos</div>
     </div>
-    <div class="dc-field">
-      <label>Your Jurisdiction</label>
-      <input id="dc-myjuris" value="FR" placeholder="FR" maxlength="2" style="text-transform:uppercase" />
-    </div>
-    <div class="dc-field">
-      <label>Counterparty Name</label>
-      <input id="dc-cpname" placeholder="Beta Fund Ltd" />
-    </div>
-    <div class="dc-field">
-      <label>Counterparty Jurisdiction</label>
-      <input id="dc-cpjuris" value="GB" placeholder="GB" maxlength="2" style="text-transform:uppercase" />
-    </div>
-    <div class="dc-field dc-field-full">
-      <label>Counterparty Email (optional — for reference)</label>
-      <input id="dc-cpemail" type="email" placeholder="legal@betafund.com" />
-    </div>
-    <div class="dc-field">
-      <label>Notional (EUR)</label>
-      <input id="dc-notional" type="number" placeholder="10000000" min="1" />
-    </div>
-    <div class="dc-field">
-      <label>Fixed Rate (%)</label>
-      <input id="dc-rate" type="number" step="0.001" placeholder="3.200" min="0.001" max="49.999" />
-    </div>
-    <div class="dc-field">
-      <label>Effective Date</label>
-      <input id="dc-eff" type="date" />
-    </div>
-    <div class="dc-field">
-      <label>Termination Date</label>
-      <input id="dc-term" type="date" />
-    </div>
-  </div>
-  <div style="font-size:10px;color:var(--t3);line-height:2;margin-bottom:4px">
-    Defaults: EUR · EURIBOR 3M floating · Quarterly payments · English Law · MTPN elected
-  </div>
-  <div id="dc-result" style="display:none"></div>
-  <div class="dc-btn-row">
-    <button class="btn dc-primary" onclick="submitDC(this)">Create Contract</button>
-    <button class="btn" onclick="closeDC()">Cancel</button>
-    <span id="dc-err" style="font-size:10px;color:var(--r);padding:5px 0"></span>
-  </div>
-</div>
-</div>
-
-<script>
-// ── CONFIG ────────────────────────────────────────────────────────────────────
-const API = '/api'
-
-// ── AUTH ──────────────────────────────────────────────────────────────────────
-;(function(){const r=localStorage.getItem('nomos_role');if(r&&r!=='client')window.location.href='/'})()
-function logout(){localStorage.removeItem('nomos_role');window.location.href='/'}
-
-// ── DEMO MODE ─────────────────────────────────────────────────────────────────
-function isDemoMode() { return localStorage.getItem('nomos_demo_mode') === '1' }
-
-function _applyDemoMode() {
-  const on = isDemoMode()
-  const banner = document.getElementById('demo-banner')
-  if (banner) { if (on) banner.classList.add('on'); else banner.classList.remove('on') }
-}
-
-// Sync from server env (in case NOMOS_MODE=demo was set at startup)
-;(function(){
-  fetch('/api/demo-mode').then(r=>r.json()).then(r=>{
-    if (r.demo && !isDemoMode()) {
-      localStorage.setItem('nomos_demo_mode', '1')
-    }
-    _applyDemoMode()
-  }).catch(()=>{ _applyDemoMode() })
-})()
-
-// ── TOAST ─────────────────────────────────────────────────────────────────────
-function toast(msg, type='inf', dur=4000) {
-  const tc = document.getElementById('toast-container')
-  if (!tc) return
-  const icons = {ok:'✓',err:'✕',wr:'⚠',inf:'ℹ'}
-  const t = document.createElement('div')
-  t.className = 'toast '+type
-  t.innerHTML = `<span style="flex-shrink:0;font-size:13px">${icons[type]||'ℹ'}</span><span>${msg}</span>`
-  tc.appendChild(t)
-  setTimeout(()=>{ t.style.animation='toastOut .2s ease forwards'; setTimeout(()=>t.remove(), 220) }, dur)
-}
-
-// ── BREADCRUMB ────────────────────────────────────────────────────────────────
-function crumb(...parts) {
-  if (!parts.length) return ''
-  const items = parts.map((p,i) =>
-    i < parts.length-1
-      ? `<a onclick="N('${p.view||'d'}',document.querySelector('.si'))">${p.label||p}</a>`
-      : `<span style="color:var(--t2)">${p.label||p}</span>`
-  )
-  return `<div class="bc">${items.join('<span>/</span>')}</div>`
-}
-
-// ── MOBILE SIDEBAR ────────────────────────────────────────────────────────────
-function _toggleSide() {
-  const side = document.querySelector('.side')
-  const ov   = document.getElementById('side-overlay')
-  if (!side) return
-  const open = side.classList.toggle('open')
-  if (ov) ov.style.display = open ? 'block' : 'none'
-}
-function _closeSide() {
-  const side = document.querySelector('.side')
-  const ov   = document.getElementById('side-overlay')
-  if (side) side.classList.remove('open')
-  if (ov)   ov.style.display = 'none'
-}
-
-// ── STATE ─────────────────────────────────────────────────────────────────────
-let S = {
-  contracts:[], oracle:{}, details:{},
-  orc3: { rates:{}, lastFetch:null },
-  dd: {},       // keyed by contract_id
-  comments: {}, // keyed by contract_id
-  profile: {},
-  loading:true, error:null, lastUpdate:null
-}
-let view = 'd', EX = null, _detId = null
-
-// ── CLOCK ─────────────────────────────────────────────────────────────────────
-function tk(){const n=new Date();document.getElementById('ck').textContent=n.toUTCString().slice(5,16)+' '+n.toUTCString().slice(17,22)+' UTC'}
-setInterval(tk,1e3);tk()
-
-// ── API HELPERS ───────────────────────────────────────────────────────────────
-async function apiFetch(path, opts={}) {
-  const r = await fetch(API+path, opts)
-  if (!r.ok) throw new Error(`HTTP ${r.status}`)
-  return r.json()
-}
-async function apiPost(path, body) {
-  return apiFetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:body?JSON.stringify(body):undefined})
-}
-
-// Auto-seed removed — contracts are created via the Advisor portal New Contract wizard.
-async function seed() { /* no-op */ }
-
-// ── DATA REFRESH (polled every 10s) ───────────────────────────────────────────
-async function refresh() {
-  try {
-    const [cs, orc, rates, prof] = await Promise.all([
-      apiFetch('/contracts?role=client'),
-      apiFetch('/oracle/latest'),
-      apiFetch('/oracle/rates').catch(()=>({})),
-      apiFetch('/client/profile').catch(()=>({})),
-    ])
-    S.contracts = cs
-    S.oracle = orc
-    S.orc3.rates = rates.rates || {}
-    S.orc3.lastFetch = new Date()
-    S.profile = prof.profile || {}
-    S.loading = false
-    S.error = null
-    S.lastUpdate = new Date()
-    if (EX && cs.find(c=>c.id===EX)) {
-      S.details[EX] = await apiFetch(`/contracts/${EX}?role=client`)
-    }
-    updateSidebar()
-  } catch(e) {
-    S.error = 'API unreachable — is the server running on :8000?'
-  }
-  R()
-}
-setInterval(refresh, 10000)
-seed().then(refresh)
-
-// ── SIDEBAR ───────────────────────────────────────────────────────────────────
-function updateSidebar() {
-  const el = document.getElementById('sb-swaps')
-  if (el) el.textContent = S.contracts.length || '0'
-  const al = buildAlerts()
-  const elAl = document.getElementById('sb-alerts')
-  if (elAl) elAl.textContent = al.length || '0'
-  const oEl = document.getElementById('sb-oracle')
-  if (oEl) { oEl.textContent = S.oracle.status==='CONFIRMED'?'●':'△'; oEl.className='si-badge '+(S.oracle.status==='CONFIRMED'?'ok':'al') }
-  const st = document.getElementById('api-status')
-  if (st) {
-    st.className = 'status-dot '+(S.error?'offline':'live')
-    st.innerHTML = S.error
-      ? `<span class="dot"></span>Offline`
-      : `<span class="dot pulse"></span>Live API`
-  }
-}
-
-// ── NAVIGATION ────────────────────────────────────────────────────────────────
-function N(v, el) { view=v; EX=null; document.querySelectorAll('.si').forEach(e=>e.classList.remove('on')); if(el) el.classList.add('on'); _closeSide(); R() }
-function R() { const fn = ({d:rD,s:rS,p:rP,o:rO,dc:rDc,al:rAl,pr:rPr,det:rDet})[view]; const res=fn(document.getElementById('C')); if(res instanceof Promise) res.catch(console.error) }
-
-// ── DISPLAY HELPERS ───────────────────────────────────────────────────────────
-const eur = (v,d=0) => v!=null ? '€'+Number(v).toLocaleString('en-GB',{minimumFractionDigits:d,maximumFractionDigits:d}) : '—'
-const pct = v => v!=null ? (Number(v)*100).toFixed(3)+'%' : '—'
-
-function pSt(p) {
-  if (p.payment_confirmed) return 'confirmed'
-  if (p.fixed_amount !== null) return 'pending'
-  const today = new Date().toISOString().slice(0,10)
-  if (p.payment_date < today) return 'overdue'
-  return 'future'
-}
-function pBadge(st) {
-  const map = {
-    confirmed: ['p-g',  '✓ Confirmed'],
-    pending:   ['p-w',  'Pending PI'],
-    overdue:   ['p-r',  'Overdue'],
-    future:    ['p-b',  'Scheduled'],
-  }
-  const [cls, lbl] = map[st] || ['p-b', st]
-  return `<span class="p ${cls}">${lbl}</span>`
-}
-function oracleTag() {
-  if (S.oracle.status==='CONFIRMED') return '<span class="tag tag-g">● Confirmed</span>'
-  if (S.oracle.status==='FALLBACK')  return '<span class="tag tag-w">△ Fallback</span>'
-  return '<span class="tag tag-r">○ Stale</span>'
-}
-
-// Status helpers
-function statusCls(st) {
-  if (st==='ACTIVE')            return 'p-g'
-  if (st==='PENDING_SIGNATURE') return 'p-w'
-  if (st==='SUSPENDED')         return 'p-r'
-  if (st==='TERMINATED')        return 'p-gy'
-  return 'p-b'
-}
-function statusLbl(st) {
-  if (st==='PENDING_SIGNATURE') return '◐ Pending Sig'
-  if (st==='TERMINATED')        return '✕ Terminated'
-  return st
-}
-
-const updBadge  = () => S.lastUpdate ? `<span style="font-size:9px;color:var(--t3);margin-left:10px;font-weight:400">↻ ${S.lastUpdate.toLocaleTimeString()}</span>` : ''
-const errBanner = () => S.error ? `<div style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.22);border-radius:8px;padding:10px 16px;margin-bottom:20px;font-size:11px;color:var(--r)">⚠ ${S.error}</div>` : ''
-const spinner   = () => `<div style="padding:60px;text-align:center;color:var(--t3);font-size:11px;letter-spacing:.04em">Loading from API…</div>`
-
-// ── DIRECT CONTRACT MODAL ─────────────────────────────────────────────────────
-function openDC() {
-  const bg = document.getElementById('dc-bg')
-  if (bg) {
-    bg.style.display = 'flex'
-    // Pre-fill My Name from profile
-    const nameEl = document.getElementById('dc-myname')
-    if (nameEl && S.profile?.company_name) nameEl.value = S.profile.company_name
-    const jurisEl = document.getElementById('dc-myjuris')
-    if (jurisEl && S.profile?.jurisdiction) jurisEl.value = S.profile.jurisdiction.toUpperCase()
-    // Pre-fill effective date with today + 2 days
-    const effEl = document.getElementById('dc-eff')
-    if (effEl && !effEl.value) {
-      const d = new Date(); d.setDate(d.getDate()+2)
-      effEl.value = d.toISOString().slice(0,10)
-    }
-    // Pre-fill termination with today + 2yr
-    const termEl = document.getElementById('dc-term')
-    if (termEl && !termEl.value) {
-      const d = new Date(); d.setFullYear(d.getFullYear()+2)
-      termEl.value = d.toISOString().slice(0,10)
-    }
-    document.getElementById('dc-result').style.display='none'
-    document.getElementById('dc-err').textContent=''
-  }
-}
-function closeDC() {
-  const bg = document.getElementById('dc-bg')
-  if (bg) bg.style.display='none'
-}
-async function submitDC(btn) {
-  const err = document.getElementById('dc-err')
-  const res = document.getElementById('dc-result')
-  err.textContent = ''
-  const myName   = document.getElementById('dc-myname').value.trim()
-  const myJuris  = document.getElementById('dc-myjuris').value.trim().toUpperCase()
-  const cpName   = document.getElementById('dc-cpname').value.trim()
-  const cpJuris  = document.getElementById('dc-cpjuris').value.trim().toUpperCase()
-  const cpEmail  = document.getElementById('dc-cpemail').value.trim()
-  const notional = parseFloat(document.getElementById('dc-notional').value)
-  const rateRaw  = parseFloat(document.getElementById('dc-rate').value)   // user enters %
-  const eff      = document.getElementById('dc-eff').value
-  const term     = document.getElementById('dc-term').value
-
-  if (!myName)  { err.textContent='Your company name is required'; return }
-  if (!cpName)  { err.textContent='Counterparty name is required'; return }
-  if (!notional || notional <= 0) { err.textContent='Enter a valid notional amount'; return }
-  if (!rateRaw  || rateRaw  <= 0) { err.textContent='Enter a valid fixed rate (e.g. 3.2 for 3.2%)'; return }
-  if (rateRaw >= 50) { err.textContent='Rate must be less than 50% (e.g. 3.2, not 320)'; return }
-  if (!eff || !term)  { err.textContent='Both dates are required'; return }
-  if (eff >= term)    { err.textContent='Termination date must be after effective date'; return }
-
-  btn.disabled = true; btn.textContent = 'Creating…'
-  res.style.display='block'
-  res.className='dc-result loading'
-  res.textContent='Generating contract, payment schedule, and Confirmation PDF…'
-  try {
-    const r = await apiPost('/contracts/direct', {
-      my_name: myName,
-      my_jurisdiction: myJuris,
-      counterparty_name: cpName,
-      counterparty_jurisdiction: cpJuris,
-      counterparty_email: cpEmail,
-      notional,
-      fixed_rate: rateRaw / 100,   // convert % → decimal
-      effective_date: eff,
-      termination_date: term,
-      currency: 'EUR',
-    })
-    res.className='dc-result ok'
-    res.innerHTML = `
-      <strong>✓ Contract created: ${r.contract_id}</strong><br>
-      Mode: Peer-to-Peer · ${r.periods} payment periods<br>
-      Status: Waiting for ${cpName} to sign first<br>
-      ${r.pdf_error ? '<span style="color:var(--r)">⚠ PDF generation failed</span>' : '✓ Confirmation PDF generated'}
-      <br><br>
-      <span style="font-size:10px;color:var(--g)">
-        The contract will appear in ${cpName}'s dashboard. Once they sign, you will countersign to activate.
+    <div class="row" style="gap:12px;">
+      <span class="chip mono">Client</span>
+      <span id="conn-chip" class="chip" aria-live="polite">
+        <span class="dot" aria-hidden="true"></span>
+        <span class="conn-text">Connecting…</span>
       </span>
-    `
-    btn.textContent = 'Created!'
-    // Refresh state after a short delay
-    await refresh()
-  } catch(e) {
-    res.className='dc-result err'
-    res.textContent='Error: '+e.message
-    btn.disabled=false; btn.textContent='Create Contract'
-  }
-}
-
-// ── SIGN CONTRACT (party-specific, for P2P) ────────────────────────────────────
-async function signContractP(contractId, party) {
-  const key = `sign-btn-p-${contractId}-${party}`
-  const btn = document.getElementById(key) || document.querySelector(`[onclick*="signContractP('${contractId}','${party}')"]`)
-  if (btn) { btn.disabled=true; btn.textContent='Checking…' }
-  try {
-    const readiness = await apiFetch('/contracts/'+contractId+'/signing-readiness')
-    if (!readiness.ready) {
-      if (btn) { btn.disabled=false; btn.textContent=party==='A'?'✍ Countersign (Party A)':'They sign (Party B)' }
-      toast('Cannot sign yet: '+readiness.message, 'err')
-      return
-    }
-    if (btn) btn.textContent='Signing…'
-    const partyLabel = party==='A'?'Creator — '+contractId:'Counterparty — '+contractId
-    const result = await apiPost(
-      `/contracts/${contractId}/sign?signed_by=${encodeURIComponent(partyLabel)}&party=${party}`
-    )
-    delete S.details[contractId]
-    delete S.comments[contractId]
-    await refresh()
-    if (result?.activated) {
-      toast(`✓ Both parties signed — contract ${contractId} is now ACTIVE`, 'ok')
-    } else {
-      toast(`✓ Signed as Party ${party}. ${party==='B'?'Creator must countersign to activate.':'Waiting for Party B.'}`, 'ok')
-    }
-  } catch(e) {
-    if (btn) { btn.disabled=false; btn.textContent=party==='A'?'✍ Countersign (Party A)':'They sign (Party B)' }
-    toast('Error: '+e.message, 'err')
-  }
-}
-
-// ── SIGN CONTRACT ─────────────────────────────────────────────────────────────
-async function signContract(contractId) {
-  const btn = document.getElementById('sign-btn-'+contractId)
-  if (btn) { btn.disabled=true; btn.textContent='Checking…' }
-  try {
-    // DD + comments gate: verify signing readiness before attempting to sign
-    const readiness = await apiFetch('/contracts/'+contractId+'/signing-readiness')
-    if (!readiness.ready) {
-      if (btn) { btn.disabled=false; btn.textContent='✍ Sign & Activate' }
-      const n = readiness.blocking_count || 0
-      const oc = readiness.open_comments || 0
-      const details = [
-        readiness.message,
-        n > 0 ? `${n} document${n!==1?'s':''} required — check Documents tab` : '',
-        oc > 0 ? `${oc} open comment${oc!==1?'s':''} must be resolved first` : '',
-      ].filter(Boolean).join(' · ')
-      toast('Cannot sign: '+details, 'err', 7000)
-      return
-    }
-    if (btn) btn.textContent='Signing…'
-    const result = await apiPost('/contracts/'+contractId+'/sign?signed_by='+encodeURIComponent('Client — '+contractId))
-    delete S.details[contractId]
-    delete S.comments[contractId]
-    await refresh()
-    if (result?.signature_hash) {
-      toast('✓ Contract signed and activated · Hash: '+result.signature_hash.slice(0,16)+'…', 'ok', 6000)
-    }
-  } catch(e) {
-    if (btn) { btn.disabled=false; btn.textContent='✍ Sign & Activate' }
-    toast('Error signing contract: '+e.message, 'err')
-  }
-}
-
-// ── BUILD ALERTS ──────────────────────────────────────────────────────────────
-function buildAlerts() {
-  const al = []
-  S.contracts.forEach(x => {
-    if (x.status === 'PENDING_SIGNATURE') {
-      al.push({t:'wr',i:'✍',ti:`Awaiting your signature · ${x.id}`,d:`New contract from your advisor is ready for execution. Review the Confirmation and sign to activate.`,r:'§1(b) ISDA 2002 · Confirmation execution',sign:x.id})
-      return
-    }
-    if (x.status !== 'ACTIVE') al.push({t:'cr',i:'🚨',ti:`Status alert · ${x.id}`,d:`Contract status: ${x.status}. Payment obligations may be suspended under §2(a)(iii).`,r:'§5(a)'})
-    const rep = x.compliance?.representations
-    if (rep?.breached > 0) al.push({t:'cr',i:'🚨',ti:`Representation breached · ${x.id}`,d:`${rep.breached} §3 representation(s) breached. Potential §5(a)(iv) Misrepresentation.`,r:'§3 · §5(a)(iv)'})
-    if (rep?.pending_review > 0) al.push({t:'wr',i:'⚠',ti:`Documents overdue · ${x.id}`,d:`Specified Information may be stale — ${rep.pending_review} §4(a) obligation(s) need attention.`,r:'§3(d) · §4(a)(ii)'})
-    if (x.netting_status === 'AMBER') al.push({t:'wr',i:'⚠',ti:`Netting review · ${x.id}`,d:'Close-out netting enforceability AMBER. Legal advisor review required before next cycle.',r:'§1(c)'})
-    if (x.netting_status === 'RED')   al.push({t:'cr',i:'🚨',ti:`Netting unenforceable · ${x.id}`,d:'Close-out netting may NOT be enforceable in counterparty jurisdiction. Immediate legal review required.',r:'§1(c) · §6(e)'})
-    const det = S.details[x.id]
-    if (det) {
-      const pendingPIs = det.periods.filter(p=>p.fixed_amount!==null&&!p.payment_confirmed)
-      if (pendingPIs.length) al.push({t:'inf',i:'ℹ',ti:`Payment Instruction pending · ${x.id}`,d:`${pendingPIs.length} PI(s) awaiting advisor approval. Period: ${pendingPIs.map(p=>'P'+p.number).join(', ')}.`,r:'§2(a)(i)'})
-    }
-  })
-  return al
-}
-
-// ── DASHBOARD ─────────────────────────────────────────────────────────────────
-function rD(c) {
-  if (S.loading && !S.contracts.length) { c.innerHTML = spinner(); return }
-  const D = S.contracts, O = S.oracle
-  const tot = D.reduce((s,x)=>s+x.notional, 0)
-  const np = D.find(x=>x.next_payment)?.next_payment
-  const alerts = buildAlerts()
-  const issues = D.filter(x=>(x.compliance?.representations?.breached||0)+(x.compliance?.representations?.pending_review||0)>0).length
-
-  c.innerHTML = `
-${errBanner()}
-${crumb('Dashboard')}
-<div class="hd">Dashboard${updBadge()}</div>
-<div class="sub">${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</div>
-<div class="kpi-row">
-  <div class="kpi">
-    <div class="kpi-l">Active Swaps</div>
-    <div class="kpi-v">${D.length}</div>
-    <div class="kpi-s">${D.filter(x=>x.status!=='ACTIVE').length ? `<span style="color:var(--r)">${D.filter(x=>x.status!=='ACTIVE').length} needs attention</span>` : 'All performing'}</div>
-  </div>
-  <div class="kpi">
-    <div class="kpi-l">Total Notional</div>
-    <div class="kpi-v" style="color:var(--warm)">€${(tot/1e6).toFixed(0)}M</div>
-    <div class="kpi-s">${D.length} contract${D.length!==1?'s':''}</div>
-  </div>
-  <div class="kpi">
-    <div class="kpi-l">Next Payment</div>
-    <div class="kpi-v" style="color:var(--warm)">${np ? eur(np.amount) : '—'}</div>
-    <div class="kpi-s">${np ? `You pay · ${np.date}` : 'No payment due yet'}</div>
-  </div>
-  <div class="kpi">
-    <div class="kpi-l">Compliance</div>
-    <div class="kpi-v" style="color:${issues?'var(--r)':'var(--g)'}">${issues ? issues : 'OK'}</div>
-    <div class="kpi-s">${issues ? `${issues} contract${issues!==1?'s':''} need review` : 'All representations met'}</div>
-  </div>
-</div>
-
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-  <div class="sh" style="margin-bottom:0">Alerts <span class="tag ${alerts.length?'tag-r':'tag-g'}">${alerts.length}</span></div>
-  <button class="btn" style="color:var(--vi);border-color:rgba(167,139,250,.3);font-size:11px;padding:6px 14px" onclick="openDC()">+ New Direct Contract</button>
-</div>
-${alerts.length
-  ? alerts.map(a=>`<div class="al ${a.t}">
-  <div class="al-i">${a.i}</div>
-  <div>
-    <div class="al-t">${a.ti}</div>
-    <div class="al-d">${a.d}</div>
-    <div class="al-r">${a.r}</div>
-    <div class="al-a">
-      ${a.sign
-        ? `<button id="sign-btn-${a.sign}-alert" class="btn sign-btn" onclick="signContract('${a.sign}')">✍ Sign &amp; Activate</button>`
-        : '<button class="btn pr">View</button>'}
-      <button class="btn">Contact advisor</button>
+      <button id="sign-out-btn" class="btn btn-ghost btn-sm" type="button">Sign out</button>
     </div>
+  </header>
+
+  <div id="demo-banner" class="demo-banner" role="status">
+    Demonstration mode — uploaded documents are auto-validated for testing.
   </div>
-</div>`).join('')
-  : '<div class="card" style="text-align:center;color:var(--t3);padding:30px;font-size:11px">No alerts.</div>'}
 
-<div class="sh" style="margin-top:28px">Oracle ${oracleTag()}</div>
-<div class="card"><div class="orc">
-  <div class="orc-v">${O.current_rate ? (Number(O.current_rate)*100).toFixed(3)+'%' : '—'}</div>
-  <div class="orc-m"><strong>EURIBOR 3M</strong><br>${O.source||'—'}<br>Fetch count: ${O.fetch_count||0} · Anomalies: ${O.anomalies_detected||0}</div>
-</div></div>
-
-<div class="sh" style="margin-top:28px">Positions</div>
-<table class="tb"><thead><tr><th>Contract</th><th>Counterparty</th><th>Notional</th><th>Fixed Rate</th><th>Next Net</th><th>Status / Action</th><th>Mode</th></tr></thead><tbody>
-${D.map(x => {
-  const n = x.next_payment
-  const wf = x.workflow_status || x.status
-  const modeTag = x.contract_mode==='peer_to_peer'
-    ? '<span class="mode-p2p">P2P</span>'
-    : x.contract_mode==='dual_advisor'
-      ? '<span class="mode-dual">Dual Adv</span>'
-      : '<span class="mode-adv">Managed</span>'
-
-  let statusCell = ''
-  if (x.contract_mode==='peer_to_peer') {
-    if (wf==='PENDING_COUNTERPARTY') {
-      statusCell = `<div style="display:flex;flex-direction:column;gap:4px">
-        <span class="p p-gy" style="font-size:9px">⏳ Waiting for ${x.party_b} to sign</span>
-        <button class="btn sign-btn" style="font-size:9px;padding:4px 10px" onclick="signContractP('${x.id}','B')">They sign (Party B)</button>
-      </div>`
-    } else if (wf==='PENDING_INITIATOR') {
-      statusCell = `<div style="display:flex;flex-direction:column;gap:4px">
-        <span class="p p-w" style="font-size:9px">✓ ${x.party_b} signed — your turn</span>
-        <button id="sign-btn-${x.id}" class="btn sign-btn" onclick="signContractP('${x.id}','A')">✍ Countersign (Party A)</button>
-      </div>`
-    } else {
-      statusCell = `<span class="p ${statusCls(x.status)}">${statusLbl(wf||x.status)}</span>`
-    }
-  } else if (x.status==='PENDING_SIGNATURE') {
-    statusCell = `<button id="sign-btn-${x.id}" class="btn sign-btn" onclick="signContract('${x.id}')">✍ Sign &amp; Activate</button>`
-  } else {
-    statusCell = `<span class="p ${statusCls(x.status)}">${statusLbl(x.status)}</span>`
-  }
-
-  return `<tr onclick="openContract('${x.id}')" style="cursor:pointer" onmouseover="this.style.background='rgba(196,149,106,.04)'" onmouseout="this.style.background=''">
-    <td class="id" style="color:var(--warm)">${x.id}</td>
-    <td>${x.party_b}</td>
-    <td class="m">€${(x.notional/1e6).toFixed(0)}M</td>
-    <td class="m">${pct(x.fixed_rate)}</td>
-    <td class="m" style="color:var(--warm)">${n ? eur(n.amount) : '—'}</td>
-    <td>${statusCell}</td>
-    <td>${modeTag}</td>
-  </tr>`
-}).join('')}
-</tbody></table>
-
-<div class="sh">Compliance</div>
-<div class="cg">${D.map(x => {
-  const rep = x.compliance?.representations
-  const ok = !rep?.breached && !rep?.pending_review
-  return `<div class="cc">
-    <div class="cc-h"><div class="cc-t">${x.id}</div><span class="p ${ok?'p-g':'p-r'}">${ok?'OK':'review'}</span></div>
-    <div class="cc-i">● §3(b): ${rep?.satisfied?'satisfied':'—'}<br>● Docs: ${rep?.pending_review||0} overdue<br>● Netting: ${x.netting_status||'—'}</div>
-  </div>`
-}).join('')}</div>`
-}
-
-// ── MY SWAPS ──────────────────────────────────────────────────────────────────
-function rS(c) {
-  if (S.loading && !S.contracts.length) { c.innerHTML = spinner(); return }
-  const D = S.contracts
-  const G = {}
-  D.forEach(x => { if(!G[x.party_b]) G[x.party_b]={cp:x.party_b,cs:[]}; G[x.party_b].cs.push(x) })
-
-  c.innerHTML = `${crumb('My Swaps')}<div class="hd">My Swaps</div><div class="sub">Grouped by counterparty</div>
-${Object.values(G).map(g => {
-  const tn = g.cs.reduce((s,x)=>s+x.notional, 0)
-  return `<div class="cpg">
-<div class="cph" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">
-  <div><div class="cpn">${g.cp}</div></div>
-  <div class="cpm"><span>${g.cs.length} swap${g.cs.length>1?'s':''}</span><span>€${(tn/1e6).toFixed(0)}M</span></div>
-</div>
-<div class="cpb">
-${g.cs.map(x => {
-  const det = S.details[x.id]
-  const expanded = EX===x.id
-  return `
-<div style="padding:12px 20px;border-bottom:1px solid var(--b0);cursor:pointer;transition:background var(--trans)" onmouseover="this.style.background='rgba(255,255,255,.02)'" onmouseout="this.style.background=''" onclick="_toggleSwap('${x.id}')">
-  <div style="display:flex;justify-content:space-between;align-items:center">
-    <div>
-      <span class="id">${x.id}</span>
-      <span style="color:var(--t3);font-size:11px;margin-left:10px">${x.type} · €${(x.notional/1e6).toFixed(0)}M · ${pct(x.fixed_rate)}</span>
-    </div>
-    <div style="display:flex;gap:8px;align-items:center">
-      ${x.status==='PENDING_SIGNATURE'
-        ? `<button id="sign-btn-${x.id}" class="btn sign-btn" onclick="event.stopPropagation();signContract('${x.id}')">✍ Sign &amp; Activate</button>`
-        : `<span class="p ${statusCls(x.status)}">${statusLbl(x.status)}</span>`}
-      <span style="color:var(--t3);font-size:10px">${expanded?'▲':'▼'}</span>
-    </div>
-  </div>
-</div>
-${expanded ? (det ? `
-<div style="padding:16px 20px;background:var(--s1)">
-  <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-    ${[`30/360 · Act/360`,'Quarterly',x.governing_law,`Netting: ${x.netting_status}`].map(t=>`<span style="font-family:var(--fm);font-size:9px;color:var(--t3);padding:4px 10px;border:1px solid var(--b0);border-radius:6px">${t}</span>`).join('')}
-  </div>
-  <table class="st"><thead><tr>
-    <th>#</th><th>Start</th><th>End</th><th>Pay Date</th>
-    <th>EURIBOR</th><th>Fixed</th><th>Floating</th><th>Net</th>
-    <th>Direction</th><th>Status</th><th>Fingerprint</th>
-  </tr></thead><tbody>
-  ${det.periods.map(p => {
-    const st = pSt(p)
-    const dir = p.net_payer==='PARTY_A'
-      ? '<span style="color:var(--r);font-weight:500">You pay</span>'
-      : p.net_payer==='PARTY_B'
-        ? '<span style="color:var(--g);font-weight:500">You receive</span>'
-        : '—'
-    return `<tr>
-      <td style="text-align:left;color:var(--t3)">${String(p.number).padStart(2,'0')}</td>
-      <td style="text-align:left">${p.start}</td>
-      <td style="text-align:left">${p.end}</td>
-      <td style="text-align:left">${p.payment_date}</td>
-      <td style="color:var(--warm)">${p.oracle_rate?(p.oracle_rate*100).toFixed(3)+'%':'—'}</td>
-      <td>${eur(p.fixed_amount)}</td>
-      <td>${eur(p.floating_amount)}</td>
-      <td style="color:var(--warm);font-weight:500">${eur(p.net_amount)}</td>
-      <td>${p.fixed_amount!==null?dir:'—'}</td>
-      <td>${pBadge(st)}</td>
-      <td style="color:var(--t3);font-size:9px">${p.fingerprint?p.fingerprint.slice(0,12)+'…':'—'}</td>
-    </tr>`
-  }).join('')}
-  </tbody></table>
-</div>` : `<div style="padding:20px;text-align:center;color:var(--t3);font-size:11px">Loading…</div>`) : ''}`
-}).join('')}
-</div></div>`
-}).join('')}`
-
-  window._toggleSwap = async (id) => {
-    if (EX === id) { EX = null; rS(c); return }
-    EX = id
-    if (!S.details[id]) {
-      rS(c)
-      try { S.details[id] = await apiFetch(`/contracts/${id}?role=client`) } catch(e) { console.warn(e) }
-    }
-    rS(c)
-  }
-}
-
-// ── PAYMENTS ──────────────────────────────────────────────────────────────────
-async function rP(c) {
-  if (S.loading && !S.contracts.length) { c.innerHTML = spinner(); return }
-  await Promise.all(S.contracts.map(async x => {
-    if (!S.details[x.id]) {
-      try { S.details[x.id] = await apiFetch(`/contracts/${x.id}?role=client`) } catch(e){}
-    }
-  }))
-  const rows = []
-  S.contracts.forEach(x => {
-    const det = S.details[x.id]
-    if (det) det.periods.forEach(p => rows.push({...p, cid:x.id, cp:x.party_b}))
-  })
-  rows.sort((a,b) => (a.payment_date||'z').localeCompare(b.payment_date||'z'))
-  c.innerHTML = `${crumb('Payments')}<div class="hd">Payments</div><div class="sub">All scheduled payments across contracts</div>
-<table class="tb"><thead><tr>
-  <th>Pay Date</th><th>Contract</th><th>Counterparty</th><th>#</th>
-  <th>Fixed</th><th>Floating</th><th>Net</th>
-  <th>Direction</th><th>Oracle</th><th>Status</th>
-</tr></thead><tbody>
-${rows.map(p => {
-  const st = pSt(p)
-  const dir = p.net_payer==='PARTY_A'
-    ? '<span style="color:var(--r)">You pay</span>'
-    : p.net_payer==='PARTY_B'
-      ? '<span style="color:var(--g)">You receive</span>'
-      : '—'
-  return `<tr>
-    <td class="m">${p.payment_date}</td>
-    <td class="id">${p.cid}</td>
-    <td>${p.cp}</td>
-    <td class="m">${p.number}</td>
-    <td class="m">${eur(p.fixed_amount)}</td>
-    <td class="m">${eur(p.floating_amount)}</td>
-    <td class="m" style="color:var(--warm);font-weight:500">${eur(p.net_amount)}</td>
-    <td>${p.fixed_amount!==null?dir:'—'}</td>
-    <td style="font-family:var(--fm);font-size:10px;color:var(--t3)">${p.oracle_rate?(p.oracle_rate*100).toFixed(3)+'%':'—'}</td>
-    <td>${pBadge(st)}</td>
-  </tr>`
-}).join('')}
-</tbody></table>`
-}
-
-// ── ORACLE ────────────────────────────────────────────────────────────────────
-function rO(c) {
-  const O = S.oracle
-  const R3 = S.orc3
-  const rates = R3.rates || {}
-
-  // Find the EURIBOR_3M rate from oracle v3 (or fall back to old oracle)
-  const e3m = rates['EURIBOR_3M'] || rates['EURIBOR 3M']
-  const displayRate = e3m
-    ? (Number(e3m.rate)*100).toFixed(4)
-    : (O.current_rate ? (Number(O.current_rate)*100).toFixed(3) : null)
-  const displayStatus = e3m?.status || O.status
-
-  function statusPill(st) {
-    if (st==='CONFIRMED') return '<span class="tag tag-g">● Confirmed</span>'
-    if (st==='FALLBACK'||st==='STATIC_FALLBACK') return '<span class="tag tag-w">△ Fallback</span>'
-    if (st==='STALE') return '<span class="tag tag-r">○ Stale</span>'
-    return '<span class="tag tag-b">— Pending</span>'
-  }
-
-  // Per-contract rate display
-  const contractRates = S.contracts.map(x => {
-    const det = S.details[x.id]
-    const lastRate = det?.periods.filter(p=>p.oracle_rate!=null).slice(-1)[0]?.oracle_rate
-    return `<tr>
-      <td class="id">${x.id}</td>
-      <td>${x.party_b}</td>
-      <td class="m">${pct(x.fixed_rate)}</td>
-      <td style="color:var(--warm);font-family:var(--fm);font-size:11px">${lastRate ? (Number(lastRate)*100).toFixed(4)+'%' : displayRate ? displayRate+'%' : '—'}</td>
-      <td>${statusPill(lastRate ? 'CONFIRMED' : displayStatus)}</td>
-    </tr>`
-  }).join('')
-
-  // All rates table from oracle v3
-  const allRateRows = Object.values(rates).map(r => `<tr>
-    <td class="m" style="color:var(--warm)">${r.rate_id}</td>
-    <td class="m">${r.rate ? (Number(r.rate)*100).toFixed(4)+'%' : '—'}</td>
-    <td><span class="tag ${r.status==='CONFIRMED'?'tag-g':r.status==='FALLBACK'||r.status==='STATIC_FALLBACK'?'tag-w':'tag-r'}">${r.status||'—'}</span></td>
-    <td style="font-size:10px;color:var(--t3)">${(r.fetch_timestamp||'—').slice(0,16).replace('T',' ')}</td>
-  </tr>`).join('')
-
-  c.innerHTML = `${crumb('Oracle')}<div class="hd">Oracle</div>
-<div class="sub">Reference rates for floating leg calculations · ISDA 2021 5-step fallback waterfall</div>
-
-<div class="card">
-  <div class="orc">
-    <div style="text-align:center;min-width:190px">
-      <div style="font-size:10px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;font-family:var(--fm)">EURIBOR 3M</div>
-      <div class="orc-v">${displayRate ? displayRate+'%' : '—'}</div>
-      <div style="margin-top:12px">${statusPill(displayStatus)}</div>
-    </div>
-    <div style="width:1px;background:var(--b0);align-self:stretch"></div>
-    <div class="orc-m">
-      <strong>Source:</strong> ${e3m?.source || O.source||'—'}<br>
-      <strong>Last fetch:</strong> ${R3.lastFetch ? R3.lastFetch.toLocaleTimeString() : '—'}<br>
-      <strong>Fetch count:</strong> ${O.fetch_count||0}<br>
-      <strong>Anomalies detected:</strong> ${O.anomalies_detected||0}<br>
-      <strong>Challenge threshold:</strong> 5 bps · ISDA 2021 §5(b)
-    </div>
-  </div>
-</div>
-
-${S.contracts.length ? `<div class="sh">Per-Contract Rates</div>
-<table class="tb"><thead><tr><th>Contract</th><th>Counterparty</th><th>Fixed Rate</th><th>EURIBOR 3M (last)</th><th>Status</th></tr></thead>
-<tbody>${contractRates}</tbody></table>` : ''}
-
-<div class="sh">All Rates Registry <span class="tag tag-v">${Object.keys(rates).length}</span></div>
-<table class="tb"><thead><tr><th>Rate ID</th><th>Value</th><th>Status</th><th>Last Fetched</th></tr></thead>
-<tbody>${allRateRows||'<tr><td colspan="4" style="text-align:center;color:var(--t3);padding:16px">No cached rates. Advisor portal can refresh from ECB.</td></tr>'}</tbody>
-</table>
-
-<div style="margin-top:16px;font-size:11px;color:var(--t2);line-height:2.4">
-  <span style="color:var(--g)">● Step 1</span> ECB SDW &nbsp;→&nbsp;
-  <span style="color:var(--warm)">◐ Step 2</span> ISDA 2021 €STR+spread &nbsp;→&nbsp;
-  <span style="color:var(--t3)">○ Step 3</span> Last confirmed (stale) &nbsp;→&nbsp;
-  <span style="color:var(--t3)">○ Step 4</span> Static fallback
-</div>`
-}
-
-// ── DOCUMENTS (Due Diligence Checklist) ───────────────────────────────────────
-async function rDc(c) {
-  if (S.loading && !S.contracts.length) { c.innerHTML = spinner(); return }
-  if (!S.ready) S.ready = {}
-
-  // Load DD summaries, signing readiness, and comments in parallel for all contracts
-  await Promise.all(S.contracts.flatMap(x => {
-    const tasks = []
-    if (!S.dd[x.id])
-      tasks.push(apiFetch(`/contracts/${x.id}/due-diligence`).then(r=>{S.dd[x.id]=r}).catch(e=>{S.dd[x.id]={error:e.message}}))
-    if (!S.ready[x.id])
-      tasks.push(apiFetch(`/contracts/${x.id}/signing-readiness`).then(r=>{S.ready[x.id]=r}).catch(()=>{S.ready[x.id]={ready:false,blocking_count:0,missing:[],open_comments:0}}))
-    if (!S.comments[x.id])
-      tasks.push(apiFetch(`/contracts/${x.id}/comments`).then(r=>{S.comments[x.id]=r}).catch(()=>{S.comments[x.id]={comments:[],open_count:0}}))
-    return tasks
-  }))
-
-  function ragPill(rag) {
-    if (rag==='GREEN') return '<span class="p p-g">● All OK</span>'
-    if (rag==='AMBER') return '<span class="p p-w">◐ Pending</span>'
-    if (rag==='RED')   return '<span class="p p-r">○ Action needed</span>'
-    return '<span class="p p-gy">—</span>'
-  }
-  function docStatusPill(st) {
-    const map={REQUIRED:'p-r',UPLOADED:'p-b',VALIDATED:'p-g',REJECTED:'p-r',EXPIRED:'p-r',NOT_REQUIRED:'p-gy'}
-    const labels={REQUIRED:'MISSING',UPLOADED:'UPLOADED',VALIDATED:'VALIDATED',REJECTED:'REJECTED',EXPIRED:'EXPIRED',NOT_REQUIRED:'N/A'}
-    return `<span class="p ${map[st]||'p-b'}">${labels[st]||st}</span>`
-  }
-  function workflowBar(state) {
-    const steps=['KYC_PENDING','KYC_VALIDATED','DOCS_PENDING','DOCS_VALIDATED','READY_TO_SIGN']
-    const labels=['KYC','KYC ✓','Docs','Docs ✓','Ready ✓']
-    const cur=steps.indexOf(state)
-    return `<div style="display:flex;gap:0;margin-bottom:14px">`+
-      steps.map((s,i)=>`<div style="flex:1;text-align:center;padding:5px 2px;font-size:9px;border-radius:${i===0?'6px 0 0 6px':i===steps.length-1?'0 6px 6px 0':'0'};background:${i<=cur?'rgba(74,222,128,.12)':'rgba(255,255,255,.04)'};color:${i<=cur?'var(--g)':'var(--t3)'};border:1px solid ${i<=cur?'rgba(74,222,128,.25)':'var(--b0)'};margin-left:${i>0?'-1px':'0'}">${labels[i]}</div>`).join('')+
-    `</div>`
-  }
-
-  // ── Two-tier document rendering ──────────────────────────────────────────────
-  function docRow(d, contractId) {
-    const isGeneral = d.category === 'GENERAL' || (d.doc_id && d.doc_id.startsWith('GD-'))
-    const entityName = d.entity_name || ''
-    const uploadCell = (d.status==='REQUIRED'||d.status==='REJECTED'||d.status==='EXPIRED')
-      ? `<button class="btn pr" onclick="_ddUpload('${contractId}','${d.doc_id}','${d.doc_type}','${isGeneral?entityName:''}',this)">↑ Upload</button>`
-      : d.status==='UPLOADED' ? '<span style="font-size:10px;color:var(--bl)">⏳ Awaiting review</span>'
-      : d.status==='VALIDATED' ? '<span style="font-size:10px;color:var(--g)">✓ Accepted</span>'
-      : '—'
-    return `<tr${d.status==='REQUIRED'?' style="background:rgba(248,113,113,.025)"':''}>
-  <td><div style="font-size:11px">${d.description||d.doc_type}</div><div style="font-size:9px;color:var(--t3)">${d.linked_obligation||''}</div></td>
-  <td>${docStatusPill(d.status)}</td>
-  <td style="font-size:10px;color:var(--t3)">${d.due_date_obligation||'—'}</td>
-  <td>${uploadCell}</td>
-</tr>`
-  }
-
-  function entityDocsSection(docs, partyLabel, partyName) {
-    if (!docs || !docs.length) return ''
-    const val = docs.filter(d=>d.status==='VALIDATED').length
-    const total = docs.length
-    const allOk = val === total
-    return `
-<div style="margin-bottom:14px;border:1px solid ${allOk?'rgba(74,222,128,.2)':'rgba(248,113,113,.2)'};border-radius:8px;overflow:hidden">
-  <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;background:${allOk?'rgba(74,222,128,.06)':'rgba(248,113,113,.04)'};border-bottom:1px solid var(--b0)">
-    <div>
-      <span style="font-size:11px;font-weight:600;color:var(--t2)">${partyLabel}</span>
-      <span style="font-size:10px;color:var(--t3);margin-left:8px">${partyName}</span>
-    </div>
-    <span style="font-size:10px;color:${allOk?'var(--g)':'var(--r)'}">${val}/${total} validated${allOk?' ✓':''}</span>
-  </div>
-  <table class="tb" style="margin:0"><thead><tr>
-    <th>Document</th><th>Status</th><th>Due</th><th>Upload</th>
-  </tr></thead><tbody>${docs.map(d=>docRow(d, '')).join('')}</tbody></table>
-</div>`
-  }
-
-  const blocks = S.contracts.map(x => {
-    const dd       = S.dd[x.id]
-    if (!dd || dd.error) return `<div class="card"><strong>${x.id}</strong> — <span style="color:var(--t3);font-size:11px">${dd?.error||'Due diligence module not available'}</span></div>`
-
-    const tiers        = dd.document_tiers || {}
-    const genA         = tiers.general_party_a || []
-    const genB         = tiers.general_party_b || []
-    const contractDocs = tiers.contract_specific || dd.documents || []
-    const allDocs      = dd.documents || []
-    const preDocs      = allDocs.filter(d=>d.is_pre_signing)
-    const preVal       = preDocs.filter(d=>d.status==='VALIDATED').length
-    const overdue      = dd.overdue_docs || []
-    const expiring     = dd.expiring_soon || []
-    const wfState      = dd.workflow?.state || 'KYC_PENDING'
-    const ready        = S.ready[x.id]
-    const cmtData      = S.comments[x.id] || {comments:[], open_count:0}
-    const openComments = cmtData.open_count || 0
-    const canSign      = (ready?.ready ?? false) && openComments === 0
-    const blocking     = ready?.blocking_count || 0
-
-    const pct = preDocs.length ? Math.round(100*preVal/preDocs.length) : 100
-
-    const signDisabledTitle = !canSign
-      ? (blocking > 0 && openComments > 0
-          ? `${blocking} document(s) required · ${openComments} open comment(s) to resolve`
-          : blocking > 0
-            ? `Due diligence incomplete: ${blocking} document${blocking!==1?'s':''} still required`
-            : `${openComments} open comment${openComments!==1?'s':''} must be resolved before signing`)
-      : ''
-
-    const signAreaHtml = x.status === 'PENDING_SIGNATURE'
-      ? canSign
-        ? `<button id="sign-btn-${x.id}" class="btn sign-btn" onclick="signContract('${x.id}')">✍ Sign &amp; Activate</button>`
-        : `<button id="sign-btn-${x.id}" class="btn sign-btn" disabled title="${signDisabledTitle}" style="opacity:.45;cursor:not-allowed">✍ Sign &amp; Activate</button>`
-      : x.status === 'ACTIVE'
-        ? `<span class="p p-g">● Active</span>`
-        : `<span class="p p-gy">${x.status}</span>`
-
-    const csPreDocs  = contractDocs.filter(d=>d.is_pre_signing)
-    const csPostDocs = contractDocs.filter(d=>!d.is_pre_signing)
-
-    return `<div class="card" style="margin-bottom:16px">
-${isDemoMode()?`<div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.2);border-radius:8px;padding:7px 12px;margin-bottom:12px;font-size:11px;color:#eab308;display:flex;align-items:center;gap:6px"><span>⚠</span><span>DEMO MODE: Documents auto-validated</span></div>`:''}
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-  <div>
-    <div style="font-size:13px;font-weight:600">${x.id}</div>
-    <div style="font-size:10px;color:var(--t3)">Counterparty: ${x.party_b} · Schedule Part 3</div>
-  </div>
-  <div style="display:flex;gap:8px;align-items:center">${ragPill(dd.rag_status)}${signAreaHtml}</div>
-</div>
-
-${workflowBar(wfState)}
-
-<div style="margin-bottom:14px">
-  <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--t3);margin-bottom:5px">
-    <span>Pre-signing documents</span>
-    <span>${preVal} of ${preDocs.length} validated${!canSign&&x.status==='PENDING_SIGNATURE'?' · <span style="color:var(--r)">'+blocking+' required</span>':''}</span>
-  </div>
-  <div style="background:rgba(255,255,255,.05);border-radius:4px;height:5px;overflow:hidden">
-    <div style="width:${pct}%;background:${pct===100?'var(--g)':'var(--warm)'};height:5px;border-radius:4px;transition:width .4s ease"></div>
-  </div>
-</div>
-
-${overdue.length ? `<div style="background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.2);border-radius:8px;padding:8px 14px;margin-bottom:10px;font-size:10px;color:var(--r)">⚠ Overdue: ${overdue.join(' · ')}</div>` : ''}
-${expiring.length ? `<div style="background:rgba(196,149,106,.06);border:1px solid rgba(196,149,106,.15);border-radius:8px;padding:8px 14px;margin-bottom:10px;font-size:10px;color:var(--warm)">Expiring soon: ${expiring.join(' · ')}</div>` : ''}
-
-<!-- ── SECTION 1: Entity Documents ── -->
-${(genA.length || genB.length) ? `
-<div style="font-size:11px;font-weight:600;color:var(--t2);margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--b0)">
-  Section 1 — Entity Documents <span style="font-size:9px;font-weight:400;color:var(--t3);margin-left:4px">Uploaded once · Applies to all contracts for this entity</span>
-</div>
-${entityDocsSection(genA, 'Party A', x.party_a)}
-${entityDocsSection(genB, 'Party B', x.party_b)}` : ''}
-
-<!-- ── SECTION 2: Contract-Specific Documents ── -->
-<div style="font-size:11px;font-weight:600;color:var(--t2);margin-bottom:6px;${(genA.length||genB.length)?'margin-top:14px;padding-top:14px;border-top:1px solid var(--b0)':''}">
-  Section 2 — Contract-Specific Documents
-</div>
-${csPreDocs.length ? `
-<div style="font-size:10px;color:var(--t3);margin-bottom:6px">Phase 1 — Pre-Signing</div>
-<table class="tb" style="margin-bottom:${csPostDocs.length?'14px':'0'}"><thead><tr>
-  <th>Document</th><th>Status</th><th>Due</th><th>Upload</th>
-</tr></thead><tbody>${csPreDocs.map(d=>docRow(d, x.id)).join('')}</tbody></table>` : ''}
-
-${csPostDocs.length ? `
-<div style="font-size:10px;color:var(--t3);margin-bottom:6px;margin-top:12px">Phase 2 — Post-Signing (Ongoing)</div>
-<table class="tb" style="margin-bottom:0"><thead><tr>
-  <th>Document</th><th>Status</th><th>Due</th><th>Upload</th>
-</tr></thead><tbody>${csPostDocs.map(d=>docRow(d, x.id)).join('')}</tbody></table>` : ''}
-
-<!-- ── PDF Preview ── -->
-${x.status === 'PENDING_SIGNATURE' || x.status === 'ACTIVE' ? `
-<div style="margin-top:14px;margin-bottom:10px;border:1px solid var(--b1);border-radius:8px;overflow:hidden">
-  <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;background:var(--s2);border-bottom:1px solid var(--b0)">
-    <div style="font-size:11px;font-weight:600;color:var(--t2)">Confirmation PDF</div>
-    <a href="/api/contracts/${x.id}/pdf" download="confirmation-${x.id}.pdf"
-       style="font-size:10px;color:var(--warm);text-decoration:none;border:1px solid rgba(196,149,106,.3);border-radius:4px;padding:3px 10px;transition:all .15s"
-       onmouseover="this.style.background='rgba(196,149,106,.1)'" onmouseout="this.style.background=''">
-      ↓ Download PDF
-    </a>
-  </div>
-  <iframe class="pdf-frame" src="/api/contracts/${x.id}/pdf" title="Confirmation PDF — ${x.id}"></iframe>
-</div>` : ''}
-
-<!-- ── Comments Section ── -->
-<div style="margin-bottom:16px">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-    <div style="font-size:11px;font-weight:600;color:var(--t2)">Pre-Signing Comments</div>
-    <span style="font-size:10px;${openComments>0?'color:var(--r)':'color:var(--g)'}">
-      ${openComments>0 ? openComments+' open' : '✓ No open comments'}
-    </span>
-  </div>
-  <div id="cmts-${x.id}">
-    ${cmtData.comments.length ? cmtData.comments.map(cm=>`
-    <div class="cmt ${cm.status==='OPEN'?'cmt-open':'cmt-resolved'}">
-      <div class="cmt-meta">
-        <span>${cm.author}</span>
-        <span>${cm.timestamp.slice(0,16).replace('T',' ')} UTC</span>
-        <span class="p ${cm.status==='OPEN'?'p-w':'p-g'}" style="font-size:8px">${cm.status}</span>
-        ${cm.status==='RESOLVED'?`<span style="color:var(--g)">✓ resolved by ${cm.resolved_by}</span>`:''}
+  <div class="shell">
+    <nav class="sidebar" aria-label="Primary">
+      <div class="side-group"><span class="label">Portfolio</span></div>
+      <div class="side-item on" data-view="today">Today</div>
+      <div class="side-item" data-view="contracts">
+        <span>Contracts</span>
+        <span class="badge" id="badge-contracts">—</span>
       </div>
-      <div class="cmt-text">${cm.text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
-    </div>`).join('') : '<div style="font-size:11px;color:var(--t3);padding:6px 0">No comments yet.</div>'}
-  </div>
-  ${x.status === 'PENDING_SIGNATURE' ? `
-  <div style="margin-top:10px">
-    <textarea id="cmt-txt-${x.id}" class="cmt-ta" placeholder="Add a question or comment before signing…"></textarea>
-    <div style="margin-top:6px;display:flex;gap:8px;align-items:center">
-      <button class="btn pr" onclick="_addComment('${x.id}',this)">Submit Comment</button>
-      <span id="cmt-msg-${x.id}" style="font-size:10px;color:var(--t3)"></span>
-    </div>
-  </div>` : ''}
-</div>
+      <div class="side-group" style="margin-top:18px;"><span class="label">Account</span></div>
+      <div class="side-item" data-view="documents">Documents</div>
+      <div class="side-item" data-view="profile">Profile</div>
 
-</div>`
-  }).join('')
-
-  c.innerHTML = `${crumb('Documents')}<div class="hd">Documents</div>
-<div class="sub">Required deliveries under Schedule Part 3 · §4(a) ISDA 2002 · Pre-signing gate enforced</div>
-${blocks || '<div class="card" style="text-align:center;color:var(--t3);padding:30px;font-size:11px">No contracts or documents found.</div>'}
-<div style="font-size:10px;color:var(--t3);margin-top:8px">Contact Linklaters LLP for questions about your document obligations.</div>
-<div id="dd-upload-msg" style="display:none;margin-top:12px"></div>`
-
-  // _ddUpload: entityName='' means contract-specific (uses contract endpoint)
-  // entityName non-empty means general doc (uses entity endpoint)
-  window._ddUpload = async (contractId, docId, docType, entityName, btn) => {
-    const label = entityName ? `"${docType}" for ${entityName}` : `"${docType}" for ${contractId}`
-    if (!confirm(`Submit ${label}?\n\nA stub document will be uploaded for advisor review.`)) return
-    btn.disabled = true; btn.textContent = 'Uploading…'
-    try {
-      const payload = {
-        doc_id:           docId,
-        document_type:    docType,
-        filename:         docType.toLowerCase().replace(/_/g,'-')+'.pdf',
-        uploaded_by:      entityName || ('Client — '+contractId),
-        file_content_b64: btoa('STUB_CONTENT'),
-      }
-      if (entityName) {
-        await apiFetch('/entities/'+encodeURIComponent(entityName)+'/documents/upload', {
-          method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
-        })
-      } else {
-        await apiFetch('/contracts/'+contractId+'/due-diligence/upload', {
-          method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
-        })
-      }
-      delete S.dd[contractId]
-      delete S.ready[contractId]
-      toast(`✓ ${docType} uploaded — awaiting advisor review`, 'ok')
-      await refresh()
-    } catch(e) {
-      toast('Upload error: '+e.message, 'err')
-      btn.disabled=false; btn.textContent='↑ Upload'
-    }
-  }
-
-  window._addComment = async (contractId, btn) => {
-    const ta = document.getElementById('cmt-txt-'+contractId)
-    const msg = document.getElementById('cmt-msg-'+contractId)
-    const text = ta ? ta.value.trim() : ''
-    if (!text) { if (msg) { msg.style.color='var(--r)'; msg.textContent='Please enter a comment.' }; return }
-    btn.disabled = true; btn.textContent = 'Submitting…'
-    try {
-      await apiPost('/contracts/'+contractId+'/comments', {
-        author: 'Client — '+contractId,
-        role: 'client',
-        text,
-      })
-      delete S.comments[contractId]
-      delete S.ready[contractId]
-      if (ta) ta.value = ''
-      await refresh()
-    } catch(e) {
-      if (msg) { msg.style.color='var(--r)'; msg.textContent='Error: '+e.message }
-      btn.disabled=false; btn.textContent='Submit Comment'
-    }
-  }
-}
-
-// ── PROFILE ───────────────────────────────────────────────────────────────────
-function rPr(c) {
-  const P = S.profile || {}
-  c.innerHTML = `${crumb('Profile')}<div class="hd">Profile</div>
-<div class="sub">Your company information — shared with your legal advisor and used for compliance checks</div>
-<div class="card">
-  <div style="font-size:12px;font-weight:600;margin-bottom:16px;color:var(--t2)">Company Details</div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-    <div>
-      <div style="font-size:10px;color:var(--t3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:5px">Legal Company Name</div>
-      <input id="pr-name" class="fi" value="${P.company_name||''}" placeholder="Alpha Corp S.A."/>
-    </div>
-    <div>
-      <div style="font-size:10px;color:var(--t3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:5px">Jurisdiction</div>
-      <input id="pr-juris" class="fi" value="${P.jurisdiction||''}" placeholder="FR"/>
-    </div>
-    <div>
-      <div style="font-size:10px;color:var(--t3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:5px">LEI (Legal Entity Identifier)</div>
-      <input id="pr-lei" class="fi" value="${P.lei||''}" placeholder="2138007XKZTKFHVXL357"/>
-    </div>
-    <div>
-      <div style="font-size:10px;color:var(--t3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:5px">Contact Email</div>
-      <input id="pr-email" class="fi" value="${P.contact_email||''}" placeholder="legal@alphacorp.com"/>
-    </div>
-    <div>
-      <div style="font-size:10px;color:var(--t3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:5px">Advisor Key (required to save)</div>
-      <input id="pr-key" class="fi" value="${P.advisor_key||''}" placeholder="Provided by Linklaters LLP" type="password"/>
-    </div>
-  </div>
-  <div style="margin-top:16px;display:flex;gap:8px;align-items:center">
-    <button class="btn pr" onclick="_savePr(this)">Save Profile</button>
-    <span id="pr-msg" style="font-size:10px;color:var(--t3)"></span>
-  </div>
-</div>
-
-<div class="card" style="margin-top:12px">
-  <div style="font-size:12px;font-weight:600;margin-bottom:12px;color:var(--t2)">Legal Advisor</div>
-  <div style="font-size:11px;color:var(--t2);line-height:2.4">
-    <strong>Firm:</strong> Linklaters LLP<br>
-    <strong>Calculation Agent role:</strong> Party A<br>
-    <strong>ISDA Master Agreement:</strong> 2002 (English Law)<br>
-    <strong>Governing Law:</strong> §13 ISDA 2002
-  </div>
-</div>`
-
-  window._savePr = async (btn) => {
-    btn.disabled=true; btn.textContent='Saving…'
-    const msg = document.getElementById('pr-msg')
-    try {
-      const res = await apiFetch('/client/profile', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          company_name: document.getElementById('pr-name').value,
-          jurisdiction: document.getElementById('pr-juris').value,
-          lei: document.getElementById('pr-lei').value,
-          contact_email: document.getElementById('pr-email').value,
-          advisor_key: document.getElementById('pr-key').value,
-        })
-      })
-      S.profile = res.profile || {}
-      if (msg) { msg.style.color='var(--g)'; msg.textContent='✓ Profile saved' }
-    } catch(e) {
-      if (msg) { msg.style.color='var(--r)'; msg.textContent='⚠ '+e.message }
-    }
-    btn.disabled=false; btn.textContent='Save Profile'
-  }
-}
-
-// ── CONTRACT DETAIL ───────────────────────────────────────────────────────────
-function openContract(id) {
-  _detId = id
-  if (!S.details[id]) apiFetch(`/contracts/${id}?role=client`).then(d=>{S.details[id]=d;if(view==='det')R()}).catch(()=>{})
-  if (!S.dd[id])      apiFetch(`/contracts/${id}/due-diligence`).then(d=>{S.dd[id]=d}).catch(()=>{})
-  if (!S.comments[id]) apiFetch(`/contracts/${id}/comments`).then(d=>{S.comments[id]=d}).catch(()=>{})
-  view='det'; document.querySelectorAll('.si').forEach(e=>e.classList.remove('on')); _closeSide(); R()
-}
-
-async function rDet(c) {
-  if (!_detId) { N('d',null); return }
-  const x = S.contracts.find(ct=>ct.id===_detId)
-  if (!x) { c.innerHTML=`<div class="hd">Contract not found</div>`; return }
-
-  c.innerHTML = spinner()
-  await Promise.all([
-    !S.details[_detId]  ? apiFetch(`/contracts/${_detId}?role=client`).then(d=>S.details[_detId]=d).catch(()=>{}) : Promise.resolve(),
-    !S.dd[_detId]       ? apiFetch(`/contracts/${_detId}/due-diligence`).then(d=>S.dd[_detId]=d).catch(()=>{}) : Promise.resolve(),
-    !S.comments[_detId] ? apiFetch(`/contracts/${_detId}/comments`).then(d=>S.comments[_detId]=d).catch(()=>{}) : Promise.resolve(),
-  ])
-
-  const det  = S.details[_detId]
-  if (!det) { c.innerHTML=`<div class="hd" style="color:var(--r)">Failed to load contract</div>`; return }
-  const dd   = S.dd[_detId] || {}
-  const cmtData = S.comments[_detId] || {comments:[],open_count:0}
-  const periods = det.periods || []
-  const O = S.oracle
-
-  const today = new Date().toISOString().slice(0,10)
-  const signed = ['ACTIVE','TERMINATED','EARLY_TERM_NOTIFIED'].includes(x.status)
-  const ddDone = dd.rag_status==='GREEN' || ['READY_TO_SIGN','DOCS_VALIDATED'].includes(dd.workflow?.state)
-  const pendingApproval = periods.find(p=>p.payment_instruction_issued&&!p.payment_confirmed)
-  const completedCount = periods.filter(p=>p.payment_confirmed).length
-  const nextCalc = periods.find(p=>!p.fixed_amount)
-
-  // Helpers
-  function tlItem(state, label, sub) {
-    const d=state==='done', k=state==='cur'
-    return `<div class="tl-item ${d?'done':''}">
-      <div class="tl-dot ${d?'done':k?'cur':''}">${d?'✓':k?'●':'○'}</div>
-      <div class="tl-lbl ${d?'done':k?'cur':''}">${label}</div>
-      ${sub?`<div class="tl-sub">${sub}</div>`:''}
-    </div>`
-  }
-  function pBadgeDet(p) {
-    if (p.payment_confirmed) return '<span class="p p-g" style="font-size:9px">✓ Confirmed</span>'
-    if (p.payment_instruction_issued) return '<span class="p p-w" style="font-size:9px">◐ PI Pending</span>'
-    if (p.fixed_amount!==null) return '<span class="p p-b" style="font-size:9px">Calculated</span>'
-    return '<span class="p p-gy" style="font-size:9px">Scheduled</span>'
-  }
-  function payerLabel(p) {
-    if (!p.net_payer) return '—'
-    return p.net_payer==='PARTY_A'
-      ? '<span style="color:var(--r)">You pay</span>'
-      : '<span style="color:var(--g)">You receive</span>'
-  }
-  function docPill(st) {
-    const m={REQUIRED:'p-r',UPLOADED:'p-b',VALIDATED:'p-g',REJECTED:'p-r',EXPIRED:'p-r',NOT_REQUIRED:'p-gy'}
-    const l={REQUIRED:'Missing',UPLOADED:'Uploaded',VALIDATED:'✓ OK',REJECTED:'Rejected',EXPIRED:'Expired',NOT_REQUIRED:'N/A'}
-    return `<span class="p ${m[st]||'p-b'}" style="font-size:9px">${l[st]||st}</span>`
-  }
-
-  // Timeline
-  const tlPeriods = periods.map(p => {
-    const st = p.payment_confirmed ? 'done' : p.payment_instruction_issued ? 'cur' : 'fut'
-    return tlItem(st, `P${p.number}`, p.payment_date)
-  })
-  const tlHtml = [
-    tlItem('done', 'Created', x.effective_date),
-    tlItem(ddDone?'done':signed?'done':'cur', 'DD', ddDone?'✓ Complete':'In progress'),
-    tlItem(signed?'done':'cur', 'Signed', signed?'● Active':'Pending'),
-    ...tlPeriods,
-    tlItem(x.status==='TERMINATED'?'done':'fut', 'Termination', x.termination_date),
-  ].join('')
-
-  // DD data
-  const ddDocs  = dd.documents || []
-  const preDocs = ddDocs.filter(d=>d.is_pre_signing)
-  const postDocs= ddDocs.filter(d=>!d.is_pre_signing)
-  const preVal  = preDocs.filter(d=>d.status==='VALIDATED').length
-  const pctDD   = preDocs.length ? Math.round(100*preVal/preDocs.length) : 100
-
-  // Sign button logic
-  const ready = S.ready && S.ready[_detId]
-  const openCmts = cmtData.open_count || 0
-  let signCell = ''
-  if (x.status==='PENDING_SIGNATURE') {
-    signCell = ready?.ready && !openCmts
-      ? `<button id="sign-btn-${_detId}-det" class="btn sign-btn" onclick="signContract('${_detId}')">✍ Sign &amp; Activate</button>`
-      : `<button class="btn sign-btn" disabled style="opacity:.45" title="${!ready?.ready?'Documents required':'Resolve open comments first'}">✍ Sign &amp; Activate</button>`
-  }
-
-  c.innerHTML = `
-${crumb({label:'Dashboard',view:'d'}, _detId)}
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">
-  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-    <div class="hd" style="margin-bottom:0">${_detId}</div>
-    <span class="p ${statusCls(x.status)}">${x.status.replace(/_/g,' ')}</span>
-  </div>
-  <div style="display:flex;gap:8px;align-items:center">
-    ${signCell}
-    <button class="btn" onclick="_detId=null;N('d',null)" style="font-size:10px">← Back</button>
-    <button class="btn" onclick="openContract('${_detId}')" style="font-size:10px;color:var(--warm);border-color:rgba(196,149,106,.3)">⟳ Refresh</button>
-  </div>
-</div>
-
-<!-- Summary -->
-<div class="sh">Summary</div>
-<div class="card" style="margin-bottom:16px">
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:14px">
-    <div>
-      <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Counterparty</div>
-      <div style="font-size:13px;font-weight:600">${x.party_b}</div>
-      <div style="font-size:11px;color:var(--t3);margin-top:4px">Your advisor: Linklaters LLP · Calc. Agent: Party A</div>
-    </div>
-    <div>
-      <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Key Terms</div>
-      <div style="font-size:11px;color:var(--t2);line-height:2.3">
-        Notional <span style="color:var(--warm);font-weight:600">€${(x.notional/1e6).toFixed(0)}M</span><br>
-        Fixed <span style="font-family:var(--fm)">${pct(x.fixed_rate)}</span> · Floating EURIBOR 3M<br>
-        <span style="font-family:var(--fm)">${x.effective_date}</span> → <span style="font-family:var(--fm)">${x.termination_date}</span>
+      <div class="side-foot">
+        Legal advisor<br>
+        <span class="strong">Linklaters LLP</span><br><br>
+        Calculation Agent · Party A
       </div>
-    </div>
-  </div>
-  <div style="padding-top:14px;border-top:1px solid var(--b0);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-    <div style="font-size:11px;color:var(--t2)">
-      EURIBOR 3M today: <span style="color:var(--warm);font-weight:600;font-family:var(--fm)">${O.current_rate?(Number(O.current_rate)*100).toFixed(3)+'%':'—'}</span>
-      <span class="tag tag-${O.status==='CONFIRMED'?'g':'w'}" style="margin-left:6px">${O.status||'—'}</span>
-    </div>
-    <div style="font-size:11px;color:var(--t2)">
-      ${pendingApproval
-        ? `Next: <span style="color:var(--warm)">${eur(pendingApproval.net_amount)} due ${pendingApproval.payment_date}</span> (awaiting advisor approval)`
-        : nextCalc
-          ? `Next period P${nextCalc.number} resets ${nextCalc.start}`
-          : `<span style="color:var(--g)">All ${periods.length} periods complete</span>`}
-    </div>
-  </div>
-</div>
+    </nav>
 
-<!-- Timeline -->
-<div class="sh">Timeline</div>
-<div class="card" style="overflow-x:auto;margin-bottom:16px;padding:16px 20px 12px">
-  <div class="tl">${tlHtml}</div>
-</div>
-
-<!-- Payment Schedule -->
-<div class="sh">Payment Schedule <span class="tag tag-w">${periods.length} periods · ${completedCount} approved</span></div>
-<div style="border:1px solid var(--b0);border-radius:var(--rad);overflow:hidden;margin-bottom:16px">
-  <table class="tb" style="margin-bottom:0"><thead><tr>
-    <th>#</th><th>Pay Date</th><th>Fixed</th><th>Floating</th><th>Net</th><th>Direction</th><th>EURIBOR</th><th>Status</th>
-  </tr></thead><tbody>
-  ${periods.map(p=>`<tr>
-    <td class="m">P${p.number}</td>
-    <td class="m">${p.payment_date}</td>
-    <td class="m">${eur(p.fixed_amount)}</td>
-    <td class="m">${eur(p.floating_amount)}</td>
-    <td class="m" style="${p.net_amount?'color:var(--warm);font-weight:500':''}">${eur(p.net_amount)}</td>
-    <td>${p.fixed_amount!==null?payerLabel(p):'—'}</td>
-    <td class="m" style="color:var(--t3)">${p.oracle_rate!=null?(p.oracle_rate*100).toFixed(3)+'%':'—'}</td>
-    <td>${pBadgeDet(p)}</td>
-  </tr>`).join('')}
-  </tbody></table>
-</div>
-
-<!-- Due Diligence -->
-<div class="sh">Due Diligence <span class="tag tag-${dd.rag_status==='GREEN'?'g':dd.rag_status==='AMBER'?'w':'r'}">${dd.rag_status||'—'}</span></div>
-<div class="card" style="margin-bottom:16px">
-  ${isDemoMode()?`<div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.2);border-radius:8px;padding:7px 12px;margin-bottom:12px;font-size:11px;color:#eab308;display:flex;align-items:center;gap:6px"><span>⚠</span><span>DEMO MODE: Documents auto-validated</span></div>`:''}
-  <div style="display:flex;justify-content:space-between;margin-bottom:8px">
-    <span style="font-size:11px;color:var(--t2)">${preVal} of ${preDocs.length} pre-signing documents validated</span>
-    <span style="font-size:10px;color:${pctDD===100?'var(--g)':'var(--warm)'}">
-      ${pctDD===100?'✓ Complete':pctDD+'%'}
-    </span>
+    <main class="main">
+      <div id="conn-banner" class="conn-banner hidden" role="status" aria-live="polite">
+        <span class="dot" aria-hidden="true"></span>
+        <span>Connection to the API interrupted. Retrying…</span>
+      </div>
+      <div id="page" class="page" aria-live="polite"></div>
+    </main>
   </div>
-  <div style="background:rgba(255,255,255,.05);border-radius:4px;height:5px;overflow:hidden;margin-bottom:14px">
-    <div style="width:${pctDD}%;background:${pctDD===100?'var(--g)':'var(--warm)'};height:5px;border-radius:4px;transition:width .4s"></div>
-  </div>
-  ${preDocs.length?`<table class="tb" style="margin-bottom:${postDocs.length?'12px':'0'}"><thead><tr><th>Document</th><th>Status</th><th>Due</th><th>Action</th></tr></thead><tbody>
-  ${preDocs.map(d=>`<tr>
-    <td style="font-size:11px">${d.description||d.doc_type}</td>
-    <td>${docPill(d.status)}</td>
-    <td style="font-size:10px;color:var(--t3)">${d.due_date_obligation||'—'}</td>
-    <td>${(d.status==='REQUIRED'||d.status==='REJECTED'||d.status==='EXPIRED')
-      ? `<button class="btn pr" style="font-size:10px" onclick="_detUpload('${_detId}','${d.doc_id}','${d.doc_type}',this)">↑ Upload</button>`
-      : d.status==='UPLOADED' ? '<span style="font-size:10px;color:var(--bl)">⏳ Review pending</span>'
-      : '<span style="font-size:10px;color:var(--g)">✓</span>'}</td>
-  </tr>`).join('')}
-  </tbody></table>`:''}
-  ${postDocs.length?`<div style="font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Post-Signing Obligations</div>
-  <table class="tb" style="margin-bottom:0"><thead><tr><th>Document</th><th>Status</th><th>Due</th><th>Action</th></tr></thead><tbody>
-  ${postDocs.map(d=>`<tr>
-    <td style="font-size:11px">${d.description||d.doc_type}</td>
-    <td>${docPill(d.status)}</td>
-    <td style="font-size:10px;color:${d.due_date_obligation&&d.due_date_obligation<today?'var(--r)':'var(--t3)'}">${d.due_date_obligation||'—'}</td>
-    <td>${(d.status==='REQUIRED'||d.status==='REJECTED'||d.status==='EXPIRED')
-      ? `<button class="btn pr" style="font-size:10px" onclick="_detUpload('${_detId}','${d.doc_id}','${d.doc_type}',this)">↑ Upload</button>`
-      : d.status==='UPLOADED' ? '<span style="font-size:10px;color:var(--bl)">⏳ Review pending</span>'
-      : '<span style="font-size:10px;color:var(--g)">✓</span>'}</td>
-  </tr>`).join('')}
-  </tbody></table>`:''}
-</div>
 
-<!-- Comments -->
-<div class="sh">Comments <span class="tag ${openCmts?'tag-r':'tag-g'}">${openCmts} open</span></div>
-<div class="card" style="margin-bottom:32px">
-  <div id="det-cmts">
-    ${cmtData.comments?.length
-      ? cmtData.comments.map(cm=>`<div class="cmt ${cm.status==='OPEN'?'cmt-open':'cmt-resolved'}">
-          <div class="cmt-meta">
-            <span>${cm.author}</span>
-            <span>${(cm.timestamp||'').slice(0,16).replace('T',' ')} UTC</span>
-            <span class="p ${cm.status==='OPEN'?'p-w':'p-g'}" style="font-size:8px">${cm.status}</span>
-            ${cm.status==='RESOLVED'?`<span style="color:var(--g)">✓ ${cm.resolved_by}</span>`:''}
+  <script type="module">
+    import {
+      apiFetch,
+      formatTimestamp,
+      formatRelative,
+      formatDecimalRate,
+      formatHashShort,
+      toast,
+    } from "/static/assets/nomos-ui.js";
+
+    /* ──────────────────────────────────────────────────────────────────
+       Dictionaries
+       ────────────────────────────────────────────────────────────────── */
+    const RULE_LABELS = {
+      "R-001": "Failure to pay",
+      "R-002": "Breach of agreement",
+      "R-003": "Cross default",
+      "R-004": "Illegality",
+      "R-005": "Tax event",
+      "R-006": "Material adverse change",
+    };
+    const SEVERITY_CHIPS = {
+      "warning":           { cls: "chip-ochre", label: "Warning" },
+      "potential_trigger": { cls: "chip-blue",  label: "Potential trigger" },
+      "trigger":           { cls: "chip-red",   label: "Trigger" },
+    };
+
+    /* ──────────────────────────────────────────────────────────────────
+       Module-scope state
+       ────────────────────────────────────────────────────────────────── */
+    const state = {
+      contracts: [],
+      details: {},     // keyed by contract_id
+      dd: {},          // keyed by contract_id
+      ready: {},       // keyed by contract_id
+      comments: {},    // keyed by contract_id
+      profile: {},
+      oracle: {},
+      v2: { health: null, latest: null, triggers: [], chainOk: null },
+      loaded: false,
+      error: null,
+    };
+    let view = "today";
+    let exContract = null;        // currently expanded contract id (detail view)
+    let detailTab = "summary";    // summary | schedule | documents
+
+    /* ──────────────────────────────────────────────────────────────────
+       Auth gate + sign out (preserves legacy behavior)
+       ────────────────────────────────────────────────────────────────── */
+    (function gateRole() {
+      const r = localStorage.getItem("nomos_role");
+      if (r && r !== "client") window.location.href = "/";
+    })();
+    function signOut() {
+      localStorage.removeItem('nomos_role');
+      window.location.href = '/';
+    }
+    document.getElementById("sign-out-btn").addEventListener("click", signOut);
+
+    /* ──────────────────────────────────────────────────────────────────
+       Utilities
+       ────────────────────────────────────────────────────────────────── */
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => (
+      { "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]
+    ));
+    const eur = (v, d=0) => v == null
+      ? "—"
+      : "€" + Number(v).toLocaleString("en-GB", { minimumFractionDigits: d, maximumFractionDigits: d });
+    const pct = (v) => v == null ? "—" : (Number(v) * 100).toFixed(3) + "%";
+    const today = () => new Date().toISOString().slice(0, 10);
+    const daysFromNow = (iso) => {
+      const d = new Date(iso + "T00:00:00Z").getTime();
+      const t = new Date(); t.setUTCHours(0,0,0,0);
+      return Math.round((d - t.getTime()) / 86400000);
+    };
+    function statusChip(status) {
+      const map = {
+        ACTIVE:             { cls: "chip-green",  text: "Active" },
+        PENDING_SIGNATURE:  { cls: "chip-ochre",  text: "Pending signature" },
+        PENDING_INITIATOR:  { cls: "chip-ochre",  text: "Awaiting your signature" },
+        PENDING_COUNTERPARTY: { cls: "chip-blue", text: "Awaiting counterparty" },
+        SUSPENDED:          { cls: "chip-red",    text: "Suspended" },
+        TERMINATED:         { cls: "chip-",       text: "Terminated" },
+        EARLY_TERM_NOTIFIED:{ cls: "chip-ochre",  text: "Early termination notified" },
+      };
+      const m = map[status] || { cls: "chip-", text: status };
+      return `<span class="chip ${m.cls}"><span class="dot"></span><span>${esc(m.text)}</span></span>`;
+    }
+
+    /* ──────────────────────────────────────────────────────────────────
+       Connection chip + banner
+       ────────────────────────────────────────────────────────────────── */
+    function setConn(ok) {
+      const c = document.getElementById("conn-chip");
+      const b = document.getElementById("conn-banner");
+      c.classList.remove("chip-green", "chip-ochre");
+      c.classList.add(ok ? "chip-green" : "chip-ochre");
+      c.querySelector(".conn-text").textContent = ok ? "Live" : "Reconnecting…";
+      b.classList.toggle("hidden", ok);
+    }
+
+    /* ──────────────────────────────────────────────────────────────────
+       Demo banner — uses legacy /api/demo-mode (returns { demo: bool })
+       ────────────────────────────────────────────────────────────────── */
+    async function pollDemo() {
+      const r = await apiFetch("/api/demo-mode");
+      const on = r.ok && r.data && (r.data.demo === true || r.data.enabled === true);
+      document.getElementById("demo-banner").classList.toggle("on", !!on);
+    }
+
+    /* ──────────────────────────────────────────────────────────────────
+       Polling — every 30s. Calls legacy and v2 endpoints in parallel.
+       Detail-only data (per-contract) loaded on demand by openContract.
+       ────────────────────────────────────────────────────────────────── */
+    let inFlight = false;
+    async function refresh() {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const [csR, orcR, _ratesR, profR, healthR, latestR, trigsR, verifyR] = await Promise.all([
+          apiFetch("/api/contracts?role=client"),
+          apiFetch("/api/oracle/latest"),
+          apiFetch("/api/oracle/rates"),
+          apiFetch("/api/client/profile"),
+          apiFetch("/api/v2/oracle/health"),
+          apiFetch("/api/v2/oracle/attestations/latest"),
+          apiFetch("/api/v2/oracle/triggers?limit=10"),
+          apiFetch("/api/v2/oracle/chain/verify"),
+        ]);
+        if (csR.ok && Array.isArray(csR.data)) state.contracts = csR.data;
+        if (orcR.ok && orcR.data) state.oracle = orcR.data;
+        if (profR.ok && profR.data) state.profile = profR.data.profile || profR.data || {};
+        state.v2.health   = healthR.ok ? healthR.data : null;
+        state.v2.latest   = (latestR.ok || latestR.status === 503) ? latestR.data : null;
+        state.v2.triggers = (trigsR.ok && Array.isArray(trigsR.data)) ? trigsR.data : [];
+        state.v2.chainOk  = (verifyR.ok && verifyR.data) ? !!verifyR.data.ok : null;
+        state.loaded = true;
+        state.error  = csR.ok ? null : "API unreachable — is the server running on :8000?";
+        setConn(csR.ok);
+
+        document.getElementById("badge-contracts").textContent = String(state.contracts.length);
+
+        // Refresh the currently open detail.
+        if (exContract && state.contracts.find(c => c.id === exContract)) {
+          const dR = await apiFetch(`/api/contracts/${exContract}?role=client`);
+          if (dR.ok) state.details[exContract] = dR.data;
+        }
+        render();
+      } finally {
+        inFlight = false;
+      }
+    }
+    pollDemo();
+    refresh();
+    setInterval(refresh, 30_000);
+
+    /* ──────────────────────────────────────────────────────────────────
+       Navigation
+       ────────────────────────────────────────────────────────────────── */
+    function nav(v) {
+      view = v;
+      exContract = null;
+      detailTab = "summary";
+      document.querySelectorAll(".side-item").forEach(el => {
+        el.classList.toggle("on", el.dataset.view === v);
+      });
+      render();
+    }
+    document.querySelectorAll(".side-item").forEach(el => {
+      el.addEventListener("click", () => nav(el.dataset.view));
+    });
+
+    /* ──────────────────────────────────────────────────────────────────
+       Render dispatcher
+       ────────────────────────────────────────────────────────────────── */
+    function render() {
+      const main = document.getElementById("page");
+      if (view === "today")     return renderToday(main);
+      if (view === "contracts") return exContract ? renderContractDetail(main) : renderContracts(main);
+      if (view === "documents") return renderDocuments(main);
+      if (view === "profile")   return renderProfile(main);
+    }
+
+    /* ──────────────────────────────────────────────────────────────────
+       View 1 — Today
+       ────────────────────────────────────────────────────────────────── */
+    function todayHeroSentence(name) {
+      if (!state.loaded) return `Loading the latest from your portfolio…`;
+      const c = state.contracts.length;
+      if (state.error)            return `Connection to the API was interrupted. Retrying.`;
+      if (c === 0)                return `Welcome back${name ? ", " + name : ""}. No contracts yet.`;
+      const trig = state.v2.triggers.find(t => t.severity === "trigger");
+      if (trig) {
+        const lbl = RULE_LABELS[trig.rule_id] || trig.rule_id;
+        return `Action required. ${lbl} on ${trig.contract_id}. Review the contract and contact your advisor.`;
+      }
+      let soonest = null;
+      for (const cid of Object.keys(state.details)) {
+        const det = state.details[cid];
+        if (!det || !det.periods) continue;
+        for (const p of det.periods) {
+          if (p.payment_confirmed) continue;
+          if (p.fixed_amount === null) continue;
+          if (!soonest || p.payment_date < soonest.payment_date) {
+            soonest = { ...p, cid, cp: state.contracts.find(x => x.id === cid)?.party_b || cid };
+          }
+        }
+      }
+      if (soonest) {
+        const days = daysFromNow(soonest.payment_date);
+        const amt  = eur(soonest.net_amount);
+        if (days < 0)  return `Action required. The payment of ${amt} to ${esc(soonest.cp)} was due ${Math.abs(days)} day${Math.abs(days)===1?"":"s"} ago and remains pending.`;
+        if (days === 0) return `You have a payment due today: ${amt} to ${esc(soonest.cp)}.`;
+        return `You have 1 payment due in ${days} day${days===1?"":"s"} for ${amt} net to ${esc(soonest.cp)}. ${c} active contract${c===1?"":"s"}.`;
+      }
+      return `All clear. No payments due this week. ${c} active contract${c===1?"":"s"}, all performing nominally.`;
+    }
+
+    function renderToday(main) {
+      const name = state.profile?.company_name || "";
+      const subtitle = name
+        ? `What needs your attention today, ${esc(name)}.`
+        : `What needs your attention today.`;
+      const hero = todayHeroSentence(name);
+
+      // Active triggers panel
+      const trigs = state.v2.triggers.filter(t => t.severity === "trigger" || t.severity === "potential_trigger");
+      const trigHtml = trigs.length === 0
+        ? `<div class="empty-state">
+             <div class="empty-state-title">No active triggers</div>
+             <div class="empty-state-body">All monitored conditions are nominal.</div>
+           </div>`
+        : `<table class="table"><thead><tr>
+             <th>Severity</th><th>Rule</th><th>Clause</th><th>Contract</th><th>When</th>
+           </tr></thead><tbody>${trigs.map(ev => {
+             const sev = SEVERITY_CHIPS[ev.severity] || { cls: "", label: ev.severity };
+             const lbl = RULE_LABELS[ev.rule_id] || ev.rule_id;
+             return `<tr>
+               <td><span class="chip ${sev.cls}"><span class="dot"></span><span>${esc(sev.label)}</span></span></td>
+               <td><span class="strong">${esc(lbl)}</span> <span class="jargon">${esc(ev.rule_id)}</span></td>
+               <td><span class="jargon">${esc(ev.clause_ref)}</span></td>
+               <td>${esc(ev.contract_id)}</td>
+               <td><span class="timestamp" title="${esc(formatTimestamp(ev.evaluated_at))}">${esc(formatRelative(ev.evaluated_at))}</span></td>
+             </tr>`;
+           }).join("")}</tbody></table>`;
+
+      // Market data tile from v2 latest
+      const mdHtml = renderMarketTile();
+
+      main.innerHTML = `
+        <section class="page-h fade-up">
+          <div>
+            <div class="num">01 · Today</div>
+            <h1>Today</h1>
+            <p class="lede">${subtitle}</p>
           </div>
-          <div class="cmt-text">${cm.text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
-        </div>`).join('')
-      : '<div style="font-size:11px;color:var(--t3);padding:4px 0">No comments yet.</div>'}
-  </div>
-  <div style="margin-top:12px;border-top:1px solid var(--b0);padding-top:12px">
-    <textarea id="det-cmt-ta" class="cmt-ta" placeholder="Ask your advisor a question…"></textarea>
-    <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
-      <button class="btn pr" onclick="_detAddComment('${_detId}',this)">Submit Comment</button>
-      <span id="det-cmt-msg" style="font-size:10px;color:var(--t3)"></span>
-    </div>
-  </div>
-</div>`
+        </section>
 
-  window._detUpload = async (contractId, docId, docType, btn) => {
-    if (!confirm(`Upload "${docType}" for ${contractId}?`)) return
-    btn.disabled=true; btn.textContent='Uploading…'
-    try {
-      await apiFetch('/contracts/'+contractId+'/due-diligence/upload',{
-        method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({doc_id:docId,document_type:docType,filename:docType.toLowerCase().replace(/_/g,'-')+'.pdf',uploaded_by:'Client — '+contractId,file_content_b64:btoa('STUB_CONTENT')})
-      })
-      delete S.dd[contractId]; delete S.ready?.[contractId]
-      toast(`✓ ${docType} uploaded — awaiting review`,'ok')
-      await refresh(); openContract(contractId)
-    } catch(e) { toast('Upload error: '+e.message,'err'); btn.disabled=false; btn.textContent='↑ Upload' }
-  }
-  window._detAddComment = async (contractId, btn) => {
-    const ta  = document.getElementById('det-cmt-ta')
-    const msg = document.getElementById('det-cmt-msg')
-    const text = ta?.value.trim()
-    if (!text) { if(msg){msg.style.color='var(--r)';msg.textContent='Enter a comment.'} return }
-    btn.disabled=true; btn.textContent='Submitting…'
-    try {
-      await apiPost('/contracts/'+contractId+'/comments',{author:'Client — '+contractId,role:'client',text})
-      delete S.comments[contractId]
-      await refresh(); openContract(contractId)
-    } catch(e) { toast('Error: '+e.message,'err'); btn.disabled=false; btn.textContent='Submit Comment' }
-  }
-}
+        <div class="stack">
+          <section class="card fade-up"><p class="hero-para">${hero}</p></section>
 
-// ── ALERTS ────────────────────────────────────────────────────────────────────
-function rAl(c) {
-  const al = buildAlerts()
-  c.innerHTML = `${crumb('Alerts')}<div class="hd">Alerts</div><div class="sub">Items requiring your attention — live from API</div>
-${al.length
-  ? al.map(a=>`<div class="al ${a.t}">
-  <div class="al-i">${a.i}</div>
-  <div>
-    <div class="al-t">${a.ti}</div>
-    <div class="al-d">${a.d}</div>
-    <div class="al-r">${a.r}</div>
-    <div class="al-a">
-      ${a.sign
-        ? `<button id="sign-btn-${a.sign}-alert" class="btn sign-btn" onclick="signContract('${a.sign}')">✍ Sign &amp; Activate</button>`
-        : '<button class="btn pr">View</button>'}
-      <button class="btn">Contact advisor</button>
-    </div>
-  </div>
-</div>`).join('')
-  : '<div class="card" style="text-align:center;color:var(--t3);padding:30px;font-size:11px">No alerts.</div>'}`
-}
+          <section class="card fade-up">
+            <div class="section-h" style="margin-bottom:14px;">
+              <span class="section-num">02</span>
+              <h2 class="section-title">Active triggers</h2>
+              <span class="section-sub">${trigs.length} active</span>
+            </div>
+            ${trigHtml}
+          </section>
 
-R()
-</script></body></html>
+          <section class="card fade-up">
+            <div class="section-h" style="margin-bottom:14px;">
+              <span class="section-num">03</span>
+              <h2 class="section-title">Market data</h2>
+            </div>
+            ${mdHtml}
+          </section>
+
+          <section class="card fade-up">
+            <div class="section-h" style="margin-bottom:14px;">
+              <span class="section-num">04</span>
+              <h2 class="section-title">Quick actions</h2>
+            </div>
+            <div class="quick-links">
+              <button class="btn" data-jump="contracts" type="button">View contracts</button>
+              <button class="btn" data-jump="documents" type="button">View documents</button>
+              <button class="btn" data-jump="profile"   type="button">Update profile</button>
+            </div>
+          </section>
+        </div>
+      `;
+      main.querySelectorAll("button[data-jump]").forEach(b => {
+        b.addEventListener("click", () => nav(b.dataset.jump));
+      });
+    }
+
+    function renderMarketTile() {
+      const env = state.v2.latest;
+      const chainOk = state.v2.chainOk;
+      let chainHtml = "";
+      if (chainOk === true) {
+        chainHtml = `<span class="chip chip-green"><span class="dot"></span><span>Audit trail verified</span></span>`;
+      } else if (chainOk === false) {
+        chainHtml = `<span class="chip chip-red"><span class="dot"></span><span>Audit trail mismatch</span></span>`;
+      } else {
+        chainHtml = `<span class="chip chip-ochre"><span class="dot"></span><span>Audit trail: checking…</span></span>`;
+      }
+      if (!env || !env.attestation || !Array.isArray(env.datapoints) || env.datapoints.length === 0) {
+        return `<div class="empty-state">
+          <div class="empty-state-title">Market data unavailable</div>
+          <div class="empty-state-body">The Oracle has not yet published a verified rate.</div>
+        </div>`;
+      }
+      const estr = env.datapoints.find(d => d.metric === "ESTR") || env.datapoints[0];
+      const valTxt = estr.unit === "decimal_fraction"
+        ? formatDecimalRate(estr.value)
+        : Number(estr.value).toFixed(3) + "%";
+      return `
+        <div style="display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center;">
+          <div class="dp-tile">
+            <div class="muted" style="font-size:12px;">Euro short-term rate <span class="jargon">${esc(estr.metric)}</span></div>
+            <div class="dp-value">${esc(valTxt)}</div>
+            <div style="font-size:12px;color:var(--ink-2);">European Central Bank <span class="jargon">ECB SDW</span></div>
+            <div class="timestamp" style="margin-top:4px;">As of ${esc(formatRelative(estr.as_of + "T00:00:00Z"))} · ${esc(estr.as_of)}</div>
+          </div>
+          <div>${chainHtml}</div>
+        </div>`;
+    }
+
+    /* ──────────────────────────────────────────────────────────────────
+       View 2 — Contracts (table + detail)
+       ────────────────────────────────────────────────────────────────── */
+    function renderContracts(main) {
+      const D = state.contracts;
+      const body = D.length === 0
+        ? `<div class="empty-state">
+             <div class="empty-state-title">No contracts yet</div>
+             <div class="empty-state-body">Once your advisor drafts a contract, it will appear here.</div>
+           </div>`
+        : `<table class="table"><thead><tr>
+             <th>Contract</th><th>Counterparty</th><th>Notional</th>
+             <th>Status</th><th>Next payment</th>
+           </tr></thead><tbody>${D.map(x => {
+             const np = x.next_payment;
+             const npTxt = np ? `${eur(np.amount)} · ${esc(np.date)}` : "—";
+             return `<tr class="contract-row" data-id="${esc(x.id)}">
+               <td><span class="id-cell">${esc(x.id)}</span></td>
+               <td>${esc(x.party_b)}</td>
+               <td class="mono">${eur(x.notional)} ${esc(x.currency || "EUR")}</td>
+               <td>${statusChip(x.workflow_status || x.status)}</td>
+               <td class="timestamp">${esc(npTxt)}</td>
+             </tr>`;
+           }).join("")}</tbody></table>`;
+
+      main.innerHTML = `
+        <section class="page-h fade-up">
+          <div>
+            <div class="num">01 · Contracts</div>
+            <h1>Contracts</h1>
+            <p class="lede">Your active and past derivatives portfolio.</p>
+          </div>
+          <div class="aside">
+            <button id="btn-direct-contract" class="btn btn-sm" type="button">+ Direct contract</button>
+          </div>
+        </section>
+        <div class="stack">
+          <section class="card fade-up">${body}</section>
+        </div>
+      `;
+      main.querySelectorAll(".contract-row").forEach(tr => {
+        tr.addEventListener("click", () => openContract(tr.dataset.id));
+      });
+      const dcBtn = document.getElementById("btn-direct-contract");
+      if (dcBtn) dcBtn.addEventListener("click", openDirectContract);
+    }
+
+    async function openContract(id) {
+      exContract = id;
+      detailTab = "summary";
+      // Lazy-load the satellites; render() may fire before they finish.
+      const tasks = [];
+      if (!state.details[id])  tasks.push(apiFetch(`/api/contracts/${id}?role=client`).then(r => { if (r.ok) state.details[id] = r.data; }));
+      if (!state.dd[id])       tasks.push(apiFetch(`/api/contracts/${id}/due-diligence`).then(r => { if (r.ok) state.dd[id] = r.data; }));
+      if (!state.ready[id])    tasks.push(apiFetch(`/api/contracts/${id}/signing-readiness`).then(r => { if (r.ok) state.ready[id] = r.data; }));
+      if (!state.comments[id]) tasks.push(apiFetch(`/api/contracts/${id}/comments`).then(r => { if (r.ok) state.comments[id] = r.data; }));
+      render();
+      await Promise.all(tasks);
+      render();
+    }
+
+    function renderContractDetail(main) {
+      const id = exContract;
+      const x  = state.contracts.find(c => c.id === id);
+      if (!x) {
+        main.innerHTML = `<div class="page-h"><div><div class="num">Contracts</div><h1>Not found</h1></div></div>`;
+        return;
+      }
+      const det = state.details[id];
+
+      const tabs = ["summary", "schedule", "documents"];
+      const labels = { summary: "Summary", schedule: "Schedule & payments", documents: "Documents" };
+      const tabsHtml = tabs.map(t =>
+        `<button class="tab ${t === detailTab ? "on" : ""}" data-tab="${t}" type="button">${labels[t]}</button>`
+      ).join("");
+
+      const signBtn = renderSignButton(x);
+
+      let bodyHtml;
+      if (!det) bodyHtml = `<div class="empty-state"><div class="empty-state-title">Loading</div><div class="empty-state-body">Fetching contract detail.</div></div>`;
+      else if (detailTab === "summary")    bodyHtml = detailSummary(x, det);
+      else if (detailTab === "schedule")   bodyHtml = detailSchedule(x, det);
+      else                                 bodyHtml = detailDocuments(x, det);
+
+      main.innerHTML = `
+        <button class="detail-back" id="back-btn" type="button">← Back to contracts</button>
+        <section class="page-h fade-up">
+          <div>
+            <div class="num">Contract · ${esc(id)}</div>
+            <h1 style="font-size:42px;">${esc(x.party_b)}</h1>
+            <p class="lede">${esc(x.type || "Interest rate swap")} · ${eur(x.notional)} ${esc(x.currency || "EUR")} · ${esc(x.effective_date)} → ${esc(x.termination_date)}</p>
+          </div>
+          <div class="aside" style="display:flex;gap:10px;align-items:center;">
+            ${statusChip(x.workflow_status || x.status)}
+            ${signBtn}
+          </div>
+        </section>
+        <div class="tabs">${tabsHtml}</div>
+        <div id="detail-body">${bodyHtml}</div>
+      `;
+      document.getElementById("back-btn").addEventListener("click", () => {
+        exContract = null; render();
+      });
+      main.querySelectorAll(".tab").forEach(b => {
+        b.addEventListener("click", () => { detailTab = b.dataset.tab; render(); });
+      });
+      const sb = document.getElementById("sign-btn-" + id);
+      if (sb) sb.addEventListener("click", () => signContract(id));
+      const sbA = document.getElementById("sign-btn-A-" + id);
+      if (sbA) sbA.addEventListener("click", () => signContractP(id, "A"));
+      const sbB = document.getElementById("sign-btn-B-" + id);
+      if (sbB) sbB.addEventListener("click", () => signContractP(id, "B"));
+    }
+
+    function renderSignButton(x) {
+      const id = x.id;
+      const wf = x.workflow_status || x.status;
+      const ready = state.ready[id];
+      const cmt   = state.comments[id];
+      const openCmts = cmt?.open_count || 0;
+      const canSign = (ready?.ready ?? false) && openCmts === 0;
+      if (x.contract_mode === "peer_to_peer") {
+        if (wf === "PENDING_COUNTERPARTY") return `<button id="sign-btn-B-${id}" class="btn btn-sm" type="button">Sign as Party B</button>`;
+        if (wf === "PENDING_INITIATOR")    return `<button id="sign-btn-A-${id}" class="btn btn-ochre btn-sm" type="button">Countersign as Party A</button>`;
+      }
+      if (x.status !== "PENDING_SIGNATURE") return "";
+      const cls   = canSign ? "btn btn-ochre btn-sm" : "btn btn-sm";
+      const title = canSign ? "" : (ready ? `${ready.blocking_count || 0} document(s) required · ${openCmts} open comment(s)` : "Checking readiness…");
+      const dis   = canSign ? "" : "disabled";
+      return `<button id="sign-btn-${id}" class="${cls}" type="button" ${dis} title="${esc(title)}">Sign &amp; activate</button>`;
+    }
+
+    /* ──────────────────────────────────────────────────────────────────
+       Contract detail · Summary tab
+       ────────────────────────────────────────────────────────────────── */
+    function detailSummary(x, det) {
+      const env = state.v2.latest;
+      const estr = env?.datapoints?.find(d => d.metric === "ESTR");
+      const rateTxt = estr ? formatDecimalRate(estr.value) : (state.oracle?.current_rate ? pct(state.oracle.current_rate) : "—");
+      const seq = env?.attestation?.sequence_number;
+      return `
+        <div class="stack">
+          <section class="card">
+            <div class="section-h" style="margin-bottom:14px;">
+              <span class="section-num">A</span>
+              <h2 class="section-title">Counterparty &amp; terms</h2>
+            </div>
+            <dl class="kv">
+              <dt>Counterparty</dt><dd>${esc(x.party_b)}</dd>
+              <dt>Your role</dt><dd>Party A · Calculation Agent</dd>
+              <dt>Notional</dt><dd>${eur(x.notional)} ${esc(x.currency || "EUR")}</dd>
+              <dt>Fixed leg</dt><dd>${pct(x.fixed_rate)}</dd>
+              <dt>Floating leg</dt><dd>${esc(x.floating_index || "EURIBOR 3M")}</dd>
+              <dt>Effective</dt><dd class="mono">${esc(x.effective_date)}</dd>
+              <dt>Termination</dt><dd class="mono">${esc(x.termination_date)}</dd>
+              <dt>Governing law</dt><dd>${esc(x.governing_law || "English law")} <span class="jargon">§13 ISDA 2002</span></dd>
+            </dl>
+          </section>
+
+          <section class="card">
+            <div class="section-h" style="margin-bottom:14px;">
+              <span class="section-num">B</span>
+              <h2 class="section-title">Oracle reference</h2>
+              <span class="section-sub">Used to compute the floating leg</span>
+            </div>
+            <div class="dp-tile" style="max-width:520px;">
+              <div class="muted" style="font-size:12px;">Euro short-term rate <span class="jargon">ESTR</span></div>
+              <div class="dp-value">${esc(rateTxt)}</div>
+              <div style="font-size:12px;color:var(--ink-2);">European Central Bank <span class="jargon">ECB SDW</span></div>
+              <div class="timestamp" style="margin-top:4px;">
+                ${seq != null ? "Attestation #" + String(seq).padStart(3, "0") : "Awaiting first attestation"}
+                · <a href="/oracle" style="color:var(--ochre);text-decoration:underline;text-underline-offset:2px;">Open Oracle</a>
+              </div>
+            </div>
+          </section>
+        </div>
+      `;
+    }
+
+    /* ──────────────────────────────────────────────────────────────────
+       Contract detail · Schedule & payments tab
+       ────────────────────────────────────────────────────────────────── */
+    function detailSchedule(x, det) {
+      const periods = det.periods || [];
+      if (periods.length === 0) {
+        return `<section class="card"><div class="empty-state">
+          <div class="empty-state-title">No payment periods</div>
+          <div class="empty-state-body">Once the contract is signed, the schedule will appear here.</div>
+        </div></section>`;
+      }
+      const rows = periods.map(p => {
+        const st = pStatus(p);
+        const dir = p.net_payer === "PARTY_A"
+          ? `<span class="chip chip-red"><span class="dot"></span><span>You pay</span></span>`
+          : p.net_payer === "PARTY_B"
+            ? `<span class="chip chip-green"><span class="dot"></span><span>You receive</span></span>`
+            : "—";
+        return `<tr>
+          <td class="mono">P${p.number}</td>
+          <td class="mono">${esc(p.payment_date)}</td>
+          <td class="mono">${eur(p.fixed_amount)}</td>
+          <td class="mono">${eur(p.floating_amount)}</td>
+          <td class="mono"><span class="strong">${eur(p.net_amount)}</span></td>
+          <td>${p.fixed_amount !== null ? dir : "—"}</td>
+          <td class="mono muted">${p.oracle_rate != null ? pct(p.oracle_rate) : "—"}</td>
+          <td>${pStatusChip(st)}</td>
+        </tr>`;
+      }).join("");
+      return `<section class="card">
+        <table class="table"><thead><tr>
+          <th>#</th><th>Pay date</th><th>Fixed</th><th>Floating</th>
+          <th>Net</th><th>Direction</th><th>Floating reset</th><th>Status</th>
+        </tr></thead><tbody>${rows}</tbody></table>
+      </section>`;
+    }
+    function pStatus(p) {
+      if (p.payment_confirmed) return "confirmed";
+      if (p.fixed_amount !== null) return "pending";
+      if (p.payment_date < today()) return "overdue";
+      return "future";
+    }
+    function pStatusChip(st) {
+      const m = {
+        confirmed: { cls: "chip-green", label: "Confirmed" },
+        pending:   { cls: "chip-ochre", label: "Pending PI" },
+        overdue:   { cls: "chip-red",   label: "Overdue" },
+        future:    { cls: "chip-blue",  label: "Scheduled" },
+      };
+      const x = m[st] || { cls: "", label: st };
+      return `<span class="chip ${x.cls}"><span class="dot"></span><span>${x.label}</span></span>`;
+    }
+
+    /* ──────────────────────────────────────────────────────────────────
+       Contract detail · Documents tab (PDF + DD upload + comments)
+       ────────────────────────────────────────────────────────────────── */
+    function detailDocuments(x, det) {
+      const id = x.id;
+      const dd = state.dd[id] || {};
+      const cmt = state.comments[id] || { comments: [], open_count: 0 };
+      const docs = dd.documents || [];
+      const preDocs  = docs.filter(d => d.is_pre_signing);
+      const postDocs = docs.filter(d => !d.is_pre_signing);
+
+      function docTable(list, caption) {
+        if (!list.length) return "";
+        const rows = list.map(d => `<tr>
+          <td>${esc(d.description || d.doc_type)}</td>
+          <td>${docStatusChip(d.status)}</td>
+          <td class="mono muted">${esc(d.due_date_obligation || "—")}</td>
+          <td>${(d.status === "REQUIRED" || d.status === "REJECTED" || d.status === "EXPIRED")
+            ? `<button class="btn btn-sm" data-upload-doc="${esc(d.doc_id)}" data-doc-type="${esc(d.doc_type)}" type="button">Upload</button>`
+            : d.status === "UPLOADED"
+              ? `<span class="muted" style="font-size:12px;">Awaiting review</span>`
+              : `<span class="chip chip-green"><span class="dot"></span><span>Accepted</span></span>`}</td>
+        </tr>`).join("");
+        return `<div class="field-label" style="margin-top:14px;">${esc(caption)}</div>
+          <table class="table"><thead><tr><th>Document</th><th>Status</th><th>Due</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table>`;
+      }
+
+      const pdfHtml = (x.status === "PENDING_SIGNATURE" || x.status === "ACTIVE")
+        ? `<section class="card">
+            <div class="section-h" style="margin-bottom:14px;">
+              <span class="section-num">A</span>
+              <h2 class="section-title">Confirmation PDF</h2>
+              <span class="section-sub"><a href="/api/contracts/${esc(id)}/pdf" download="confirmation-${esc(id)}.pdf" style="color:var(--ochre);text-decoration:underline;text-underline-offset:2px;">Download</a></span>
+            </div>
+            <iframe class="pdf-frame" src="/api/contracts/${esc(id)}/pdf" title="Confirmation — ${esc(id)}"></iframe>
+          </section>` : "";
+
+      const ddHtml = `<section class="card">
+        <div class="section-h" style="margin-bottom:14px;">
+          <span class="section-num">B</span>
+          <h2 class="section-title">Due diligence</h2>
+          <span class="section-sub">${esc(dd.rag_status || "—")}</span>
+        </div>
+        ${docTable(preDocs, "Pre-signing")}
+        ${docTable(postDocs, "Post-signing (ongoing)")}
+        ${docs.length === 0 ? `<div class="empty-state"><div class="empty-state-title">No documents listed</div><div class="empty-state-body">Your advisor has not yet attached a due-diligence checklist.</div></div>` : ""}
+      </section>`;
+
+      const cmtHtml = `<section class="card">
+        <div class="section-h" style="margin-bottom:14px;">
+          <span class="section-num">C</span>
+          <h2 class="section-title">Comments</h2>
+          <span class="section-sub">${cmt.open_count || 0} open</span>
+        </div>
+        ${cmt.comments.length
+          ? cmt.comments.map(c => `<div style="padding:10px 0;border-bottom:1px dashed var(--hair);">
+              <div class="muted" style="font-size:11px;font-family:var(--mono);margin-bottom:4px;">${esc(c.author)} · ${esc((c.timestamp || "").slice(0,16).replace("T"," "))} UTC · ${esc(c.status)}</div>
+              <div style="font-size:13px;color:var(--ink);">${esc(c.text)}</div>
+            </div>`).join("")
+          : `<div class="muted" style="font-size:13px;">No comments yet. Your advisor will respond here.</div>`}
+      </section>`;
+
+      // Wire the Upload buttons after innerHTML is set in renderContractDetail
+      queueMicrotask(() => {
+        document.querySelectorAll("[data-upload-doc]").forEach(btn => {
+          btn.addEventListener("click", () => uploadDDDoc(id, btn.dataset.uploadDoc, btn.dataset.docType, btn));
+        });
+      });
+
+      return `<div class="stack">${pdfHtml}${ddHtml}${cmtHtml}</div>`;
+    }
+    function docStatusChip(st) {
+      const m = {
+        REQUIRED:     { cls: "chip-red",   label: "Required" },
+        UPLOADED:     { cls: "chip-blue",  label: "Uploaded" },
+        VALIDATED:    { cls: "chip-green", label: "Validated" },
+        REJECTED:     { cls: "chip-red",   label: "Rejected" },
+        EXPIRED:      { cls: "chip-red",   label: "Expired" },
+        NOT_REQUIRED: { cls: "",           label: "N/A" },
+      };
+      const x = m[st] || { cls: "", label: st };
+      return `<span class="chip ${x.cls}"><span class="dot"></span><span>${x.label}</span></span>`;
+    }
+
+    /* ──────────────────────────────────────────────────────────────────
+       View 3 — Documents (entity + per-contract)
+       ────────────────────────────────────────────────────────────────── */
+    async function ensureDDLoaded() {
+      const tasks = state.contracts.flatMap(x => {
+        const t = [];
+        if (!state.dd[x.id])    t.push(apiFetch(`/api/contracts/${x.id}/due-diligence`).then(r => { if (r.ok) state.dd[x.id] = r.data; }));
+        if (!state.ready[x.id]) t.push(apiFetch(`/api/contracts/${x.id}/signing-readiness`).then(r => { if (r.ok) state.ready[x.id] = r.data; }));
+        return t;
+      });
+      if (tasks.length) await Promise.all(tasks);
+    }
+
+    async function renderDocuments(main) {
+      main.innerHTML = `
+        <section class="page-h fade-up">
+          <div>
+            <div class="num">01 · Documents</div>
+            <h1>Documents</h1>
+            <p class="lede">Required documents for your active and pending contracts.</p>
+          </div>
+        </section>
+        <div class="stack" id="docs-stack">
+          <div class="empty-state"><div class="empty-state-title">Loading</div><div class="empty-state-body">Fetching due-diligence checklists.</div></div>
+        </div>
+      `;
+      await ensureDDLoaded();
+
+      const stack = document.getElementById("docs-stack");
+      if (!stack) return;
+      if (state.contracts.length === 0) {
+        stack.innerHTML = `<div class="empty-state"><div class="empty-state-title">Nothing required yet</div><div class="empty-state-body">Once your advisor drafts a contract, the document checklist will appear here.</div></div>`;
+        return;
+      }
+      stack.innerHTML = state.contracts.map(x => contractDocsBlock(x)).join("");
+      stack.querySelectorAll("[data-upload-doc]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const cid    = btn.dataset.contractId;
+          const docId  = btn.dataset.uploadDoc;
+          const dtype  = btn.dataset.docType;
+          const entity = btn.dataset.entityName || "";
+          uploadDDDoc(cid, docId, dtype, btn, entity);
+        });
+      });
+    }
+
+    function contractDocsBlock(x) {
+      const dd = state.dd[x.id];
+      if (!dd) return `<section class="card"><div class="muted">${esc(x.id)} — not available</div></section>`;
+      const tiers   = dd.document_tiers || {};
+      const genA    = tiers.general_party_a || [];
+      const genB    = tiers.general_party_b || [];
+      const csDocs  = tiers.contract_specific || dd.documents || [];
+      function docRow(d, contractId, entityName) {
+        const action = (d.status === "REQUIRED" || d.status === "REJECTED" || d.status === "EXPIRED")
+          ? `<button class="btn btn-sm" type="button"
+                data-upload-doc="${esc(d.doc_id)}"
+                data-doc-type="${esc(d.doc_type)}"
+                data-contract-id="${esc(contractId)}"
+                data-entity-name="${esc(entityName || "")}">Upload</button>`
+          : d.status === "UPLOADED"
+            ? `<span class="muted" style="font-size:12px;">Awaiting review</span>`
+            : `<span class="chip chip-green"><span class="dot"></span><span>Accepted</span></span>`;
+        return `<tr>
+          <td>${esc(d.description || d.doc_type)}<div class="muted" style="font-size:11px;">${esc(d.linked_obligation || "")}</div></td>
+          <td>${docStatusChip(d.status)}</td>
+          <td class="mono muted">${esc(d.due_date_obligation || "—")}</td>
+          <td>${action}</td>
+        </tr>`;
+      }
+      function group(list, caption, entityName) {
+        if (!list.length) return "";
+        const rows = list.map(d => docRow(d, x.id, entityName)).join("");
+        return `<div class="field-label" style="margin-top:14px;">${esc(caption)}</div>
+          <table class="table"><thead><tr><th>Document</th><th>Status</th><th>Due</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table>`;
+      }
+      return `<section class="card">
+        <div class="section-h" style="margin-bottom:14px;">
+          <span class="section-num">${esc(x.id)}</span>
+          <h2 class="section-title">${esc(x.party_b)}</h2>
+          <span class="section-sub">${statusChip(x.workflow_status || x.status)}</span>
+        </div>
+        ${group(genA, "Entity documents · Party A", x.party_a)}
+        ${group(genB, "Entity documents · Party B", x.party_b)}
+        ${group(csDocs.filter(d => d.is_pre_signing),  "Pre-signing", "")}
+        ${group(csDocs.filter(d => !d.is_pre_signing), "Post-signing (ongoing)", "")}
+      </section>`;
+    }
+
+    async function uploadDDDoc(contractId, docId, docType, btn, entityName = "") {
+      const label = entityName ? `${docType} for ${entityName}` : `${docType} for ${contractId}`;
+      if (!confirm(`Submit ${label}?\n\nA stub document will be uploaded for advisor review.`)) return;
+      btn.disabled = true; const orig = btn.textContent; btn.textContent = "Uploading…";
+      const payload = {
+        doc_id: docId,
+        document_type: docType,
+        filename: docType.toLowerCase().replace(/_/g, "-") + ".pdf",
+        uploaded_by: entityName || ("Client — " + contractId),
+        file_content_b64: btoa("STUB_CONTENT"),
+      };
+      const path = entityName
+        ? `/api/entities/${encodeURIComponent(entityName)}/documents/upload`
+        : `/api/contracts/${contractId}/due-diligence/upload`;
+      const r = await apiFetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (r.ok) {
+        delete state.dd[contractId]; delete state.ready[contractId];
+        toast(`${docType} uploaded — awaiting review`, "info");
+        await refresh();
+      } else {
+        toast("Upload failed: " + (r.error || "unknown"), "error");
+        btn.disabled = false; btn.textContent = orig;
+      }
+    }
+
+    /* ──────────────────────────────────────────────────────────────────
+       View 4 — Profile
+       ────────────────────────────────────────────────────────────────── */
+    function renderProfile(main) {
+      const P = state.profile || {};
+      main.innerHTML = `
+        <section class="page-h fade-up">
+          <div>
+            <div class="num">01 · Profile</div>
+            <h1>Profile</h1>
+            <p class="lede">Your company information and signing identity.</p>
+          </div>
+        </section>
+        <section class="card fade-up">
+          <div class="section-h" style="margin-bottom:18px;">
+            <span class="section-num">A</span>
+            <h2 class="section-title">Company details</h2>
+          </div>
+          <div class="profile-grid">
+            <div>
+              <label class="field-label" for="pf-name">Legal company name</label>
+              <input id="pf-name" class="input" value="${esc(P.company_name || "")}" placeholder="Alpha Corp S.A." />
+            </div>
+            <div>
+              <label class="field-label" for="pf-juris">Jurisdiction</label>
+              <input id="pf-juris" class="input" value="${esc(P.jurisdiction || "")}" placeholder="FR" maxlength="2" />
+            </div>
+            <div>
+              <label class="field-label" for="pf-lei">LEI</label>
+              <input id="pf-lei" class="input" value="${esc(P.lei || "")}" placeholder="2138007XKZTKFHVXL357" />
+            </div>
+            <div>
+              <label class="field-label" for="pf-email">Contact email</label>
+              <input id="pf-email" class="input" type="email" value="${esc(P.contact_email || "")}" placeholder="legal@alphacorp.com" />
+            </div>
+            <div class="full">
+              <label class="field-label" for="pf-key">Advisor key <span class="muted" style="text-transform:none;letter-spacing:0;">(required to save · provided by Linklaters LLP)</span></label>
+              <input id="pf-key" class="input" type="password" value="${esc(P.advisor_key || "")}" />
+            </div>
+          </div>
+          <div style="margin-top:20px;display:flex;gap:10px;align-items:center;">
+            <button id="pf-save" class="btn btn-ochre" type="button">Save</button>
+            <span id="pf-msg" class="muted" style="font-size:12px;"></span>
+          </div>
+        </section>
+
+        <section class="card fade-up" style="margin-top:18px;">
+          <div class="section-h" style="margin-bottom:14px;">
+            <span class="section-num">B</span>
+            <h2 class="section-title">Legal advisor</h2>
+          </div>
+          <dl class="kv">
+            <dt>Firm</dt><dd>Linklaters LLP</dd>
+            <dt>Calculation Agent</dt><dd>Party A</dd>
+            <dt>Master Agreement</dt><dd>2002 (English law)</dd>
+            <dt>Governing Law</dt><dd><span class="jargon">§13 ISDA 2002</span></dd>
+          </dl>
+        </section>
+      `;
+      document.getElementById("pf-save").addEventListener("click", saveProfile);
+    }
+
+    async function saveProfile() {
+      const btn = document.getElementById("pf-save");
+      const msg = document.getElementById("pf-msg");
+      btn.disabled = true; btn.textContent = "Saving…";
+      const r = await apiFetch("/api/client/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_name:  document.getElementById("pf-name").value,
+          jurisdiction:  document.getElementById("pf-juris").value,
+          lei:           document.getElementById("pf-lei").value,
+          contact_email: document.getElementById("pf-email").value,
+          advisor_key:   document.getElementById("pf-key").value,
+        }),
+      });
+      if (r.ok && r.data) {
+        state.profile = r.data.profile || r.data;
+        msg.textContent = "Saved.";
+        msg.style.color = "var(--green)";
+      } else {
+        msg.textContent = "Save failed: " + (r.error || "unknown");
+        msg.style.color = "var(--red)";
+      }
+      btn.disabled = false; btn.textContent = "Save";
+    }
+
+    /* ──────────────────────────────────────────────────────────────────
+       Sign flows (managed + peer-to-peer) — preserve existing API calls
+       ────────────────────────────────────────────────────────────────── */
+    async function signContract(id) {
+      const btn = document.getElementById("sign-btn-" + id);
+      if (btn) { btn.disabled = true; btn.textContent = "Checking…"; }
+      const ready = await apiFetch(`/api/contracts/${id}/signing-readiness`);
+      if (!(ready.ok && ready.data?.ready)) {
+        const m = ready.data?.message || "Signing readiness check failed";
+        if (btn) { btn.disabled = false; btn.textContent = "Sign & activate"; }
+        toast("Cannot sign: " + m, "error");
+        return;
+      }
+      if (btn) btn.textContent = "Signing…";
+      const r = await apiFetch(`/api/contracts/${id}/sign?signed_by=${encodeURIComponent("Client — " + id)}`, { method: "POST" });
+      if (r.ok) {
+        delete state.details[id]; delete state.comments[id]; delete state.ready[id];
+        await refresh();
+        toast("Contract signed and activated.", "info");
+      } else {
+        if (btn) { btn.disabled = false; btn.textContent = "Sign & activate"; }
+        toast("Sign failed: " + (r.error || "unknown"), "error");
+      }
+    }
+
+    async function signContractP(id, party) {
+      const btn = document.getElementById(`sign-btn-${party}-` + id);
+      if (btn) { btn.disabled = true; btn.textContent = "Checking…"; }
+      const ready = await apiFetch(`/api/contracts/${id}/signing-readiness`);
+      if (!(ready.ok && ready.data?.ready)) {
+        if (btn) { btn.disabled = false; btn.textContent = party === "A" ? "Countersign as Party A" : "Sign as Party B"; }
+        toast("Cannot sign yet: " + (ready.data?.message || "readiness check failed"), "error");
+        return;
+      }
+      if (btn) btn.textContent = "Signing…";
+      const partyLabel = party === "A" ? `Creator — ${id}` : `Counterparty — ${id}`;
+      const r = await apiFetch(`/api/contracts/${id}/sign?signed_by=${encodeURIComponent(partyLabel)}&party=${party}`, { method: "POST" });
+      if (r.ok) {
+        delete state.details[id]; delete state.comments[id]; delete state.ready[id];
+        await refresh();
+        toast(r.data?.activated ? "Both parties signed — contract is active." : `Signed as Party ${party}.`, "info");
+      } else {
+        if (btn) { btn.disabled = false; btn.textContent = party === "A" ? "Countersign as Party A" : "Sign as Party B"; }
+        toast("Sign failed: " + (r.error || "unknown"), "error");
+      }
+    }
+
+    /* ──────────────────────────────────────────────────────────────────
+       Direct contract creation modal (preserves submitDC + /api/contracts/direct)
+       ────────────────────────────────────────────────────────────────── */
+    function openDirectContract() {
+      const tomorrow2 = new Date(); tomorrow2.setDate(tomorrow2.getDate() + 2);
+      const term2y    = new Date(); term2y.setFullYear(term2y.getFullYear() + 2);
+      const fmt = d => d.toISOString().slice(0,10);
+      const myName  = state.profile?.company_name || "";
+      const myJuris = (state.profile?.jurisdiction || "").toUpperCase();
+      const html = `
+        <div class="modal-bg" id="dc-bg">
+          <div class="modal" role="dialog" aria-modal="true">
+            <div class="modal-h">
+              <div class="section-h" style="border:0;padding:0;margin:0;">
+                <span class="section-num">New</span>
+                <h2 class="section-title">Direct contract</h2>
+              </div>
+              <div class="muted" style="font-size:12.5px;margin-top:8px;">
+                Peer-to-peer interest rate swap. Standard ISDA 2002 defaults apply. Both parties must sign to activate.
+              </div>
+            </div>
+            <div class="modal-b">
+              <div class="profile-grid">
+                <div><label class="field-label">Your company</label><input id="dc-myname" class="input" value="${esc(myName)}" /></div>
+                <div><label class="field-label">Your jurisdiction</label><input id="dc-myjuris" class="input" value="${esc(myJuris)}" maxlength="2" /></div>
+                <div><label class="field-label">Counterparty</label><input id="dc-cpname" class="input" placeholder="Beta Fund Ltd" /></div>
+                <div><label class="field-label">Counterparty jurisdiction</label><input id="dc-cpjuris" class="input" value="GB" maxlength="2" /></div>
+                <div class="full"><label class="field-label">Counterparty email (optional)</label><input id="dc-cpemail" class="input" type="email" /></div>
+                <div><label class="field-label">Notional (EUR)</label><input id="dc-notional" class="input" type="number" placeholder="10000000" /></div>
+                <div><label class="field-label">Fixed rate (%)</label><input id="dc-rate" class="input" type="number" step="0.001" placeholder="3.200" /></div>
+                <div><label class="field-label">Effective date</label><input id="dc-eff" class="input" type="date" value="${fmt(tomorrow2)}" /></div>
+                <div><label class="field-label">Termination date</label><input id="dc-term" class="input" type="date" value="${fmt(term2y)}" /></div>
+              </div>
+              <div class="muted" style="font-size:11.5px;margin-top:12px;">
+                Defaults: EUR · EURIBOR 3M floating · Quarterly payments · English law.
+              </div>
+              <div id="dc-err" style="font-size:12px;color:var(--red);margin-top:10px;"></div>
+            </div>
+            <div class="modal-f">
+              <button class="btn" id="dc-cancel" type="button">Cancel</button>
+              <button class="btn btn-ochre" id="dc-submit" type="button">Create contract</button>
+            </div>
+          </div>
+        </div>`;
+      const wrap = document.createElement("div");
+      wrap.innerHTML = html;
+      const node = wrap.firstElementChild;
+      document.body.appendChild(node);
+      const close = () => node.remove();
+      node.addEventListener("click", e => { if (e.target === node) close(); });
+      node.querySelector("#dc-cancel").addEventListener("click", close);
+      node.querySelector("#dc-submit").addEventListener("click", () => submitDC(node, close));
+    }
+
+    async function submitDC(node, close) {
+      const err = node.querySelector("#dc-err");
+      err.textContent = "";
+      const v = id => node.querySelector("#" + id).value.trim();
+      const myName = v("dc-myname"), myJuris = v("dc-myjuris").toUpperCase();
+      const cpName = v("dc-cpname"), cpJuris = v("dc-cpjuris").toUpperCase();
+      const cpEmail = v("dc-cpemail");
+      const notional = parseFloat(v("dc-notional"));
+      const rate     = parseFloat(v("dc-rate"));
+      const eff      = v("dc-eff"), term = v("dc-term");
+      if (!myName)                 return err.textContent = "Your company name is required";
+      if (!cpName)                 return err.textContent = "Counterparty name is required";
+      if (!notional || notional<=0) return err.textContent = "Enter a valid notional";
+      if (!rate || rate <= 0)      return err.textContent = "Enter a valid rate (e.g. 3.2)";
+      if (rate >= 50)              return err.textContent = "Rate must be less than 50%";
+      if (!eff || !term)           return err.textContent = "Both dates are required";
+      if (eff >= term)             return err.textContent = "Termination must be after effective date";
+
+      const btn = node.querySelector("#dc-submit"); btn.disabled = true; btn.textContent = "Creating…";
+      const r = await apiFetch("/api/contracts/direct", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          my_name: myName, my_jurisdiction: myJuris,
+          counterparty_name: cpName, counterparty_jurisdiction: cpJuris,
+          counterparty_email: cpEmail,
+          notional, fixed_rate: rate / 100,
+          effective_date: eff, termination_date: term, currency: "EUR",
+        }),
+      });
+      if (r.ok && r.data) {
+        toast(`Contract ${r.data.contract_id} created — waiting for ${cpName} to sign first.`, "info");
+        close(); await refresh();
+      } else {
+        err.textContent = "Error: " + (r.error || "unknown");
+        btn.disabled = false; btn.textContent = "Create contract";
+      }
+    }
+  </script>
+
+</body>
+</html>

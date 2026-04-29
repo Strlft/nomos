@@ -1,152 +1,74 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="en" data-theme="light" data-jargon="meta">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Nomos · Login</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
-<style>
-:root {
-  --bg:#08090c; --s1:#0e1013; --s2:#141618;
-  --b0:rgba(255,255,255,.06); --b1:rgba(255,255,255,.11); --b2:rgba(255,255,255,.18);
-  --warm:#c4956a; --wBg:rgba(196,149,106,.07);
-  --g:#4ade80;   --gBg:rgba(74,222,128,.06);
-  --vi:#a78bfa;  --viBg:rgba(167,139,250,.07);
-  --bl:#60a5fa;
-  --t1:#e4e4e7; --t2:#8b8d94; --t3:#44464d;
-  --ff:'Inter',system-ui,sans-serif;
-  --fm:'JetBrains Mono',monospace;
-  --rad:12px;
-}
-*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;overflow:hidden}
-body{
-  background:var(--bg); color:var(--t1);
-  font-family:var(--ff); font-size:13px;
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-  -webkit-font-smoothing:antialiased;
-}
-body::before{
-  content:''; position:fixed; inset:0; pointer-events:none;
-  background:
-    radial-gradient(ellipse at 28% 18%, rgba(167,139,250,.05) 0%, transparent 55%),
-    radial-gradient(ellipse at 72% 82%, rgba(196,149,106,.04) 0%, transparent 55%);
-}
-
-.wrap{
-  width:100%; max-width:680px; padding:0 24px;
-  display:flex; flex-direction:column; align-items:center;
-  position:relative; z-index:1;
-}
-
-/* ── Brand ── */
-.brand{display:flex;align-items:center;gap:14px;margin-bottom:8px}
-.logo-mark{
-  width:40px;height:40px;border-radius:10px;flex-shrink:0;
-  background:linear-gradient(140deg,#a78bfa 0%,#60a5fa 100%);
-  display:flex;align-items:center;justify-content:center;
-  font-family:var(--fm);font-weight:600;font-size:19px;color:#fff;
-  box-shadow:0 0 0 1px rgba(167,139,250,.25),0 6px 24px rgba(167,139,250,.15);
-}
-.brand-name{font-size:24px;font-weight:600;letter-spacing:-.5px;line-height:1.1}
-.brand-sub{font-size:11px;color:var(--t3);margin-top:3px;letter-spacing:.01em}
-
-.tagline{
-  font-size:9.5px;color:var(--t3);text-align:center;
-  margin-bottom:44px;letter-spacing:.12em;font-family:var(--fm);text-transform:uppercase;
-}
-
-/* ── Cards ── */
-.cards{display:grid;grid-template-columns:1fr 1fr;gap:14px;width:100%;margin-bottom:28px}
-
-.card{
-  background:var(--s1);border:1px solid var(--b0);border-radius:16px;
-  padding:28px 24px;cursor:pointer;
-  transition:border-color .2s,transform .22s,box-shadow .22s;
-  position:relative;overflow:hidden;
-}
-.card::before{
-  content:'';position:absolute;inset:0;opacity:0;
-  transition:opacity .25s;
-}
-.card.client::before  {background:radial-gradient(circle at 0% 0%,rgba(196,149,106,.12),transparent 60%)}
-.card.advisor::before {background:radial-gradient(circle at 0% 0%,rgba(167,139,250,.12),transparent 60%)}
-.card:hover{border-color:var(--b1);transform:translateY(-3px);box-shadow:0 10px 36px rgba(0,0,0,.45)}
-.card:hover::before{opacity:1}
-.card:active{transform:translateY(-1px)}
-
-.role-icon{
-  width:38px;height:38px;border-radius:10px;
-  display:flex;align-items:center;justify-content:center;
-  font-family:var(--fm);font-weight:600;font-size:15px;
-  margin-bottom:16px;
-}
-.client  .role-icon{background:var(--wBg); color:var(--warm);border:1px solid rgba(196,149,106,.22)}
-.advisor .role-icon{background:var(--viBg);color:var(--vi);  border:1px solid rgba(167,139,250,.22)}
-
-.role-title {font-size:16px;font-weight:600;margin-bottom:7px;letter-spacing:-.2px}
-.role-desc  {font-size:11px;color:var(--t2);line-height:1.75;margin-bottom:14px}
-.role-bullets{font-size:10px;color:var(--t3);line-height:2.4;font-family:var(--fm);margin-bottom:22px}
-
-.role-btn{
-  display:inline-flex;align-items:center;padding:8px 16px;
-  border-radius:7px;font-size:11px;font-weight:500;
-  transition:background .15s,box-shadow .15s;
-}
-.client  .role-btn{background:var(--wBg); color:var(--warm);border:1px solid rgba(196,149,106,.25)}
-.client:hover  .role-btn{background:rgba(196,149,106,.13);box-shadow:0 2px 8px rgba(196,149,106,.1)}
-.advisor .role-btn{background:var(--viBg);color:var(--vi);  border:1px solid rgba(167,139,250,.25)}
-.advisor:hover .role-btn{background:rgba(167,139,250,.13);box-shadow:0 2px 8px rgba(167,139,250,.1)}
-
-/* ── Footer ── */
-.isda-bar{
-  background:var(--s1);border:1px solid var(--b0);border-radius:8px;
-  padding:8px 18px;font-family:var(--fm);font-size:9px;color:var(--t3);
-  text-align:center;margin-bottom:14px;letter-spacing:.05em;
-}
-.ft{font-size:9px;color:var(--t3);text-align:center;letter-spacing:.04em;line-height:2;font-family:var(--fm)}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nomos · Sign in</title>
+  <link rel="stylesheet" href="/static/assets/nomos.css">
+  <style>
+    /* Page-local layout only. All component styles come from nomos.css. */
+    body { display: grid; place-items: center; min-height: 100vh; padding: 32px 24px; }
+    .login-wrap { width: 100%; max-width: 720px; display: flex; flex-direction: column; align-items: center; gap: 56px; }
+    .hero { text-align: center; }
+    .hero h1 { font-family: var(--display); font-weight: 400; font-size: 96px; letter-spacing: -0.035em; line-height: 1; }
+    .hero p  { font-size: 17px; color: var(--ink-2); margin-top: 18px; }
+    .roles   { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .role    { display: flex; flex-direction: column; gap: 14px; padding: 32px 30px; }
+    .role h2 { font-family: var(--display); font-weight: 400; font-size: 32px; letter-spacing: -0.02em; }
+    .role p  { font-size: 14px; color: var(--ink-2); line-height: 1.55; }
+    .role .btn { align-self: flex-start; margin-top: 6px; }
+    .foot { text-align: center; display: flex; flex-direction: column; gap: 10px; }
+    .foot .disclaimer { font-size: 12px; color: var(--ink-4); line-height: 1.6; max-width: 540px; }
+    @media (max-width: 640px) { .roles { grid-template-columns: 1fr; } .hero h1 { font-size: 72px; } }
+  </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="brand">
-    <div class="logo-mark">N</div>
-    <div>
-      <div class="brand-name">Nomos</div>
-      <div class="brand-sub">Smart Legal Contracts</div>
-    </div>
-  </div>
-  <div class="tagline">ISDA 2002 Master Agreement · Automated Execution · Cryptographic Audit Trail</div>
 
-  <div class="cards">
-    <div class="card client" onclick="login('client')">
-      <div class="role-icon">C</div>
-      <div class="role-title">Client</div>
-      <div class="role-desc">View your swap portfolio, upcoming payments, compliance status, and sign new contracts.</div>
-      <div class="role-bullets">● Portfolio overview<br>● Payment schedule<br>● Oracle rates (EURIBOR 3M)<br>● Document management</div>
-      <div class="role-btn">Login as Client →</div>
-    </div>
-    <div class="card advisor" onclick="login('advisor')">
-      <div class="role-icon">A</div>
-      <div class="role-title">Advisor</div>
-      <div class="role-desc">Create contracts, monitor §3/§4/§5, approve payment instructions, and generate §12 notices.</div>
-      <div class="role-bullets">● New contract wizard<br>● §3/§4/§5 monitoring<br>● PI approval workflow<br>● Clause builder &amp; netting</div>
-      <div class="role-btn">Login as Advisor →</div>
-    </div>
-  </div>
+  <main class="login-wrap">
 
-  <div class="isda-bar">§1(b) ISDA 2002 · Confirmation &gt; Schedule &gt; MA &gt; Code · Legal text always prevails</div>
-  <div class="ft">Prototype · Academic demonstration only · Not for production use · Not legal or financial advice</div>
-</div>
-<script>
-function login(role) {
-  localStorage.setItem('nomos_role', role)
-  window.location.href = role === 'advisor' ? '/advisor' : '/client'
-}
-;(function(){
-  const r = localStorage.getItem('nomos_role')
-  if (r === 'advisor') window.location.href = '/advisor'
-  else if (r === 'client') window.location.href = '/client'
-})()
-</script>
+    <section class="hero">
+      <h1>Nomos</h1>
+      <p>Smart legal contracts for OTC derivatives.</p>
+    </section>
+
+    <section class="roles" aria-label="Choose role">
+      <article class="card role">
+        <h2>Client</h2>
+        <p>View your contracts, payments, and obligations.</p>
+        <button type="button" class="btn" data-role="client">Continue as Client</button>
+      </article>
+
+      <article class="card role">
+        <h2>Advisor</h2>
+        <p>Draft, monitor, and execute on behalf of your clients.</p>
+        <div class="label muted">ISDA §3/§4/§5 monitoring · PI approval · Audit trail</div>
+        <button type="button" class="btn btn-ochre" data-role="advisor">Continue as Advisor</button>
+      </article>
+    </section>
+
+    <footer class="foot">
+      <div class="label">§1(b) ISDA 2002 · Confirmation › Schedule › MA › Code</div>
+      <p class="disclaimer">Prototype · Academic demonstration · Not for production use · Not legal or financial advice.</p>
+    </footer>
+
+  </main>
+
+  <script type="module" src="/static/assets/nomos-ui.js"></script>
+  <script>
+    (function () {
+      var r = localStorage.getItem('nomos_role');
+      if (r === 'advisor') window.location.href = '/advisor';
+      else if (r === 'client') window.location.href = '/client';
+    })();
+
+    document.querySelectorAll('button[data-role]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var role = btn.getAttribute('data-role');
+        localStorage.setItem('nomos_role', role);
+        window.location.href = role === 'advisor' ? '/advisor' : '/client';
+      });
+    });
+  </script>
+
 </body>
 </html>

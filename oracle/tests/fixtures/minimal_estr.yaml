@@ -1,0 +1,6 @@
+datapoints:
+  - metric: ESTR
+    value: "0.0375"
+    unit: decimal_fraction
+    as_of: "2026-04-23"
+    source_reported_as_of: "2026-04-23"

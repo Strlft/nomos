@@ -1,0 +1,1426 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1440" />
+<title>Nomos — Oracle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<template id="__bundler_thumbnail" data-bg-color="#F6F1E8">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="800" fill="#F6F1E8"/>
+    <!-- three horizon rails -->
+    <line x1="240" y1="280" x2="960" y2="280" stroke="#C7BEA8" stroke-width="2"/>
+    <line x1="240" y1="400" x2="960" y2="400" stroke="#C7BEA8" stroke-width="2"/>
+    <line x1="240" y1="520" x2="960" y2="520" stroke="#C7BEA8" stroke-width="2"/>
+    <!-- signal dots -->
+    <circle cx="380" cy="280" r="10" fill="#3F5A6B"/>
+    <circle cx="560" cy="280" r="6" fill="#3F5A6B" opacity=".6"/>
+    <circle cx="780" cy="280" r="14" fill="#A8442A"/>
+    <circle cx="460" cy="400" r="8" fill="#B8853A"/>
+    <circle cx="700" cy="400" r="18" fill="#A8442A"/>
+    <circle cx="340" cy="520" r="6" fill="#6B6456" opacity=".5"/>
+    <circle cx="620" cy="520" r="22" fill="#8F6423"/>
+    <circle cx="880" cy="520" r="10" fill="#B8853A"/>
+    <!-- lane labels -->
+    <text x="240" y="248" font-family="Geist Mono, ui-monospace, monospace" font-size="20" fill="#6B6456" letter-spacing="2">RATES</text>
+    <text x="240" y="368" font-family="Geist Mono, ui-monospace, monospace" font-size="20" fill="#6B6456" letter-spacing="2">EVENTS</text>
+    <text x="240" y="488" font-family="Geist Mono, ui-monospace, monospace" font-size="20" fill="#6B6456" letter-spacing="2">REGULATORY</text>
+    <!-- title -->
+    <text x="600" y="160" font-family="Newsreader, Georgia, serif" font-size="60" fill="#1C1A16" text-anchor="middle" font-style="italic">Oracle</text>
+    <text x="600" y="660" font-family="Geist Mono, ui-monospace, monospace" font-size="14" fill="#958D7C" letter-spacing="3" text-anchor="middle">NOMOS · SIGNAL INTELLIGENCE</text>
+  </svg>
+</template>
+<style>
+  :root {
+    --paper: #F6F1E8;
+    --paper-2: #EFE8DB;
+    --ink: #1C1A16;
+    --ink-2: #2E2A22;
+    --ink-3: #6B6456;
+    --ink-4: #958D7C;
+    --rule: #D9D1BE;
+    --rule-2: #C7BEA8;
+    --ochre: #B8853A;
+    --ochre-2: #8F6423;
+    --red: #A8442A;
+    --green: #4E6A3A;
+    --blue: #3F5A6B;
+    --card: #FBF7EE;
+    --night: #1C1A16;
+
+    --serif: 'Newsreader', Georgia, serif;
+    --sans: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    --mono: 'Geist Mono', ui-monospace, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: 140px;
+  }
+
+  .wrap { max-width: 1320px; margin: 0 auto; padding: 0 40px; }
+
+  /* ================ Header ================ */
+  header.top { padding: 64px 0 36px; border-bottom: 1px solid var(--rule); }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--ink-3);
+  }
+  h1.title {
+    font-family: var(--serif); font-weight: 400;
+    font-size: 64px; line-height: 1.02; letter-spacing: -.02em;
+    margin: 14px 0 18px;
+    max-width: 1000px;
+  }
+  h1.title em { font-style: italic; color: var(--ochre-2); font-weight: 500; }
+  .lede {
+    font-family: var(--serif); font-size: 19px; line-height: 1.5;
+    color: var(--ink-2); max-width: 780px; margin: 0;
+  }
+  .meta-row {
+    display: flex; gap: 28px; flex-wrap: wrap;
+    margin-top: 36px; padding-top: 22px; border-top: 1px dashed var(--rule-2);
+  }
+  .meta-row a, .meta-row span {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--ink-2); text-decoration: none;
+  }
+  .meta-row a:hover { color: var(--ochre-2); }
+  .meta-row .num { color: var(--ink-4); margin-right: 8px; }
+
+  /* ================ Section scaffold ================ */
+  section { padding: 80px 0 24px; border-bottom: 1px solid var(--rule); }
+  .section-head {
+    display: grid; grid-template-columns: 120px 1fr; gap: 40px;
+    align-items: baseline; margin-bottom: 36px;
+  }
+  .section-head .num {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .14em;
+    color: var(--ink-4); text-transform: uppercase;
+  }
+  h2.section-title {
+    font-family: var(--serif); font-weight: 400; font-size: 38px;
+    letter-spacing: -.015em; margin: 0 0 8px;
+  }
+  .section-sub {
+    font-family: var(--serif); font-style: italic; font-size: 16px;
+    color: var(--ink-3); margin: 0; max-width: 780px;
+  }
+  .grid-inset { display: grid; grid-template-columns: 120px 1fr; gap: 40px; align-items: start; }
+  .grid-inset .gutter { font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-4); padding-top: 4px; }
+
+  /* ================ Rationale block ================ */
+  .rationale {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
+    margin-top: 12px;
+  }
+  .rationale .pt { border-left: 2px solid var(--ochre); padding: 4px 0 6px 18px; }
+  .rationale .pt .k {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--ochre-2); display: block; margin-bottom: 6px;
+  }
+  .rationale .pt .v {
+    font-family: var(--serif); font-size: 17px; line-height: 1.45; color: var(--ink-2);
+  }
+  .rationale .pt .v em { font-style: italic; color: var(--ink-3); }
+
+  /* ================ Front-page widget ================ */
+  .widget-showcase {
+    display: grid; grid-template-columns: 400px 1fr; gap: 40px;
+    align-items: start; margin-top: 12px;
+  }
+  .widget-frame {
+    background: var(--paper-2);
+    border: 1px dashed var(--rule-2);
+    border-radius: 8px;
+    padding: 22px;
+    position: relative;
+  }
+  .widget-frame::before {
+    content: 'AS IT APPEARS ON TODAY';
+    position: absolute; top: -10px; left: 22px;
+    background: var(--paper); padding: 0 10px;
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .12em;
+    color: var(--ink-4);
+  }
+  .widget {
+    background: var(--night); color: #EEE6D2;
+    border-radius: 8px; overflow: hidden;
+    aspect-ratio: 1/1;
+    display: flex; flex-direction: column;
+    position: relative;
+  }
+  .widget::before {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 20% 10%, rgba(184,133,58,.22), transparent 45%),
+                radial-gradient(ellipse at 90% 90%, rgba(168,68,42,.18), transparent 40%);
+    pointer-events: none;
+  }
+  .widget-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 18px 20px 10px; position: relative; z-index: 1;
+  }
+  .widget-head .label {
+    font-family: var(--serif); font-size: 20px; font-weight: 500; letter-spacing: -.01em;
+  }
+  .widget-head .t {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .12em;
+    color: #B8B0A0; text-transform: uppercase;
+  }
+  .widget-head .t .pulse {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: #E2B978; margin-right: 6px;
+    box-shadow: 0 0 0 0 rgba(226,185,120,.6);
+    animation: pulse 2s infinite;
+    vertical-align: middle;
+  }
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(226,185,120,.6); }
+    70%  { box-shadow: 0 0 0 8px rgba(226,185,120,0); }
+    100% { box-shadow: 0 0 0 0 rgba(226,185,120,0); }
+  }
+  .widget-signals {
+    padding: 4px 20px 18px; display: flex; flex-direction: column; gap: 10px;
+    position: relative; z-index: 1;
+    flex: 1;
+  }
+  .wsig {
+    display: grid; grid-template-columns: 40px 1fr auto; gap: 12px;
+    padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.07);
+    align-items: baseline;
+  }
+  .wsig:last-child { border-bottom: none; }
+  .wsig .layer {
+    font-family: var(--mono); font-size: 9px; letter-spacing: .06em;
+    color: #8C826E; text-transform: uppercase;
+  }
+  .wsig .msg { font-family: var(--serif); font-size: 14px; color: #EEE6D2; line-height: 1.35; }
+  .wsig .imp {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .04em;
+    padding: 2px 7px; border-radius: 3px;
+  }
+  .wsig .imp.high { color: #F0B197; background: rgba(168,68,42,.22); }
+  .wsig .imp.med  { color: #E2B978; background: rgba(184,133,58,.22); }
+  .wsig .imp.low  { color: #B8B0A0; background: rgba(255,255,255,.06); }
+  .widget-foot {
+    padding: 10px 20px 16px; border-top: 1px solid rgba(255,255,255,.08);
+    font-family: var(--mono); font-size: 10px; letter-spacing: .08em;
+    color: #B8B0A0; text-transform: uppercase;
+    display: flex; justify-content: space-between;
+    position: relative; z-index: 1;
+  }
+  .widget-foot .go { color: #E2B978; }
+
+  .widget-notes {
+    font-family: var(--serif); font-size: 15px; line-height: 1.55; color: var(--ink-2);
+  }
+  .widget-notes p { margin: 0 0 14px; }
+  .widget-notes h4 {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--ink-3); margin: 18px 0 8px; font-weight: 400;
+  }
+  .widget-notes ul { margin: 0; padding-left: 18px; }
+  .widget-notes li { margin-bottom: 6px; }
+
+  /* ================ Horizon ================ */
+  .horizon-wrap {
+    background: var(--night); color: #EEE6D2;
+    border-radius: 10px; padding: 0;
+    overflow: hidden; margin-top: 12px;
+    position: relative;
+  }
+  .horizon-wrap::before {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 10% 20%, rgba(184,133,58,.15), transparent 40%),
+                radial-gradient(ellipse at 90% 80%, rgba(63,90,107,.15), transparent 45%);
+    pointer-events: none;
+  }
+  .horizon-head {
+    padding: 22px 28px 14px; display: flex; justify-content: space-between; align-items: baseline;
+    position: relative; z-index: 1;
+  }
+  .horizon-head h3 { font-family: var(--serif); font-size: 22px; font-weight: 500; letter-spacing: -.01em; margin: 0; }
+  .horizon-head h3 em { font-style: italic; color: #E2B978; }
+  .horizon-head .ts {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .12em;
+    color: #B8B0A0; text-transform: uppercase;
+  }
+  .horizon-svg { display: block; width: 100%; height: 320px; position: relative; z-index: 1; }
+  .horizon-foot {
+    padding: 12px 28px 22px; display: flex; gap: 24px;
+    font-family: var(--mono); font-size: 10px; letter-spacing: .08em;
+    color: #B8B0A0; text-transform: uppercase;
+    border-top: 1px solid rgba(255,255,255,.08);
+    position: relative; z-index: 1;
+  }
+  .horizon-foot .key { display: flex; align-items: center; gap: 8px; }
+  .horizon-foot .key .sw { width: 10px; height: 10px; border-radius: 50%; }
+  .horizon-foot .key.rates .sw { background: #6FA8D6; }
+  .horizon-foot .key.events .sw { background: #E2B978; }
+  .horizon-foot .key.reg .sw { background: #CB7A66; }
+  .horizon-foot .sp { flex: 1; }
+  .horizon-foot .hint { font-family: var(--serif); font-style: italic; text-transform: none; letter-spacing: 0; font-size: 12.5px; color: #B8B0A0; }
+
+  /* ================ Impact summary ================ */
+  .impact-strip {
+    background: var(--card); border: 1px solid var(--rule);
+    border-radius: 8px; padding: 0; overflow: hidden;
+    margin-top: 14px;
+  }
+  .impact-strip .row {
+    display: grid; grid-template-columns: 260px 1fr 140px;
+    gap: 0; align-items: stretch;
+    border-bottom: 1px solid var(--rule);
+  }
+  .impact-strip .row:last-child { border-bottom: none; }
+  .impact-strip .row .contract {
+    padding: 20px 22px; border-right: 1px solid var(--rule);
+    background: var(--paper-2);
+  }
+  .impact-strip .row .contract .n { font-family: var(--serif); font-weight: 500; font-size: 16px; }
+  .impact-strip .row .contract .cp { font-family: var(--mono); font-size: 10px; color: var(--ink-3); letter-spacing: .06em; margin-top: 3px; text-transform: uppercase; }
+  .impact-strip .row .signals {
+    padding: 18px 22px; border-right: 1px solid var(--rule);
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .impact-strip .row .sig-line { display: flex; align-items: baseline; gap: 10px; font-size: 13px; }
+  .impact-strip .row .sig-line .dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    display: inline-block; transform: translateY(1px);
+  }
+  .impact-strip .row .sig-line .dot.rates { background: #6FA8D6; }
+  .impact-strip .row .sig-line .dot.events { background: var(--ochre); }
+  .impact-strip .row .sig-line .dot.reg { background: var(--red); }
+  .impact-strip .row .sig-line .text { font-family: var(--serif); color: var(--ink-2); }
+  .impact-strip .row .sig-line .ref {
+    font-family: var(--mono); font-size: 10px; color: var(--ink-4); letter-spacing: .04em;
+  }
+  .impact-strip .row .action {
+    padding: 18px 22px; display: flex; flex-direction: column; justify-content: center;
+    align-items: flex-start; gap: 4px;
+  }
+  .impact-strip .row .action .st {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--ink-3);
+  }
+  .impact-strip .row .action .what {
+    font-family: var(--serif); font-size: 15px; font-weight: 500;
+  }
+  .impact-strip .row .action .what.flag { color: var(--red); }
+  .impact-strip .row .action .what.watch { color: var(--ochre-2); }
+  .impact-strip .row .action .what.ok { color: var(--green); }
+
+  /* ================ Ask the Oracle ================ */
+  .ask {
+    margin-top: 14px;
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 22px 26px 24px;
+  }
+  .ask-row {
+    display: flex; align-items: center; gap: 14px;
+    padding-bottom: 16px; border-bottom: 1px dashed var(--rule-2);
+  }
+  .ask-row .prefix {
+    font-family: var(--serif); font-size: 18px; font-style: italic; color: var(--ochre-2); font-weight: 500;
+  }
+  .ask-row input {
+    flex: 1; border: none; background: transparent; outline: none;
+    font-family: var(--serif); font-size: 18px; color: var(--ink);
+  }
+  .ask-row input::placeholder { color: var(--ink-4); }
+  .ask-row .key {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .08em;
+    color: var(--ink-3); border: 1px solid var(--rule); padding: 3px 7px; border-radius: 3px;
+  }
+  .ask-examples {
+    margin-top: 14px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+  }
+  .ask-examples .pill {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .04em;
+    padding: 6px 12px; border: 1px solid var(--rule); border-radius: 20px;
+    color: var(--ink-2); background: var(--paper); cursor: pointer;
+  }
+  .ask-examples .pill:hover { border-color: var(--ochre); color: var(--ochre-2); }
+  .ask-note {
+    font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--ink-3);
+    margin-top: 14px; max-width: 720px;
+  }
+
+  /* ================ Lens header ================ */
+  .lens-head {
+    display: flex; align-items: baseline; gap: 18px;
+    margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--rule);
+  }
+  .lens-head .layer-no {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .14em;
+    color: var(--ink-4); text-transform: uppercase;
+  }
+  .lens-head h3 {
+    font-family: var(--serif); font-weight: 500; font-size: 26px; letter-spacing: -.01em;
+    margin: 0;
+  }
+  .lens-head .blurb {
+    font-family: var(--serif); font-style: italic; color: var(--ink-3);
+    font-size: 14.5px; margin-left: auto; max-width: 420px; text-align: right;
+  }
+
+  /* ================ Layer 1: Rates (small multiples) ================ */
+  .rates-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+  }
+  .rate-card {
+    background: var(--card); border: 1px solid var(--rule); border-radius: 6px;
+    padding: 16px 16px 14px; position: relative;
+  }
+  .rate-card.alert { border-color: var(--ochre); background: #FBF2E0; }
+  .rate-card .tag {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .08em;
+    color: var(--ink-3); text-transform: uppercase;
+  }
+  .rate-card .name {
+    font-family: var(--serif); font-weight: 500; font-size: 16px;
+    margin-top: 2px; letter-spacing: -.01em;
+  }
+  .rate-card .val {
+    font-family: var(--serif); font-size: 26px; font-weight: 500;
+    letter-spacing: -.01em; margin-top: 10px;
+  }
+  .rate-card .chg {
+    font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); margin-top: 2px;
+  }
+  .rate-card .chg.up { color: var(--red); }
+  .rate-card .chg.dn { color: var(--green); }
+  .rate-card svg { display: block; margin-top: 10px; }
+  .rate-card .used {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .04em;
+    color: var(--ink-4); margin-top: 10px; text-transform: uppercase;
+  }
+  .rate-card .used strong { color: var(--ink-2); font-weight: 500; }
+  .rate-card .alert-flag {
+    position: absolute; top: 14px; right: 14px;
+    font-family: var(--mono); font-size: 9px; letter-spacing: .08em;
+    padding: 3px 7px; border-radius: 3px;
+    background: var(--ochre); color: #1C1A16; text-transform: uppercase;
+  }
+
+  /* ================ Layer 2: Events (editorial cards) ================ */
+  .events-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .evt-card {
+    background: var(--card); border: 1px solid var(--rule); border-radius: 8px;
+    padding: 22px 24px 20px; position: relative;
+  }
+  .evt-card .when {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .1em;
+    color: var(--ink-3); text-transform: uppercase;
+  }
+  .evt-card h4 {
+    font-family: var(--serif); font-weight: 500; font-size: 22px;
+    letter-spacing: -.01em; line-height: 1.2; margin: 6px 0 10px;
+  }
+  .evt-card .src {
+    font-family: var(--serif); font-style: italic; font-size: 13px;
+    color: var(--ink-3); margin-bottom: 14px;
+  }
+  .evt-card p.summary {
+    font-family: var(--serif); font-size: 15px; color: var(--ink-2);
+    line-height: 1.5; margin: 0 0 16px;
+  }
+  .evt-chain {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px; background: var(--paper-2);
+    border-radius: 5px; font-size: 12.5px;
+    flex-wrap: wrap;
+  }
+  .evt-chain .node {
+    font-family: var(--serif); font-weight: 500; color: var(--ink-2);
+  }
+  .evt-chain .arr { color: var(--ink-4); }
+  .evt-chain .hit {
+    color: var(--red); border-bottom: 2px solid var(--red);
+  }
+  .evt-card .why {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .08em;
+    color: var(--ink-3); text-transform: uppercase; margin-top: 14px;
+    display: flex; align-items: baseline; gap: 10px;
+  }
+  .evt-card .why .chip {
+    padding: 2px 7px; border-radius: 3px;
+    background: rgba(168,68,42,.1); color: var(--red);
+  }
+  .evt-card .why .chip.watch { background: rgba(184,133,58,.14); color: var(--ochre-2); }
+
+  /* ================ Layer 3: Regulatory (hero diagram) ================ */
+  .reg-hero {
+    background: var(--card); border: 1px solid var(--rule); border-radius: 10px;
+    padding: 0; overflow: hidden; margin-top: 12px;
+  }
+  .reg-hero-head {
+    padding: 24px 32px 20px; display: grid;
+    grid-template-columns: 1fr auto; gap: 24px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .reg-hero-head .title-col .kicker {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .14em;
+    color: var(--red); text-transform: uppercase;
+  }
+  .reg-hero-head .title-col h3 {
+    font-family: var(--serif); font-weight: 500; font-size: 32px;
+    letter-spacing: -.015em; margin: 6px 0 4px; line-height: 1.15;
+  }
+  .reg-hero-head .title-col .auth {
+    font-family: var(--serif); font-style: italic; color: var(--ink-3); font-size: 14px;
+  }
+  .reg-hero-head .tl-col {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em;
+    color: var(--ink-3); text-transform: uppercase; text-align: right;
+    padding-top: 6px;
+  }
+  .reg-hero-head .tl-col .v { color: var(--ink); font-weight: 500; display: block; margin-top: 2px; font-size: 12px; }
+
+  .reg-hero-body { padding: 28px 32px 8px; }
+  .reg-body-intro {
+    font-family: var(--serif); font-size: 17px; line-height: 1.5; color: var(--ink-2);
+    max-width: 880px; margin: 0 0 18px;
+  }
+  .reg-body-intro em { font-style: italic; color: var(--ochre-2); }
+
+  .reg-diagram-wrap {
+    margin: 8px 0 8px;
+    background: var(--paper); border-radius: 8px; padding: 24px 28px;
+    border: 1px dashed var(--rule-2);
+  }
+  .reg-diagram-wrap .dg-caption {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .14em;
+    color: var(--ink-4); text-transform: uppercase; margin-bottom: 10px;
+  }
+  .reg-diagram-wrap .dg-caption em { color: var(--ochre-2); font-style: normal; }
+  .reg-diagram {
+    display: grid; grid-template-columns: 240px 1fr 260px;
+    gap: 0; align-items: stretch;
+  }
+  .dg-col { padding: 14px 0; }
+  .dg-col.rule { padding-right: 20px; border-right: 1px solid var(--rule); }
+  .dg-col.scope { padding: 14px 24px; border-right: 1px solid var(--rule); }
+  .dg-col.book { padding: 14px 0 14px 24px; }
+  .dg-col .col-h {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .14em;
+    color: var(--ink-4); text-transform: uppercase; margin-bottom: 14px;
+  }
+  .dg-rule-box {
+    font-family: var(--serif); font-size: 16px; line-height: 1.4;
+    color: var(--ink);
+  }
+  .dg-rule-box .q { font-style: italic; color: var(--ink-3); font-size: 13px; display: block; margin-top: 8px; }
+  .dg-venn { position: relative; height: 140px; margin-bottom: 14px; }
+  .dg-venn svg { display: block; }
+  .dg-criteria {
+    display: flex; flex-direction: column; gap: 8px;
+    font-family: var(--serif); font-size: 14px; color: var(--ink-2);
+  }
+  .dg-criteria .c { display: grid; grid-template-columns: 20px 1fr; gap: 8px; align-items: baseline; }
+  .dg-criteria .c .tick { font-family: var(--mono); font-size: 10px; color: var(--ochre-2); font-weight: 500; }
+  .dg-criteria .c .tick.x { color: var(--ink-4); }
+
+  .dg-book-list { display: flex; flex-direction: column; gap: 10px; }
+  .dg-contract {
+    display: grid; grid-template-columns: 14px 1fr; gap: 10px;
+    padding: 10px 12px; background: var(--card); border: 1px solid var(--rule); border-radius: 5px;
+    align-items: center; position: relative;
+  }
+  .dg-contract.caught { border-color: var(--red); background: #FBEDE7; }
+  .dg-contract .mark { width: 10px; height: 10px; border-radius: 50%; background: var(--ink-4); }
+  .dg-contract.caught .mark { background: var(--red); }
+  .dg-contract .n { font-family: var(--serif); font-size: 14px; font-weight: 500; }
+  .dg-contract .cp { font-family: var(--mono); font-size: 9.5px; letter-spacing: .04em; color: var(--ink-3); margin-top: 2px; text-transform: uppercase; }
+  .dg-contract .st {
+    position: absolute; top: 50%; right: 12px; transform: translateY(-50%);
+    font-family: var(--mono); font-size: 9px; letter-spacing: .08em;
+    padding: 2px 6px; border-radius: 3px; text-transform: uppercase;
+  }
+  .dg-contract.caught .st { background: var(--red); color: #FBF7EE; }
+  .dg-contract:not(.caught) .st { color: var(--ink-3); }
+
+  /* Connectors */
+  .dg-connect { position: relative; }
+  .dg-connect .ln {
+    position: absolute; height: 1px; background: var(--rule-2); pointer-events: none;
+  }
+
+  .reg-timeline {
+    margin: 24px 0 8px;
+    padding: 22px 28px 24px;
+    background: var(--paper); border-radius: 8px;
+    border: 1px dashed var(--rule-2);
+  }
+  .reg-timeline .dg-caption {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .14em;
+    color: var(--ink-4); text-transform: uppercase; margin-bottom: 14px;
+  }
+
+  .reg-actions {
+    margin: 20px 0 28px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+  }
+  .action-card {
+    background: var(--card); border: 1px solid var(--rule); border-radius: 6px;
+    padding: 16px 18px 18px;
+  }
+  .action-card .no {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .1em;
+    color: var(--ochre-2); text-transform: uppercase;
+  }
+  .action-card .h {
+    font-family: var(--serif); font-weight: 500; font-size: 16px;
+    margin: 6px 0 6px; letter-spacing: -.01em;
+  }
+  .action-card p {
+    font-family: var(--serif); font-size: 13.5px; color: var(--ink-2);
+    line-height: 1.5; margin: 0;
+  }
+  .action-card .due {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em;
+    color: var(--ink-3); text-transform: uppercase; margin-top: 10px;
+  }
+
+  /* Other regulations list */
+  .reg-more {
+    margin-top: 24px;
+    background: var(--card); border: 1px solid var(--rule); border-radius: 8px;
+    overflow: hidden;
+  }
+  .reg-more .rm-head {
+    padding: 14px 22px; background: var(--paper-2);
+    border-bottom: 1px solid var(--rule);
+    font-family: var(--mono); font-size: 10px; letter-spacing: .12em;
+    color: var(--ink-3); text-transform: uppercase;
+  }
+  .rm-row {
+    display: grid; grid-template-columns: 160px 1fr 180px 100px;
+    gap: 24px; padding: 14px 22px; border-bottom: 1px solid var(--rule);
+    align-items: baseline;
+  }
+  .rm-row:last-child { border-bottom: none; }
+  .rm-row .juris {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .08em;
+    color: var(--ink-3); text-transform: uppercase;
+  }
+  .rm-row .name { font-family: var(--serif); font-size: 15px; font-weight: 500; }
+  .rm-row .scope { font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--ink-3); }
+  .rm-row .caught {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .06em;
+    text-transform: uppercase; text-align: right;
+  }
+  .rm-row .caught.hit { color: var(--red); }
+  .rm-row .caught.ok { color: var(--ink-4); }
+
+  /* Closing note */
+  .closing {
+    padding: 56px 0 12px;
+    display: grid; grid-template-columns: 120px 1fr; gap: 40px;
+  }
+  .closing p {
+    font-family: var(--serif); font-size: 17px; line-height: 1.55;
+    max-width: 780px; color: var(--ink-2); margin: 0 0 12px;
+  }
+  a.ret {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em;
+    color: var(--ochre-2); text-decoration: none;
+    border-bottom: 1px solid var(--ochre);
+    text-transform: uppercase; padding-bottom: 1px;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="top">
+    <div class="eyebrow">Nomos · Oracle · Design proposal</div>
+    <h1 class="title">Three layers of signal, <em>one lens on your book.</em></h1>
+    <p class="lede">Rates, market events, and regulation are three different-shaped inputs. They shouldn't look like three news feeds. The Oracle translates each into the same question: <em>what changed, and which of your contracts cares?</em></p>
+    <div class="meta-row">
+      <span><span class="num">§ 01</span>Design rationale</span>
+      <span><span class="num">§ 02</span>Front-page widget</span>
+      <span><span class="num">§ 03</span>The horizon</span>
+      <span><span class="num">§ 04</span>Impact on your book</span>
+      <span><span class="num">§ 05</span>Three lenses</span>
+      <span><span class="num">§ 06</span>Regulation, diagrammed</span>
+      <a href="index.html" class="ret">← Back to prototype</a>
+    </div>
+  </header>
+
+  <!-- =========================================================== -->
+  <!-- 01 RATIONALE                                                -->
+  <!-- =========================================================== -->
+  <section>
+    <div class="section-head">
+      <div class="num">§ 01</div>
+      <div>
+        <h2 class="section-title">Design rationale</h2>
+        <p class="section-sub">Four commitments that shape every Oracle surface. If a feature breaks one of them, it's on the wrong map.</p>
+      </div>
+    </div>
+
+    <div class="grid-inset">
+      <div class="gutter">Principles</div>
+      <div class="rationale">
+        <div class="pt">
+          <span class="k">01 · Impact first</span>
+          <span class="v">The Oracle never opens on "the news." It opens on <em>"here are the 3 contracts in your book that something happened to today."</em> Feeds live below the fold.</span>
+        </div>
+        <div class="pt">
+          <span class="k">02 · One grammar</span>
+          <span class="v">Rates, events, regulation — all three layers resolve to the same sentence: <em>signal → scope → which of your contracts → recommended action.</em></span>
+        </div>
+        <div class="pt">
+          <span class="k">03 · Auto-diagrammed, not auto-summarised</span>
+          <span class="v">For regulation, Nomos doesn't write you a paragraph. It draws you a diagram: rule, scope test, your contracts caught, timeline.</span>
+        </div>
+        <div class="pt">
+          <span class="k">04 · AI as a quiet tool</span>
+          <span class="v">"Ask the Oracle" lives as a single slim input at the top. It answers in cards anchored to contracts, not in a chat transcript. Useful, not central.</span>
+        </div>
+        <div class="pt">
+          <span class="k">05 · Two surfaces, same object</span>
+          <span class="v">The front-page square and the full tab are the same data, different compression. The square is a horizon; the tab is the atlas.</span>
+        </div>
+        <div class="pt">
+          <span class="k">06 · Quiet by default</span>
+          <span class="v">No ticker noise. The Oracle is closer to a weather report than a Bloomberg terminal. If nothing changed, it says so — <em>and that is the useful answer.</em></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================== -->
+  <!-- 02 FRONT-PAGE WIDGET                                         -->
+  <!-- =========================================================== -->
+  <section>
+    <div class="section-head">
+      <div class="num">§ 02</div>
+      <div>
+        <h2 class="section-title">The square on Today</h2>
+        <p class="section-sub">A 1:1 tile on the landing page. One line per layer — the single most consequential signal in each, today. Dark card, so it reads as an instrument panel against the paper page.</p>
+      </div>
+    </div>
+
+    <div class="grid-inset">
+      <div class="gutter">Widget</div>
+      <div>
+        <div class="widget-showcase">
+          <div class="widget-frame">
+            <div class="widget">
+              <div class="widget-head">
+                <span class="label">Oracle</span>
+                <span class="t"><span class="pulse"></span>Live · 14:22 CET</span>
+              </div>
+              <div class="widget-signals">
+                <div class="wsig">
+                  <span class="layer">Rates</span>
+                  <span class="msg">EURIBOR 3M printed <strong>3.724%</strong> — breaches your swap's floor by 18 bps</span>
+                  <span class="imp high">Impact</span>
+                </div>
+                <div class="wsig">
+                  <span class="layer">Events</span>
+                  <span class="msg">Moody's puts <strong>BoM</strong> on review for downgrade — MAC clause relevant</span>
+                  <span class="imp med">Watch</span>
+                </div>
+                <div class="wsig">
+                  <span class="layer">Reg.</span>
+                  <span class="msg">MiCA Art. 48 — your stablecoin deposit caught · <strong>H1 2025</strong></span>
+                  <span class="imp high">Action</span>
+                </div>
+              </div>
+              <div class="widget-foot">
+                <span>3 signals · 2 contracts affected</span>
+                <span class="go">Open Oracle →</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="widget-notes">
+            <h4>What the square does</h4>
+            <p>Compresses the whole Oracle into <em>three lines and a count</em>. The rule is strict: one signal per layer, and only if it touches a contract in your book.</p>
+
+            <h4>If nothing is happening</h4>
+            <p>The square shows "quiet" — a single line like <em>"No rate moves, no events, no regulatory activity touching your book since 09:00."</em> This is a feature. The absence of alarm is information.</p>
+
+            <h4>Interaction</h4>
+            <ul>
+              <li>Click any line → drops you into that layer in the full tab, scrolled to the signal.</li>
+              <li>Click the header → opens the full Oracle tab, impact-first view.</li>
+              <li>Hover → expands to show the next 2 signals per layer, in place.</li>
+            </ul>
+
+            <h4>Why dark</h4>
+            <p>The rest of Today is warm paper — deliberately calm. The Oracle's one job is to be noticed when it has something to say. Contrast does the work.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================== -->
+  <!-- 03 HORIZON                                                  -->
+  <!-- =========================================================== -->
+  <section>
+    <div class="section-head">
+      <div class="num">§ 03</div>
+      <div>
+        <h2 class="section-title">The horizon</h2>
+        <p class="section-sub">The full Oracle tab opens on this. Three rails, 48 hours wide, time flowing right. Each signal is a node; size = impact on your book; colour = layer. It's a skyline of what's been happening.</p>
+      </div>
+    </div>
+
+    <div class="grid-inset">
+      <div class="gutter">Horizon</div>
+      <div>
+        <div class="horizon-wrap">
+          <div class="horizon-head">
+            <h3>Last <em>48 hours</em> on your book</h3>
+            <span class="ts">17 signals · Scanned 14:22 CET</span>
+          </div>
+          <svg class="horizon-svg" viewBox="0 0 1180 320" preserveAspectRatio="none">
+            <!-- Time axis gridlines -->
+            <g stroke="rgba(255,255,255,.08)" stroke-width="1">
+              <line x1="80" y1="30" x2="80" y2="290"/>
+              <line x1="260" y1="30" x2="260" y2="290"/>
+              <line x1="440" y1="30" x2="440" y2="290"/>
+              <line x1="620" y1="30" x2="620" y2="290"/>
+              <line x1="800" y1="30" x2="800" y2="290"/>
+              <line x1="980" y1="30" x2="980" y2="290"/>
+              <line x1="1160" y1="30" x2="1160" y2="290"/>
+            </g>
+
+            <!-- Time labels -->
+            <g fill="#8C826E" font-family="Geist Mono" font-size="9.5" letter-spacing=".1em">
+              <text x="80"   y="22" text-anchor="middle">T-48H</text>
+              <text x="260"  y="22" text-anchor="middle">T-36H</text>
+              <text x="440"  y="22" text-anchor="middle">T-24H</text>
+              <text x="620"  y="22" text-anchor="middle">T-12H</text>
+              <text x="800"  y="22" text-anchor="middle">T-6H</text>
+              <text x="980"  y="22" text-anchor="middle">T-1H</text>
+              <text x="1160" y="22" text-anchor="middle">NOW</text>
+            </g>
+
+            <!-- Rail 1: Rates -->
+            <line x1="40" y1="90" x2="1160" y2="90" stroke="rgba(111,168,214,.25)" stroke-width="1.5"/>
+            <text x="10" y="94" fill="#6FA8D6" font-family="Geist Mono" font-size="10" letter-spacing=".1em">RATES</text>
+
+            <!-- Rail 2: Events -->
+            <line x1="40" y1="170" x2="1160" y2="170" stroke="rgba(226,185,120,.25)" stroke-width="1.5"/>
+            <text x="10" y="174" fill="#E2B978" font-family="Geist Mono" font-size="10" letter-spacing=".1em">EVENTS</text>
+
+            <!-- Rail 3: Reg -->
+            <line x1="40" y1="250" x2="1160" y2="250" stroke="rgba(203,122,102,.25)" stroke-width="1.5"/>
+            <text x="10" y="254" fill="#CB7A66" font-family="Geist Mono" font-size="10" letter-spacing=".1em">REG.</text>
+
+            <!-- Signal dots — RATES -->
+            <g>
+              <circle cx="140" cy="90" r="4" fill="#6FA8D6" opacity=".45"/>
+              <circle cx="290" cy="90" r="5" fill="#6FA8D6" opacity=".55"/>
+              <circle cx="430" cy="90" r="4" fill="#6FA8D6" opacity=".45"/>
+              <circle cx="580" cy="90" r="6" fill="#6FA8D6" opacity=".7"/>
+              <circle cx="720" cy="90" r="4" fill="#6FA8D6" opacity=".5"/>
+              <circle cx="870" cy="90" r="5" fill="#6FA8D6" opacity=".6"/>
+              <!-- The big one: today's EURIBOR breach -->
+              <circle cx="1080" cy="90" r="13" fill="#6FA8D6" opacity=".25"/>
+              <circle cx="1080" cy="90" r="8" fill="#6FA8D6"/>
+              <text x="1080" y="64" text-anchor="middle" fill="#EEE6D2" font-family="Newsreader" font-size="13" font-weight="500">EURIBOR 3M · 3.724%</text>
+              <text x="1080" y="50" text-anchor="middle" fill="#8C826E" font-family="Geist Mono" font-size="9" letter-spacing=".08em">+18 BPS VS FLOOR</text>
+            </g>
+
+            <!-- Signal dots — EVENTS -->
+            <g>
+              <circle cx="180" cy="170" r="4" fill="#E2B978" opacity=".45"/>
+              <circle cx="380" cy="170" r="5" fill="#E2B978" opacity=".5"/>
+              <!-- Big event: Moody's BoM -->
+              <circle cx="640" cy="170" r="12" fill="#E2B978" opacity=".25"/>
+              <circle cx="640" cy="170" r="7" fill="#E2B978"/>
+              <text x="640" y="148" text-anchor="middle" fill="#EEE6D2" font-family="Newsreader" font-size="13" font-weight="500">Moody's puts BoM on review</text>
+              <text x="640" y="134" text-anchor="middle" fill="#8C826E" font-family="Geist Mono" font-size="9" letter-spacing=".08em">MAC CLAUSE · 1 CONTRACT</text>
+              <circle cx="830" cy="170" r="5" fill="#E2B978" opacity=".55"/>
+              <circle cx="1000" cy="170" r="4" fill="#E2B978" opacity=".45"/>
+            </g>
+
+            <!-- Signal dots — REG -->
+            <g>
+              <circle cx="240" cy="250" r="4" fill="#CB7A66" opacity=".45"/>
+              <!-- Big reg: MiCA -->
+              <circle cx="500" cy="250" r="13" fill="#CB7A66" opacity=".25"/>
+              <circle cx="500" cy="250" r="8" fill="#CB7A66"/>
+              <text x="500" y="282" text-anchor="middle" fill="#EEE6D2" font-family="Newsreader" font-size="13" font-weight="500">MiCA Art. 48 · ARTs in force</text>
+              <text x="500" y="298" text-anchor="middle" fill="#8C826E" font-family="Geist Mono" font-size="9" letter-spacing=".08em">2 CONTRACTS CAUGHT · H1 2025</text>
+              <circle cx="760" cy="250" r="5" fill="#CB7A66" opacity=".5"/>
+              <circle cx="940" cy="250" r="4" fill="#CB7A66" opacity=".45"/>
+            </g>
+
+            <!-- "Now" vertical line -->
+            <line x1="1160" y1="35" x2="1160" y2="285" stroke="#E2B978" stroke-width="1.2" stroke-dasharray="3,3"/>
+          </svg>
+          <div class="horizon-foot">
+            <div class="key rates"><span class="sw"></span>Rates</div>
+            <div class="key events"><span class="sw"></span>Market events</div>
+            <div class="key reg"><span class="sw"></span>Regulatory</div>
+            <div class="sp"></div>
+            <div class="hint">Dot size = impact on your book. Click a dot → jump into the detail.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================== -->
+  <!-- 04 IMPACT STRIP                                              -->
+  <!-- =========================================================== -->
+  <section>
+    <div class="section-head">
+      <div class="num">§ 04</div>
+      <div>
+        <h2 class="section-title">What it means for <em>your</em> book</h2>
+        <p class="section-sub">The page is inverted from a news feed. Contracts come first; signals are evidence below them. If a signal doesn't touch a contract, it's filed in the archive, not here.</p>
+      </div>
+    </div>
+
+    <div class="grid-inset">
+      <div class="gutter">Impact</div>
+      <div>
+        <div class="ask">
+          <div class="ask-row">
+            <span class="prefix">Ask the Oracle</span>
+            <input placeholder="e.g. &quot;Which of my contracts reference EURIBOR 3M?&quot;" />
+            <span class="key">⏎</span>
+          </div>
+          <div class="ask-examples">
+            <span class="pill">Explain MiCA Art. 48 in plain English</span>
+            <span class="pill">What changes if EURIBOR rises 50bps?</span>
+            <span class="pill">Is the BoM downgrade in MAC scope?</span>
+            <span class="pill">Compare my crypto book to Q3 2024</span>
+            <span class="pill">Draft a covenant waiver letter</span>
+          </div>
+          <p class="ask-note">Answers come back as contextual cards anchored to specific contracts — not a chat transcript. Every answer cites the clause and source it's drawn from.</p>
+        </div>
+
+        <div class="impact-strip" style="margin-top: 18px;">
+          <div class="row">
+            <div class="contract">
+              <div class="n">Swap with BoM</div>
+              <div class="cp">€25M · EURIBOR 3M + 150</div>
+            </div>
+            <div class="signals">
+              <div class="sig-line"><span class="dot rates"></span><span class="text">EURIBOR 3M printed 3.724% — above your cap of 3.70%</span><span class="ref">§4.2</span></div>
+              <div class="sig-line"><span class="dot events"></span><span class="text">Moody's puts Bank of Munich on review for downgrade</span><span class="ref">§9.1 MAC</span></div>
+            </div>
+            <div class="action">
+              <div class="st">Decision</div>
+              <div class="what flag">Two signals — open</div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="contract">
+              <div class="n">USDC treasury — Circle EU</div>
+              <div class="cp">Stablecoin deposit</div>
+            </div>
+            <div class="signals">
+              <div class="sig-line"><span class="dot reg"></span><span class="text">MiCA Art. 48 applies — Circle EU is an ART issuer &gt;€5M</span><span class="ref">Scope ✓</span></div>
+            </div>
+            <div class="action">
+              <div class="st">Action</div>
+              <div class="what flag">Review custody</div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="contract">
+              <div class="n">Stablecoin deposit — Paxos</div>
+              <div class="cp">USDP · €3M</div>
+            </div>
+            <div class="signals">
+              <div class="sig-line"><span class="dot reg"></span><span class="text">MiCA Art. 48 applies — borderline on user count</span><span class="ref">Scope ? </span></div>
+            </div>
+            <div class="action">
+              <div class="st">Watch</div>
+              <div class="what watch">Verify scope</div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="contract">
+              <div class="n">Revolving facility · HSBC</div>
+              <div class="cp">€15M · floating</div>
+            </div>
+            <div class="signals">
+              <div class="sig-line"><span class="dot rates"></span><span class="text">EURIBOR rise favours your position — no threshold crossed</span><span class="ref">§3.1</span></div>
+            </div>
+            <div class="action">
+              <div class="st">Status</div>
+              <div class="what ok">No action</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================== -->
+  <!-- 05 THREE LENSES                                              -->
+  <!-- =========================================================== -->
+  <section>
+    <div class="section-head">
+      <div class="num">§ 05</div>
+      <div>
+        <h2 class="section-title">Three lenses, three visual languages</h2>
+        <p class="section-sub">Each layer gets a form that suits its data shape. Rates are numeric; events are editorial; regulation is diagrammatic. Forcing them into the same card template is how feeds become noise.</p>
+      </div>
+    </div>
+
+    <div class="grid-inset">
+      <div class="gutter">Layer 01</div>
+      <div>
+        <div class="lens-head">
+          <span class="layer-no">Layer 01</span>
+          <h3>Rates — small multiples</h3>
+          <span class="blurb">Only rates your book references. No S&amp;P 500, no "market overview." Each card shows latest value, day's change, a mini-chart, and which of your contracts depends on it.</span>
+        </div>
+
+        <div class="rates-grid">
+
+          <div class="rate-card alert">
+            <div class="alert-flag">Cap breach</div>
+            <div class="tag">Benchmark</div>
+            <div class="name">EURIBOR 3M</div>
+            <div class="val">3.724%</div>
+            <div class="chg up">▲ +18 bps vs open</div>
+            <svg viewBox="0 0 200 40" width="100%" height="40">
+              <polyline points="0,28 15,26 30,27 45,24 60,23 75,25 90,22 105,20 120,21 135,18 150,15 165,12 180,10 200,6" fill="none" stroke="#B8853A" stroke-width="1.5"/>
+              <circle cx="200" cy="6" r="3" fill="#B8853A"/>
+            </svg>
+            <div class="used"><strong>3 contracts</strong> · cap 3.70%</div>
+          </div>
+
+          <div class="rate-card">
+            <div class="tag">Benchmark</div>
+            <div class="name">SOFR</div>
+            <div class="val">4.310%</div>
+            <div class="chg dn">▼ −2 bps</div>
+            <svg viewBox="0 0 200 40" width="100%" height="40">
+              <polyline points="0,18 15,19 30,20 45,21 60,20 75,22 90,21 105,22 120,23 135,22 150,24 165,23 180,25 200,26" fill="none" stroke="#6B6456" stroke-width="1.5"/>
+              <circle cx="200" cy="26" r="3" fill="#6B6456"/>
+            </svg>
+            <div class="used"><strong>1 contract</strong></div>
+          </div>
+
+          <div class="rate-card">
+            <div class="tag">FX</div>
+            <div class="name">EUR/USD</div>
+            <div class="val">1.0814</div>
+            <div class="chg up">▲ +0.22%</div>
+            <svg viewBox="0 0 200 40" width="100%" height="40">
+              <polyline points="0,22 15,23 30,21 45,20 60,22 75,19 90,20 105,18 120,17 135,16 150,17 165,15 180,14 200,13" fill="none" stroke="#6B6456" stroke-width="1.5"/>
+              <circle cx="200" cy="13" r="3" fill="#6B6456"/>
+            </svg>
+            <div class="used"><strong>4 contracts</strong></div>
+          </div>
+
+          <div class="rate-card">
+            <div class="tag">Credit</div>
+            <div class="name">Itraxx Main</div>
+            <div class="val">62.5 bps</div>
+            <div class="chg up">▲ +1.8 bps</div>
+            <svg viewBox="0 0 200 40" width="100%" height="40">
+              <polyline points="0,20 15,22 30,21 45,23 60,22 75,24 90,23 105,22 120,24 135,23 150,21 165,22 180,20 200,18" fill="none" stroke="#6B6456" stroke-width="1.5"/>
+              <circle cx="200" cy="18" r="3" fill="#6B6456"/>
+            </svg>
+            <div class="used"><strong>2 contracts</strong> · MAC trigger 85bps</div>
+          </div>
+
+          <div class="rate-card">
+            <div class="tag">Crypto</div>
+            <div class="name">BTC / USD</div>
+            <div class="val">$64,210</div>
+            <div class="chg dn">▼ −1.1%</div>
+            <svg viewBox="0 0 200 40" width="100%" height="40">
+              <polyline points="0,10 15,12 30,14 45,13 60,15 75,14 90,16 105,18 120,17 135,19 150,20 165,22 180,23 200,25" fill="none" stroke="#6B6456" stroke-width="1.5"/>
+              <circle cx="200" cy="25" r="3" fill="#6B6456"/>
+            </svg>
+            <div class="used"><strong>1 contract</strong></div>
+          </div>
+
+          <div class="rate-card">
+            <div class="tag">Benchmark</div>
+            <div class="name">€STR</div>
+            <div class="val">3.664%</div>
+            <div class="chg dn">▼ −1 bp</div>
+            <svg viewBox="0 0 200 40" width="100%" height="40">
+              <polyline points="0,18 15,18 30,19 45,18 60,19 75,20 90,19 105,20 120,21 135,20 150,21 165,22 180,21 200,22" fill="none" stroke="#6B6456" stroke-width="1.5"/>
+              <circle cx="200" cy="22" r="3" fill="#6B6456"/>
+            </svg>
+            <div class="used"><strong>1 contract</strong></div>
+          </div>
+
+          <div class="rate-card">
+            <div class="tag">Commodity</div>
+            <div class="name">TTF Gas</div>
+            <div class="val">€28.4/MWh</div>
+            <div class="chg up">▲ +3.2%</div>
+            <svg viewBox="0 0 200 40" width="100%" height="40">
+              <polyline points="0,25 15,24 30,22 45,20 60,22 75,19 90,17 105,18 120,15 135,13 150,14 165,12 180,10 200,8" fill="none" stroke="#6B6456" stroke-width="1.5"/>
+              <circle cx="200" cy="8" r="3" fill="#6B6456"/>
+            </svg>
+            <div class="used"><strong>1 contract</strong> · indexation</div>
+          </div>
+
+          <div class="rate-card">
+            <div class="tag">CDS</div>
+            <div class="name">BoM 5Y</div>
+            <div class="val">142 bps</div>
+            <div class="chg up">▲ +12 bps</div>
+            <svg viewBox="0 0 200 40" width="100%" height="40">
+              <polyline points="0,26 15,25 30,26 45,24 60,23 75,22 90,21 105,19 120,18 135,16 150,14 165,12 180,10 200,7" fill="none" stroke="#6B6456" stroke-width="1.5"/>
+              <circle cx="200" cy="7" r="3" fill="#6B6456"/>
+            </svg>
+            <div class="used"><strong>1 contract</strong> · watch</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-inset" style="margin-top: 48px;">
+      <div class="gutter">Layer 02</div>
+      <div>
+        <div class="lens-head">
+          <span class="layer-no">Layer 02</span>
+          <h3>Events — editorial cards with impact chains</h3>
+          <span class="blurb">Each card is a story, not a headline. What happened → through whom → to which of your contracts. The chain is the content.</span>
+        </div>
+
+        <div class="events-grid">
+
+          <div class="evt-card">
+            <div class="when">Today · 09:14 CET</div>
+            <h4>Moody's places Bank of Munich on review for downgrade</h4>
+            <div class="src">Moody's Investors Service · Sector: EU banks</div>
+            <p class="summary">Cites deteriorating asset quality in the commercial real estate book; review period 90 days. One notch downgrade would move BoM to Baa1.</p>
+            <div class="evt-chain">
+              <span class="node">Moody's action</span>
+              <span class="arr">→</span>
+              <span class="node">BoM credit quality</span>
+              <span class="arr">→</span>
+              <span class="node hit">Swap §9.1 MAC test</span>
+            </div>
+            <div class="why">
+              <span>Why this matters:</span>
+              <span class="chip">MAC trigger within 1 notch</span>
+            </div>
+          </div>
+
+          <div class="evt-card">
+            <div class="when">Yesterday · 17:40 CET</div>
+            <h4>ECB keeps deposit rate unchanged at 3.75%</h4>
+            <div class="src">European Central Bank · Monetary policy</div>
+            <p class="summary">Lagarde signals no cuts before June. Terminal-rate expectations pushed out. Market-implied EURIBOR forward curve shifted up ~12 bps.</p>
+            <div class="evt-chain">
+              <span class="node">ECB pause</span>
+              <span class="arr">→</span>
+              <span class="node">EURIBOR curve</span>
+              <span class="arr">→</span>
+              <span class="node hit">3 floating contracts</span>
+            </div>
+            <div class="why">
+              <span>Why this matters:</span>
+              <span class="chip watch">Rate-path divergence from model</span>
+            </div>
+          </div>
+
+          <div class="evt-card">
+            <div class="when">2 days ago</div>
+            <h4>Circle files ART issuer application under MiCA</h4>
+            <div class="src">Circle Internet Financial · Corporate filing</div>
+            <p class="summary">First major USD stablecoin issuer to formally enter EU regime. Custody and reserve requirements trigger on grant; expected Q2 2025.</p>
+            <div class="evt-chain">
+              <span class="node">Circle MiCA filing</span>
+              <span class="arr">→</span>
+              <span class="node">USDC EU custody rules</span>
+              <span class="arr">→</span>
+              <span class="node hit">Your USDC treasury</span>
+            </div>
+            <div class="why">
+              <span>Why this matters:</span>
+              <span class="chip">Affects your custody agreement</span>
+            </div>
+          </div>
+
+          <div class="evt-card">
+            <div class="when">3 days ago</div>
+            <h4>German 10Y Bund yield breaks 2.60%</h4>
+            <div class="src">Bloomberg · Government bonds</div>
+            <p class="summary">Highest print since 2011. Catalysts: sticky services inflation, Bund supply. Credit spreads widened 4 bps in sympathy.</p>
+            <div class="evt-chain">
+              <span class="node">Bund sell-off</span>
+              <span class="arr">→</span>
+              <span class="node">Credit spreads</span>
+              <span class="arr">→</span>
+              <span class="node">Your CDS hedges</span>
+            </div>
+            <div class="why">
+              <span>Why this matters:</span>
+              <span class="chip watch">No threshold crossed — context only</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================== -->
+  <!-- 06 REGULATORY — HERO AUTO-DIAGRAM                            -->
+  <!-- =========================================================== -->
+  <section>
+    <div class="section-head">
+      <div class="num">§ 06</div>
+      <div>
+        <h2 class="section-title">Regulation, auto-diagrammed</h2>
+        <p class="section-sub">The headline move. When a regulation comes in, the Oracle doesn't write you a paragraph — it draws you the machine. <em>Rule, scope test, your contracts caught, timeline, actions.</em> Same structure every time; different content.</p>
+      </div>
+    </div>
+
+    <div class="grid-inset">
+      <div class="gutter">Hero diagram</div>
+      <div>
+        <div class="reg-hero">
+          <div class="reg-hero-head">
+            <div class="title-col">
+              <div class="kicker">◼ Regulatory · In force H1 2025</div>
+              <h3>MiCA Art. 48 — Asset-Referenced Tokens</h3>
+              <div class="auth">Regulation (EU) 2023/1114 · European Commission</div>
+            </div>
+            <div class="tl-col">
+              Auto-generated by Nomos<br>
+              <span class="v">from Circle's MiCA filing · today 09:02</span>
+            </div>
+          </div>
+
+          <div class="reg-hero-body">
+            <p class="reg-body-intro">MiCA creates a full authorisation regime for <em>asset-referenced tokens</em> — stablecoins that reference a basket of assets or a non-EU currency. The rule tightens custody, reserve, and disclosure requirements. <em>Two of your contracts are caught; one is borderline.</em></p>
+
+            <div class="reg-diagram-wrap">
+              <div class="dg-caption"><em>Auto-diagram</em> · rule → scope → your book</div>
+
+              <div class="reg-diagram">
+                <!-- Rule column -->
+                <div class="dg-col rule">
+                  <div class="col-h">The rule</div>
+                  <div class="dg-rule-box">
+                    EU-based issuers of asset-referenced tokens must hold segregated reserves, produce monthly reserve reports, and maintain redemption at par.
+                    <span class="q">"Issuers of ARTs whose average outstanding exceeds €5 M and whose user base includes 1M+ EU holders shall…"</span>
+                  </div>
+                </div>
+
+                <!-- Scope column -->
+                <div class="dg-col scope">
+                  <div class="col-h">Scope test · all three must hold</div>
+                  <div class="dg-venn">
+                    <svg viewBox="0 0 260 140" width="100%" height="140">
+                      <!-- Three overlapping circles -->
+                      <circle cx="90"  cy="70" r="55" fill="#B8853A" fill-opacity=".18" stroke="#B8853A" stroke-width="1.2"/>
+                      <circle cx="170" cy="70" r="55" fill="#A8442A" fill-opacity=".18" stroke="#A8442A" stroke-width="1.2"/>
+                      <circle cx="130" cy="40" r="45" fill="#4E6A3A" fill-opacity=".18" stroke="#4E6A3A" stroke-width="1.2"/>
+
+                      <text x="58"  y="98" fill="#6B6456" font-family="Geist Mono" font-size="9" letter-spacing=".08em">ART ISSUER</text>
+                      <text x="150" y="110" fill="#6B6456" font-family="Geist Mono" font-size="9" letter-spacing=".08em">€5M+ OUTSTANDING</text>
+                      <text x="96"  y="20" fill="#6B6456" font-family="Geist Mono" font-size="9" letter-spacing=".08em">1M+ EU HOLDERS</text>
+
+                      <!-- Central "caught" marker -->
+                      <circle cx="130" cy="70" r="6" fill="#A8442A"/>
+                      <text x="140" y="74" fill="#A8442A" font-family="Newsreader" font-size="11" font-style="italic">caught</text>
+                    </svg>
+                  </div>
+
+                  <div class="dg-criteria">
+                    <div class="c"><span class="tick">✓</span>Issuer of an asset-referenced token</div>
+                    <div class="c"><span class="tick">✓</span>Average outstanding &gt; €5M</div>
+                    <div class="c"><span class="tick">✓</span>1M+ EU resident holders</div>
+                    <div class="c"><span class="tick x">·</span>Excludes: e-money tokens, NFTs, bank-issued</div>
+                  </div>
+                </div>
+
+                <!-- Your book column -->
+                <div class="dg-col book">
+                  <div class="col-h">Your book</div>
+                  <div class="dg-book-list">
+                    <div class="dg-contract caught">
+                      <span class="mark"></span>
+                      <div>
+                        <div class="n">USDC treasury — Circle EU</div>
+                        <div class="cp">€8.4M · daily balance</div>
+                      </div>
+                      <span class="st">Caught</span>
+                    </div>
+                    <div class="dg-contract caught">
+                      <span class="mark"></span>
+                      <div>
+                        <div class="n">Stablecoin deposit — Paxos</div>
+                        <div class="cp">€3M · USDP</div>
+                      </div>
+                      <span class="st">Caught</span>
+                    </div>
+                    <div class="dg-contract">
+                      <span class="mark"></span>
+                      <div>
+                        <div class="n">Crypto derivatives — Deribit</div>
+                        <div class="cp">BTC options · €1.2M notional</div>
+                      </div>
+                      <span class="st">Not in scope</span>
+                    </div>
+                    <div class="dg-contract">
+                      <span class="mark"></span>
+                      <div>
+                        <div class="n">USDT deposit — Tether</div>
+                        <div class="cp">€0.4M · short-dated</div>
+                      </div>
+                      <span class="st">Under €5M threshold</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Timeline -->
+            <div class="reg-timeline">
+              <div class="dg-caption">Timeline · key dates</div>
+              <svg viewBox="0 0 1120 130" width="100%" height="130">
+                <!-- rail -->
+                <line x1="20" y1="70" x2="1100" y2="70" stroke="#D9D1BE" stroke-width="2"/>
+                <!-- Past (gray) / future (ochre) split -->
+                <line x1="20" y1="70" x2="180" y2="70" stroke="#6B6456" stroke-width="2"/>
+
+                <!-- Milestones -->
+                <g>
+                  <!-- 1 -->
+                  <circle cx="80" cy="70" r="7" fill="#6B6456"/>
+                  <text x="80" y="50" text-anchor="middle" fill="#6B6456" font-family="Geist Mono" font-size="9" letter-spacing=".1em">JUN 2023</text>
+                  <text x="80" y="100" text-anchor="middle" fill="#6B6456" font-family="Newsreader" font-size="13">Regulation adopted</text>
+                  <text x="80" y="116" text-anchor="middle" fill="#958D7C" font-family="Newsreader" font-size="11" font-style="italic">Published in OJEU</text>
+
+                  <!-- 2 (today) -->
+                  <circle cx="240" cy="70" r="9" fill="#B8853A"/>
+                  <circle cx="240" cy="70" r="16" fill="none" stroke="#B8853A" stroke-width="1" opacity=".5"/>
+                  <text x="240" y="50" text-anchor="middle" fill="#B8853A" font-family="Geist Mono" font-size="9" letter-spacing=".1em">NOW</text>
+                  <text x="240" y="100" text-anchor="middle" fill="#1C1A16" font-family="Newsreader" font-size="13" font-weight="500">Circle files application</text>
+                  <text x="240" y="116" text-anchor="middle" fill="#958D7C" font-family="Newsreader" font-size="11" font-style="italic">Trigger event for your book</text>
+
+                  <!-- 3 -->
+                  <circle cx="500" cy="70" r="7" fill="#B8853A"/>
+                  <text x="500" y="50" text-anchor="middle" fill="#B8853A" font-family="Geist Mono" font-size="9" letter-spacing=".1em">30 DEC 2024</text>
+                  <text x="500" y="100" text-anchor="middle" fill="#1C1A16" font-family="Newsreader" font-size="13">Title III enters into force</text>
+                  <text x="500" y="116" text-anchor="middle" fill="#958D7C" font-family="Newsreader" font-size="11" font-style="italic">ART issuers must be authorised</text>
+
+                  <!-- 4 -->
+                  <circle cx="760" cy="70" r="7" fill="#B8853A"/>
+                  <text x="760" y="50" text-anchor="middle" fill="#B8853A" font-family="Geist Mono" font-size="9" letter-spacing=".1em">30 JUN 2025</text>
+                  <text x="760" y="100" text-anchor="middle" fill="#1C1A16" font-family="Newsreader" font-size="13">Compliance deadline</text>
+                  <text x="760" y="116" text-anchor="middle" fill="#958D7C" font-family="Newsreader" font-size="11" font-style="italic">Transition period ends</text>
+
+                  <!-- 5 -->
+                  <circle cx="1040" cy="70" r="7" fill="#A8442A"/>
+                  <text x="1040" y="50" text-anchor="middle" fill="#A8442A" font-family="Geist Mono" font-size="9" letter-spacing=".1em">30 DEC 2025</text>
+                  <text x="1040" y="100" text-anchor="middle" fill="#1C1A16" font-family="Newsreader" font-size="13">Full enforcement</text>
+                  <text x="1040" y="116" text-anchor="middle" fill="#958D7C" font-family="Newsreader" font-size="11" font-style="italic">Penalties apply</text>
+                </g>
+              </svg>
+            </div>
+
+            <!-- Action cards -->
+            <div class="reg-actions">
+              <div class="action-card">
+                <div class="no">Action 01</div>
+                <div class="h">Audit custody clauses in caught contracts</div>
+                <p>USDC and Paxos agreements must specify segregation, daily reconciliation, and par redemption. Ana to draft clause amendments.</p>
+                <div class="due">Due · H1 2025</div>
+              </div>
+              <div class="action-card">
+                <div class="no">Action 02</div>
+                <div class="h">Confirm Paxos scope with counsel</div>
+                <p>USDP is borderline on EU user count. Request attestation from Paxos before relying on out-of-scope status.</p>
+                <div class="due">Due · 30 Apr 2025</div>
+              </div>
+              <div class="action-card">
+                <div class="no">Action 03</div>
+                <div class="h">Prepare client briefing</div>
+                <p>One-page plain-language summary for treasurer: what MiCA changes, what they need to approve, risks if no action.</p>
+                <div class="due">Due · Next advisor sync</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- More regulations -->
+        <div class="reg-more">
+          <div class="rm-head">Also tracked · 6 regulations in scope · auto-diagrammed on click</div>
+          <div class="rm-row">
+            <span class="juris">EU · ESMA</span>
+            <span class="name">EMIR Refit reporting</span>
+            <span class="scope">Derivatives trade reporting · expanded fields</span>
+            <span class="caught hit">3 caught</span>
+          </div>
+          <div class="rm-row">
+            <span class="juris">UK · FCA</span>
+            <span class="name">Consumer Duty · cross-border</span>
+            <span class="scope">Retail-facing products with UK touchpoint</span>
+            <span class="caught ok">Not caught</span>
+          </div>
+          <div class="rm-row">
+            <span class="juris">EU · EC</span>
+            <span class="name">CSRD — sustainability reporting</span>
+            <span class="scope">Reporting obligations from FY2025</span>
+            <span class="caught hit">1 caught</span>
+          </div>
+          <div class="rm-row">
+            <span class="juris">US · SEC</span>
+            <span class="name">Treasury clearing mandate</span>
+            <span class="scope">Central clearing for cash Treasuries</span>
+            <span class="caught ok">Not caught</span>
+          </div>
+          <div class="rm-row">
+            <span class="juris">EU · Council</span>
+            <span class="name">DAC8 — crypto tax reporting</span>
+            <span class="scope">Exchange reporting of crypto accounts</span>
+            <span class="caught hit">2 caught</span>
+          </div>
+          <div class="rm-row">
+            <span class="juris">Basel</span>
+            <span class="name">CRD VI — output floor</span>
+            <span class="scope">Capital floors for IRB banks</span>
+            <span class="caught ok">Counterparty-side only</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <div class="closing">
+    <div class="eyebrow">Close</div>
+    <div>
+      <p>The Oracle's bet: a lawyer or treasurer doesn't need <em>more information</em> — they need <em>the shape of today</em>. One horizon, three lenses, one question asked of every signal: <em>does my book care?</em> If yes, show the diagram. If no, stay quiet.</p>
+      <p style="margin-top: 18px;"><a class="ret" href="index.html">← Back to the prototype</a> &nbsp; · &nbsp; <a class="ret" href="workflow.html">See the workflow atlas</a></p>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

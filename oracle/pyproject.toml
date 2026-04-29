@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nomos-oracle"
+version = "0.1.0"
+description = "Nomos Oracle — signed, chained attestations of market and legal data for the DerivAI IRS engine."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Esther" }]
+license = { text = "Proprietary" }
+dependencies = [
+    "pydantic>=2.6",
+    "httpx>=0.27",
+    "structlog>=24",
+    "pyyaml>=6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio",
+    "pytest-cov",
+    "respx",
+    "hypothesis",
+    "streamlit>=1.32",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["oracle*"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "integration: hits real external endpoints; skipped in CI by default",
+]

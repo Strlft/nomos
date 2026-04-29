@@ -2837,6 +2837,12 @@ class IRSExecutionEngine:
         self.periods: List[CalculationPeriod] = []
         self.close_out_result: Optional[CloseOutCalculation] = None
 
+        # ── Oracle integration — acknowledge-only intake for Oracle TriggerEvents
+        # Populated by `submit_trigger_event(engine, event)` below. Holds the raw
+        # Oracle TriggerEvent objects for later human review; the engine itself
+        # does NOT act on them (no auto §6 close-out).
+        self.oracle_trigger_events: list = []
+
         # ── Module 9: Due Diligence & Covenant Monitoring ─────────────────
         # CovenantChecker tracks required documents and covenant conditions
         # per Schedule Part 3 / §4 ISDA 2002.
@@ -3353,6 +3359,147 @@ RISK_REGISTRY = {
                       "90+ jurisdictions with counterparty-level granularity."
     }
 }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ORACLE INTEGRATION SURFACE
+# ─────────────────────────────────────────────────────────────────────────────
+# Read/write API exposed to `oracle/integration/irs_bridge.py`. Kept free of
+# any Oracle-package imports so `backend/engine.py` stays self-contained —
+# the bridge does the type-shape mapping on the Oracle side.
+#
+# Two operations, nothing else:
+#
+#   get_oracle_contract_snapshot(engine, *, notices=()) -> OracleContractSnapshot
+#       Pure read. Builds a structurally duck-typed view of the contract
+#       (the one R-001's predicate reads via getattr). No mutation.
+#
+#   submit_trigger_event(engine, event) -> TriggerReceipt
+#       Acknowledge-only intake for an Oracle TriggerEvent. Appends to
+#       `engine.oracle_trigger_events` and writes one ORACLE_TRIGGER_EVENT row
+#       to the audit trail. Does NOT call declare_*, does NOT mutate
+#       `engine.state`, does NOT invoke §6 close-out. A human reviews and
+#       decides whether to escalate via the existing EoDMonitor methods.
+#
+# Notices: the engine does not track dated notices of failure in V1 — callers
+# (scheduler, tests) pass them in via the `notices` keyword.
+
+@dataclass(frozen=True)
+class OracleScheduledPayment:
+    payment_id: str            # CalculationPeriod.period_number as a string
+    amount: Decimal            # abs(net_amount); Decimal("0") if not yet calculated
+    due_date: date             # CalculationPeriod.payment_date
+    status: str                # "PAID" if payment_confirmed else "PENDING"
+
+
+@dataclass(frozen=True)
+class OracleNotice:
+    kind: str                  # e.g. "failure_to_pay"
+    payment_id: str
+    sent_at: date
+
+
+@dataclass(frozen=True)
+class OracleContractSchedule:
+    grace_period_failure_to_pay: Optional[int]   # business days; None → ISDA default
+
+
+@dataclass(frozen=True)
+class OracleContractSnapshot:
+    """Read-only contract view consumed by Oracle rules.
+
+    Named to avoid colliding with the existing ``ContractState`` enum (which
+    is the lifecycle-state enum: ACTIVE / SUSPENDED / TERMINATED).
+    """
+    contract_id: str
+    effective_date: date
+    termination_date: date
+    scheduled_payments: tuple              # tuple[OracleScheduledPayment, ...]
+    notices: tuple                         # tuple[OracleNotice, ...]
+    schedule: "OracleContractSchedule"
+
+
+@dataclass(frozen=True)
+class TriggerReceipt:
+    event_id: str              # stringified UUID from the incoming TriggerEvent
+    accepted_at: str           # ISO-8601 UTC
+    contract_id: str
+    note: str                  # "acknowledged; pending human review"
+
+
+def get_oracle_contract_snapshot(
+    engine: "IRSExecutionEngine",
+    *,
+    notices: tuple = (),
+) -> "OracleContractSnapshot":
+    """Build a read-only snapshot for the Oracle. Pure function, no mutation."""
+
+    payments = tuple(
+        OracleScheduledPayment(
+            payment_id=str(p.period_number),
+            amount=(
+                abs(p.net_amount) if p.net_amount is not None else Decimal("0")
+            ),
+            due_date=p.payment_date,
+            status=("PAID" if p.payment_confirmed else "PENDING"),
+        )
+        for p in engine.periods
+    )
+    return OracleContractSnapshot(
+        contract_id=engine.params.contract_id,
+        effective_date=engine.params.effective_date,
+        termination_date=engine.params.termination_date,
+        scheduled_payments=payments,
+        notices=tuple(notices),
+        schedule=OracleContractSchedule(
+            grace_period_failure_to_pay=engine.params.grace_period_failure_to_pay_days,
+        ),
+    )
+
+
+def submit_trigger_event(
+    engine: "IRSExecutionEngine", event
+) -> "TriggerReceipt":
+    """Acknowledge an Oracle TriggerEvent. Does not declare any EoD.
+
+    Side effects
+    ------------
+    1. Appends ``event`` to ``engine.oracle_trigger_events`` (initialised in
+       ``IRSExecutionEngine.__init__``).
+    2. Writes one ``ORACLE_TRIGGER_EVENT`` entry to ``engine.audit``.
+
+    Returns
+    -------
+    TriggerReceipt with a note reminding the caller that a human must decide
+    whether this event warrants a §6 action.
+    """
+
+    engine.oracle_trigger_events.append(event)
+
+    engine.audit.log(
+        "ORACLE_TRIGGER_EVENT",
+        {
+            "event_id": str(event.event_id),
+            "rule_id": event.rule_id,
+            "rule_version": event.rule_version,
+            "clause_ref": event.clause_ref,
+            "severity": event.severity.value,
+            "as_of": str(event.as_of),
+            "attestation_ref": str(event.attestation_ref),
+            "evidence_count": len(event.evidence),
+            "rules_version": event.rules_version,
+        },
+        actor="ORACLE",
+    )
+
+    return TriggerReceipt(
+        event_id=str(event.event_id),
+        accepted_at=datetime.now(timezone.utc)
+        .isoformat()
+        .replace("+00:00", "Z"),
+        contract_id=engine.params.contract_id,
+        note="acknowledged; pending human review",
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────

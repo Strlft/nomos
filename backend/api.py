@@ -144,6 +144,8 @@ try:
 except ImportError as _ov3_e:
     logger.warning(f"OracleV3 not available for API: {_ov3_e}")
 
+from backend.routers.oracle_v2_router import router as oracle_v2_router
+
 # ── In-memory client profile store ───────────────────────────────────────────
 _client_profile: dict = {
     "company_name": "",
@@ -2923,6 +2925,7 @@ if HAS_FASTAPI:
         docs_url="/docs",
         redoc_url="/redoc",
     )
+    app.include_router(oracle_v2_router)
 
     # CORS — permissive for local development
     # In production: restrict allow_origins to the specific portal domains
@@ -2950,6 +2953,10 @@ if HAS_FASTAPI:
     @app.get("/advisor", include_in_schema=False)
     def serve_advisor():
         return FileResponse(str(_FRONTEND_DIR / "advisor_portal.html"))
+
+    @app.get("/oracle", include_in_schema=False)
+    def serve_oracle_page():
+        return FileResponse(str(_FRONTEND_DIR / "oracle.html"))
 
     # ── Global exception handler — catches anything not caught by routes ──────
 

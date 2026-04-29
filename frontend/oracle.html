@@ -1,0 +1,715 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-jargon="meta">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nomos · Oracle</title>
+  <link rel="stylesheet" href="/static/assets/nomos.css">
+  <style>
+    /* Page-local layout: only what is unique to /oracle. Anything reusable
+       should live in nomos.css and be promoted there. */
+    .page { max-width: 1240px; margin: 0 auto; padding: 32px 36px 96px; }
+
+    .page-h {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 24px; align-items: end;
+      padding: 28px 0 20px;
+      border-bottom: 1px solid var(--hair);
+      margin-bottom: 28px;
+    }
+    .page-h .num {
+      font-family: var(--mono); font-size: 11px;
+      letter-spacing: .14em; text-transform: uppercase;
+      color: var(--ink-3);
+    }
+    .page-h h1 {
+      font-family: var(--display); font-weight: 400;
+      font-size: 56px; letter-spacing: -.02em; line-height: 1;
+      margin: 10px 0 14px;
+    }
+    .page-h .lede {
+      font-family: var(--display); font-size: 17px; line-height: 1.5;
+      color: var(--ink-2);
+      max-width: 640px;
+    }
+    .page-h .aside { align-self: end; padding-bottom: 6px; }
+
+    .stack { display: flex; flex-direction: column; gap: 28px; }
+
+    /* Latest attestation panel layout */
+    .att-head {
+      display: flex; align-items: baseline; justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    .att-head .seq { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+    .dp-list {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 18px;
+      margin: 18px 0 22px;
+    }
+    .dp {
+      padding: 16px 18px;
+      border: 1px solid var(--hair);
+      border-radius: var(--r-md);
+      background: var(--paper);
+    }
+    .dp-label {
+      font-size: 12px; color: var(--ink-3);
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 4px;
+    }
+    .dp-value {
+      font-family: var(--display);
+      font-size: 30px; letter-spacing: -.01em;
+      color: var(--ink);
+      line-height: 1.05;
+      margin: 4px 0 10px;
+    }
+    .dp-source { font-size: 12px; color: var(--ink-2); display: flex; gap: 6px; align-items: center; }
+    .dp-asof { display: block; margin-top: 6px; font-family: var(--mono); font-size: 10.5px; color: var(--ink-4); }
+
+    /* Signature expander */
+    .sig {
+      margin-top: 8px;
+      border-top: 1px dashed var(--hair-2);
+      padding-top: 16px;
+    }
+    .sig-toggle {
+      background: transparent; border: 0;
+      font-family: var(--mono); font-size: 11px;
+      letter-spacing: .08em; text-transform: uppercase;
+      color: var(--ink-3); padding: 4px 0;
+      display: inline-flex; align-items: center; gap: 8px;
+    }
+    .sig-toggle:hover { color: var(--ink); }
+    .sig-toggle .caret {
+      display: inline-block;
+      transition: transform .2s;
+    }
+    .sig[data-open="true"] .sig-toggle .caret { transform: rotate(90deg); }
+    .sig-body { display: none; margin-top: 14px; }
+    .sig[data-open="true"] .sig-body { display: block; }
+    .sig-row {
+      display: grid; grid-template-columns: 140px 1fr auto;
+      gap: 14px;
+      padding: 8px 0;
+      align-items: center;
+      border-bottom: 1px dashed var(--hair-2);
+    }
+    .sig-row:last-child { border-bottom: 0; }
+    .sig-row .k {
+      font-family: var(--mono); font-size: 10.5px;
+      letter-spacing: .08em; text-transform: uppercase;
+      color: var(--ink-3);
+    }
+    .sig-row .v { font-family: var(--mono); font-size: 12px; color: var(--ink); word-break: break-all; }
+    .sig-row .v.muted { color: var(--ink-3); }
+
+    /* Spine wrapper specific overrides */
+    .spine-card .spine { padding: 8px 0 4px; }
+    .spine-card .spine::before { top: 16px; }
+    .spine-card .spine-dot { margin-top: 9px; }
+    .spine-card .spine-node.cur .spine-dot { margin-top: 8px; }
+    .spine-card .spine-node { padding: 0 8px; }
+
+    /* Subtle copy-feedback */
+    .copied { color: var(--green) !important; }
+  </style>
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="logo">
+      <div class="logo-mark">N</div>
+      <div class="logo-word">Nomos</div>
+    </div>
+    <nav class="nav-links" aria-label="Primary">
+      <a class="nav-link" href="#" aria-disabled="true">Contracts</a>
+      <a class="nav-link active" href="/oracle">Oracle</a>
+      <a class="nav-link" href="#" aria-disabled="true">Counterparties</a>
+      <a class="nav-link" href="#" aria-disabled="true">Audit</a>
+    </nav>
+    <div class="row" style="gap:12px;">
+      <span class="chip mono">v2</span>
+      <div class="avatar" aria-label="Account">N</div>
+    </div>
+  </header>
+
+  <main class="page">
+
+    <div id="conn-banner" class="conn-banner hidden" role="status" aria-live="polite">
+      <span class="dot" aria-hidden="true"></span>
+      <span>Connection to Oracle interrupted. Retrying…</span>
+    </div>
+
+    <section class="page-h fade-up">
+      <div>
+        <div class="num">01 · Market data</div>
+        <h1>Oracle</h1>
+        <p class="lede">Verified market data and contractual triggers, with full audit trail.</p>
+      </div>
+      <div class="aside">
+        <span id="chain-status" class="chip" aria-live="polite">
+          <span class="dot" aria-hidden="true"></span>
+          <span class="chain-text">Chain integrity: checking…</span>
+        </span>
+      </div>
+    </section>
+
+    <div class="stack">
+
+      <!-- Health strip -->
+      <section class="kpi-row fade-up" aria-label="Oracle health">
+        <div class="kpi">
+          <div class="kpi-label">Database</div>
+          <div id="kpi-db" class="kpi-value">—</div>
+          <div id="kpi-db-foot" class="kpi-foot"></div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Last attestation</div>
+          <div id="kpi-last" class="kpi-value" title="">—</div>
+          <div id="kpi-last-foot" class="kpi-foot"></div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Source failures (24h)</div>
+          <div id="kpi-fails" class="kpi-value">—</div>
+          <div class="kpi-foot">From upstream feeds</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Trigger events (24h)</div>
+          <div id="kpi-trigs" class="kpi-value">—</div>
+          <div class="kpi-foot">Across monitored contracts</div>
+        </div>
+      </section>
+
+      <!-- Latest attestation -->
+      <section class="card fade-up">
+        <div class="att-head">
+          <div class="section-h" style="border:0; padding:0; margin:0;">
+            <span class="section-num">02</span>
+            <h2 class="section-title">Latest attestation</h2>
+          </div>
+          <div class="seq" id="latest-seq">—</div>
+        </div>
+
+        <div id="latest-body">
+          <div class="empty-state">
+            <div class="empty-state-title">Loading</div>
+            <div class="empty-state-body">Fetching the most recent attestation from the Oracle.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Recent triggers -->
+      <section class="card fade-up">
+        <div class="section-h" style="margin-bottom: 14px;">
+          <span class="section-num">03</span>
+          <h2 class="section-title">Recent triggers</h2>
+          <span class="section-sub">Last 10 events</span>
+        </div>
+        <div id="triggers-body">
+          <div class="empty-state">
+            <div class="empty-state-title">Loading</div>
+            <div class="empty-state-body">Fetching recent trigger events.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Recent attestations spine -->
+      <section class="card spine-card fade-up">
+        <div class="section-h" style="margin-bottom: 8px;">
+          <span class="section-num">04</span>
+          <h2 class="section-title">Attestation chain</h2>
+          <span class="section-sub">Last 20 entries</span>
+        </div>
+        <div id="spine-body">
+          <div class="empty-state">
+            <div class="empty-state-title">Loading</div>
+            <div class="empty-state-body">Fetching the recent attestation chain.</div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <script type="module">
+    import {
+      formatTimestamp,
+      formatRelative,
+      formatDecimalRate,
+      formatHashShort,
+      apiFetch,
+      toast,
+    } from "/static/assets/nomos-ui.js";
+
+    /* ------------------------------------------------------------------
+       Dictionaries — plain-language labels for canonical IDs.
+       Source: docs/Oracle/ORACLE_RULES.md and oracle/config.py
+       ------------------------------------------------------------------ */
+
+    const METRIC_LABELS = {
+      "ESTR":         "Euro short-term rate",
+      "EURIBOR_3M":   "3-month EURIBOR",
+      "EURIBOR_6M":   "6-month EURIBOR",
+      "EURIBOR_12M":  "12-month EURIBOR",
+    };
+
+    const SOURCE_LABELS = {
+      "ecb_sdw_v1": { plain: "European Central Bank", jargon: "ECB SDW" },
+      "fake_v1":    { plain: "Synthetic source",      jargon: "FAKE" },
+    };
+
+    const RULE_LABELS = {
+      "R-001": "Failure to pay",
+      "R-002": "Breach of agreement",
+      "R-003": "Cross default",
+      "R-004": "Illegality",
+      "R-005": "Tax event",
+      "R-006": "Material adverse change",
+    };
+
+    const SEVERITY_CHIPS = {
+      "warning":           { cls: "chip-ochre", label: "Warning" },
+      "potential_trigger": { cls: "chip-blue",  label: "Potential trigger" },
+      "trigger":           { cls: "chip-red",   label: "Trigger" },
+    };
+
+    /* ------------------------------------------------------------------
+       Endpoints
+       ------------------------------------------------------------------ */
+    const API = {
+      health:          "/api/v2/oracle/health",
+      chainVerify:     "/api/v2/oracle/chain/verify",
+      latest:          "/api/v2/oracle/attestations/latest",
+      attestations:    "/api/v2/oracle/attestations?limit=20",
+      triggers:        "/api/v2/oracle/triggers?limit=10",
+    };
+
+    const REFRESH_MS = 30_000;
+
+    /* ------------------------------------------------------------------
+       DOM helpers — small, local
+       ------------------------------------------------------------------ */
+    function el(tag, opts = {}, children = []) {
+      const node = document.createElement(tag);
+      if (opts.className) node.className = opts.className;
+      if (opts.text != null) node.textContent = opts.text;
+      if (opts.title != null) node.title = opts.title;
+      if (opts.attrs) for (const [k, v] of Object.entries(opts.attrs)) node.setAttribute(k, v);
+      for (const c of children) if (c) node.appendChild(c);
+      return node;
+    }
+    function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+    function emptyState(title, body) {
+      return el("div", { className: "empty-state" }, [
+        el("div", { className: "empty-state-title", text: title }),
+        el("div", { className: "empty-state-body", text: body }),
+      ]);
+    }
+
+    /* ------------------------------------------------------------------
+       Connection banner — single inline, never spammy
+       ------------------------------------------------------------------ */
+    const connBanner = document.getElementById("conn-banner");
+    function setConnState(allOk) {
+      if (allOk) connBanner.classList.add("hidden");
+      else       connBanner.classList.remove("hidden");
+    }
+
+    /* ------------------------------------------------------------------
+       Renderers
+       ------------------------------------------------------------------ */
+
+    function renderChainStatus(verifyResult) {
+      const node = document.getElementById("chain-status");
+      const txt  = node.querySelector(".chain-text");
+      node.classList.remove("chip-green", "chip-red", "chip-ochre");
+      if (!verifyResult || !verifyResult.ok && verifyResult.fetchFailed) {
+        node.classList.add("chip-ochre");
+        txt.textContent = "Chain integrity: unknown";
+        return;
+      }
+      if (verifyResult.ok) {
+        node.classList.add("chip-green");
+        const n = verifyResult.attestations_count;
+        txt.textContent = "Chain integrity: OK · " + n + " attestation" + (n === 1 ? "" : "s");
+      } else {
+        node.classList.add("chip-red");
+        txt.textContent = "Chain integrity: " + (verifyResult.error || "broken");
+      }
+    }
+
+    function renderHealth(health) {
+      const dbVal  = document.getElementById("kpi-db");
+      const dbFoot = document.getElementById("kpi-db-foot");
+      const last   = document.getElementById("kpi-last");
+      const lastFoot = document.getElementById("kpi-last-foot");
+      const fails  = document.getElementById("kpi-fails");
+      const trigs  = document.getElementById("kpi-trigs");
+
+      if (!health) {
+        dbVal.textContent = "—"; dbVal.className = "kpi-value";
+        dbFoot.textContent = "";
+        last.textContent = "—"; last.title = "";
+        lastFoot.textContent = "";
+        fails.textContent = "—"; fails.className = "kpi-value";
+        trigs.textContent = "—"; trigs.className = "kpi-value";
+        return;
+      }
+
+      dbVal.textContent = health.db_reachable ? "Reachable" : "Unreachable";
+      dbVal.className = "kpi-value " + (health.db_reachable ? "ok" : "bad");
+      dbFoot.textContent = health.db_path || "";
+
+      if (health.last_attestation_at) {
+        last.textContent = formatRelative(health.last_attestation_at);
+        last.title       = formatTimestamp(health.last_attestation_at);
+        lastFoot.textContent = formatTimestamp(health.last_attestation_at);
+      } else {
+        last.textContent = "Never";
+        last.title = "";
+        lastFoot.textContent = "No attestation has been published yet";
+      }
+
+      const f = Number(health.source_failures_24h || 0);
+      fails.textContent = String(f);
+      fails.className = "kpi-value " + (f === 0 ? "ok" : "warn");
+
+      const t = Number(health.trigger_events_24h || 0);
+      trigs.textContent = String(t);
+      trigs.className = "kpi-value " + (t === 0 ? "" : "warn");
+    }
+
+    function renderLatestAttestation(envelope, status) {
+      const body = document.getElementById("latest-body");
+      const seq  = document.getElementById("latest-seq");
+      clear(body);
+
+      if (status === 503) {
+        seq.textContent = "—";
+        body.appendChild(emptyState(
+          "No attestations yet",
+          "The Oracle has not yet published any verified market data."
+        ));
+        return;
+      }
+      if (!envelope || !envelope.attestation) {
+        seq.textContent = "—";
+        body.appendChild(emptyState(
+          "Attestation unavailable",
+          "Could not load the latest attestation. Retrying on the next refresh."
+        ));
+        return;
+      }
+
+      const att = envelope.attestation;
+      const dps = envelope.datapoints || [];
+
+      seq.textContent = "#" + String(att.sequence_number).padStart(3, "0");
+
+      // Datapoints grid
+      const grid = el("div", { className: "dp-list" });
+      for (const dp of dps) {
+        const metricLabel = METRIC_LABELS[dp.metric] || dp.metric;
+        const src = SOURCE_LABELS[dp.source_id] || { plain: dp.source_id, jargon: dp.source_id };
+
+        const card = el("div", { className: "dp" });
+        const labelRow = el("div", { className: "dp-label" }, [
+          el("span", { text: metricLabel }),
+          el("span", { className: "jargon", text: dp.metric }),
+        ]);
+        card.appendChild(labelRow);
+
+        let valueText = "—";
+        if (dp.unit === "decimal_fraction") valueText = formatDecimalRate(dp.value);
+        else if (dp.unit === "percent_per_annum") valueText = (Number(dp.value)).toFixed(3) + "%";
+        else if (dp.unit === "basis_points") valueText = dp.value + " bp";
+        card.appendChild(el("div", { className: "dp-value", text: valueText }));
+
+        const srcRow = el("div", { className: "dp-source" }, [
+          el("span", { text: src.plain }),
+          el("span", { className: "jargon", text: src.jargon }),
+        ]);
+        card.appendChild(srcRow);
+
+        const asOfRel = formatRelative(dp.as_of + "T00:00:00Z");
+        const asOfAbs = dp.as_of;
+        const asOf = el("span", {
+          className: "dp-asof",
+          text: "As of " + asOfRel + " · " + asOfAbs,
+          title: formatTimestamp(dp.fetched_at),
+        });
+        card.appendChild(asOf);
+
+        grid.appendChild(card);
+      }
+      if (dps.length === 0) {
+        grid.appendChild(emptyState(
+          "Empty payload",
+          "This attestation contains no datapoints."
+        ));
+      }
+      body.appendChild(grid);
+
+      // Signature expander
+      const sig = el("div", { className: "sig", attrs: { "data-open": "false" } });
+      const toggle = el("button", { className: "sig-toggle", attrs: { type: "button" } });
+      const caret = el("span", { className: "caret", text: "▸" });
+      toggle.appendChild(caret);
+      toggle.appendChild(el("span", { text: "Signature" }));
+      toggle.addEventListener("click", () => {
+        sig.dataset.open = sig.dataset.open === "true" ? "false" : "true";
+      });
+      sig.appendChild(toggle);
+
+      const sigBody = el("div", { className: "sig-body" });
+      function sigRow(k, full, opts = {}) {
+        const row = el("div", { className: "sig-row" });
+        row.appendChild(el("div", { className: "k", text: k }));
+        const v = el("div", {
+          className: "v" + (full ? "" : " muted"),
+          text: full ? formatHashShort(full) : (opts.placeholder || "—"),
+        });
+        if (full) v.title = full;
+        row.appendChild(v);
+        if (full && opts.copy) {
+          const btn = el("button", {
+            className: "btn btn-sm btn-ghost",
+            text: "Copy full",
+            attrs: { type: "button" },
+          });
+          btn.addEventListener("click", async () => {
+            try {
+              await navigator.clipboard.writeText(full);
+              btn.textContent = "Copied";
+              btn.classList.add("copied");
+              setTimeout(() => {
+                btn.textContent = "Copy full";
+                btn.classList.remove("copied");
+              }, 1400);
+            } catch (e) {
+              toast("Could not copy to clipboard", "warn");
+            }
+          });
+          row.appendChild(btn);
+        } else {
+          row.appendChild(el("span"));
+        }
+        return row;
+      }
+      sigBody.appendChild(sigRow("Current hash",  att.current_hash,  { copy: true }));
+      sigBody.appendChild(sigRow("Previous hash", att.previous_hash, { copy: true, placeholder: "Genesis" }));
+      sigBody.appendChild(sigRow("Payload hash",  att.payload_hash,  { copy: true }));
+      const signed = el("div", { className: "sig-row" });
+      signed.appendChild(el("div", { className: "k", text: "Signed at" }));
+      signed.appendChild(el("div", { className: "v", text: formatTimestamp(att.signed_at) }));
+      signed.appendChild(el("span"));
+      sigBody.appendChild(signed);
+      const ver = el("div", { className: "sig-row" });
+      ver.appendChild(el("div", { className: "k", text: "Versions" }));
+      ver.appendChild(el("div", {
+        className: "v",
+        text: "oracle " + att.oracle_version + " · rules " + att.rules_version,
+      }));
+      ver.appendChild(el("span"));
+      sigBody.appendChild(ver);
+
+      sig.appendChild(sigBody);
+      body.appendChild(sig);
+    }
+
+    function renderTriggers(events) {
+      const body = document.getElementById("triggers-body");
+      clear(body);
+
+      if (!Array.isArray(events) || events.length === 0) {
+        body.appendChild(emptyState(
+          "No trigger events recorded",
+          "All monitored conditions are nominal."
+        ));
+        return;
+      }
+
+      const table = el("table", { className: "table" });
+      const thead = el("thead");
+      const headRow = el("tr");
+      for (const h of ["Severity", "Rule", "Clause", "Contract", "When"]) {
+        headRow.appendChild(el("th", { text: h }));
+      }
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+
+      const tbody = el("tbody");
+      for (const ev of events) {
+        const tr = el("tr");
+
+        // Severity
+        const sevSpec = SEVERITY_CHIPS[ev.severity] || { cls: "", label: ev.severity };
+        const sevTd = el("td");
+        const sevChip = el("span", { className: "chip " + sevSpec.cls }, [
+          el("span", { className: "dot" }),
+          el("span", { text: sevSpec.label }),
+        ]);
+        sevTd.appendChild(sevChip);
+        tr.appendChild(sevTd);
+
+        // Rule (plain) + rule_id (jargon)
+        const ruleLabel = RULE_LABELS[ev.rule_id] || ev.rule_id;
+        const ruleTd = el("td");
+        const ruleRow = el("div", { className: "row", attrs: { style: "gap:8px;" } }, [
+          el("span", { className: "strong", text: ruleLabel }),
+          el("span", { className: "jargon", text: ev.rule_id }),
+        ]);
+        ruleTd.appendChild(ruleRow);
+        tr.appendChild(ruleTd);
+
+        // Clause ref (mono jargon)
+        const clauseTd = el("td");
+        clauseTd.appendChild(el("span", { className: "jargon", text: ev.clause_ref }));
+        tr.appendChild(clauseTd);
+
+        // Contract
+        tr.appendChild(el("td", { text: ev.contract_id }));
+
+        // When
+        const whenTd = el("td");
+        const whenSpan = el("span", {
+          text: formatRelative(ev.evaluated_at),
+          title: formatTimestamp(ev.evaluated_at),
+          className: "timestamp",
+        });
+        whenTd.appendChild(whenSpan);
+        tr.appendChild(whenTd);
+
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody);
+      body.appendChild(table);
+    }
+
+    function renderSpine(envelopes) {
+      const body = document.getElementById("spine-body");
+      clear(body);
+
+      if (!Array.isArray(envelopes) || envelopes.length === 0) {
+        body.appendChild(emptyState(
+          "No attestations yet",
+          "Once the Oracle starts publishing, the chain will appear here."
+        ));
+        return;
+      }
+
+      // Newest first → oldest first for visual left-to-right flow.
+      const ordered = [...envelopes].sort(
+        (a, b) => a.attestation.sequence_number - b.attestation.sequence_number
+      );
+      const latestSeq = ordered[ordered.length - 1].attestation.sequence_number;
+
+      const spine = el("div", { className: "spine", attrs: { role: "list" } });
+      for (const env of ordered) {
+        const att = env.attestation;
+        const dps = env.datapoints || [];
+        const seq = att.sequence_number;
+        const isCurrent = seq === latestSeq;
+
+        const node = el("button", {
+          className: "spine-node " + (isCurrent ? "cur" : "done"),
+          attrs: { type: "button", role: "listitem", "data-seq": String(seq) },
+          title: formatTimestamp(att.signed_at),
+        });
+        node.appendChild(el("span", { className: "spine-dot" }));
+        node.appendChild(el("span", {
+          className: "spine-label",
+          text: "#" + String(seq).padStart(3, "0"),
+        }));
+        // Date below: as_of of the first datapoint, short ("23 Apr").
+        let shortDate = "";
+        if (dps.length > 0 && dps[0].as_of) {
+          const d = new Date(dps[0].as_of + "T00:00:00Z");
+          if (!isNaN(d.getTime())) {
+            const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+            shortDate = d.getUTCDate() + " " + months[d.getUTCMonth()];
+          }
+        }
+        if (shortDate) node.appendChild(el("span", { className: "spine-date", text: shortDate }));
+        // TODO: clicking a spine node should highlight that attestation in the
+        // "Latest attestation" panel. Deferred to a later pass.
+        spine.appendChild(node);
+      }
+      body.appendChild(spine);
+    }
+
+    /* ------------------------------------------------------------------
+       Polling loop
+       ------------------------------------------------------------------ */
+    let inFlight = false;
+
+    async function refresh() {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const [healthRes, verifyRes, latestRes, listRes, trigRes] = await Promise.all([
+          apiFetch(API.health),
+          apiFetch(API.chainVerify),
+          apiFetch(API.latest),
+          apiFetch(API.attestations),
+          apiFetch(API.triggers),
+        ]);
+
+        // Health: 200 always (per spec). Treat anything else as fetch failure.
+        if (healthRes.ok && healthRes.data) renderHealth(healthRes.data);
+        else renderHealth(null);
+
+        // Chain verify
+        if (verifyRes.ok && verifyRes.data) {
+          renderChainStatus(verifyRes.data);
+        } else {
+          renderChainStatus({ ok: false, fetchFailed: true });
+        }
+
+        // Latest attestation: 503 is an honest "no data yet", not a failure.
+        if (latestRes.status === 503 && latestRes.data) {
+          renderLatestAttestation(null, 503);
+        } else if (latestRes.ok && latestRes.data) {
+          renderLatestAttestation(latestRes.data, 200);
+        } else {
+          renderLatestAttestation(null, latestRes.status || 0);
+        }
+
+        // Attestations list
+        if (listRes.ok && Array.isArray(listRes.data)) {
+          renderSpine(listRes.data);
+        } else {
+          renderSpine([]);
+        }
+
+        // Triggers
+        if (trigRes.ok && Array.isArray(trigRes.data)) {
+          renderTriggers(trigRes.data);
+        } else {
+          renderTriggers([]);
+        }
+
+        // Connection banner: shown only if a non-503 endpoint actually failed
+        // to fetch. 503 from /attestations/latest is "no data yet", not a
+        // connection problem.
+        const allOk =
+          (healthRes.ok) &&
+          (verifyRes.ok) &&
+          (latestRes.ok || latestRes.status === 503) &&
+          (listRes.ok) &&
+          (trigRes.ok);
+        setConnState(allOk);
+      } finally {
+        inFlight = false;
+      }
+    }
+
+    refresh();
+    setInterval(refresh, REFRESH_MS);
+  </script>
+
+</body>
+</html>
