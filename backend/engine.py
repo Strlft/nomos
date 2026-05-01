@@ -631,38 +631,8 @@ class CloseOutCalculation:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# MODULE 1: ORACLE — fetches EURIBOR 3M from ECB SDW
-#
-# BACKWARD-COMPATIBILITY SHIM
-# ───────────────────────────
-# OracleModule below is kept intact for existing IRS engine code.
-# New code should use oracle_v3.OracleV3 directly, which covers
-# EURIBOR 3M/6M/12M, €STR, EUR swap rates, FX rates, event monitoring,
-# and regulatory watch.
-#
-# The _v3 attribute on each OracleModule instance gives callers access to
-# the shared OracleV3 singleton when they need multi-rate or event data.
+# MODULE 1: ORACLE — fetches EURIBOR 3M from ECB SDW via _fetch_ecb()
 # ─────────────────────────────────────────────────────────────────────────────
-
-# Lazy import — oracle_v3 is optional (graceful degradation if absent)
-try:
-    from oracle_v3 import OracleV3 as _OracleV3, RateID as _RateID
-    _ORACLE_V3_AVAILABLE = True
-except ImportError:
-    _ORACLE_V3_AVAILABLE = False
-
-# Shared singleton — one OracleV3 per process, lazy-initialised
-_oracle_v3_singleton: "Optional[_OracleV3]" = None  # type: ignore[name-defined]
-
-def get_oracle_v3() -> "Optional[_OracleV3]":  # type: ignore[name-defined]
-    """Return (or create) the shared OracleV3 singleton."""
-    global _oracle_v3_singleton
-    if not _ORACLE_V3_AVAILABLE:
-        return None
-    if _oracle_v3_singleton is None:
-        import os
-        _oracle_v3_singleton = _OracleV3(newsapi_key=os.environ.get("NEWSAPI_KEY"))
-    return _oracle_v3_singleton
 
 
 class OracleModule:
@@ -706,8 +676,6 @@ class OracleModule:
         # ISDA 2021 Fallback: €STR + spread adjustment
         # Spread = 0.0959% (ISDA IBOR Fallbacks, EURIBOR 3M median)
         self._estr_fallback_spread = Decimal("0.000959")
-        # v3 delegate — access via self._v3 for multi-rate / event / regulatory data
-        self._v3 = get_oracle_v3()
 
     def fetch(self) -> OracleReading:
         """
