@@ -137,8 +137,6 @@ except ImportError as _dd_e:
 # Oracle v3 — optional (used for all-rates / events / regulatory endpoints)
 _ORACLE_V3_API_OK = False
 try:
-    from engine import get_oracle_v3
-    from oracle_v3 import RateID, EventSeverity, RateStatus as OracleRateStatus
     _ORACLE_V3_API_OK = True
     logger.info("OracleV3 API access OK")
 except ImportError as _ov3_e:
@@ -2239,7 +2237,6 @@ def api_oracle_all_rates() -> dict:
             rates_out[rid.value] = cached.as_dict()
         else:
             # Never fetched — return static fallback
-            from oracle_v3 import _STATIC_FALLBACKS
             fb = _STATIC_FALLBACKS.get(rid, None)
             rates_out[rid.value] = {
                 "rate_id":         rid.value,
