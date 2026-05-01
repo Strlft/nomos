@@ -37,13 +37,6 @@
   POST /api/entities/{name}/documents/upload        → upload general doc
   POST /api/entities/{name}/documents/{id}/validate → advisor validates general doc
 
-  ORACLE v3 (market data + events + regulatory):
-  ──────────────
-  GET  /api/oracle/rates                        → cached readings for all 9 rates
-  POST /api/oracle/rates/refresh                → force live ECB fetch (slow)
-  GET  /api/oracle/events                       → market events (advisor only)
-  GET  /api/oracle/regulatory                   → regulatory alerts by contract type
-
   CLIENT PROFILE:
   ──────────────
   GET  /api/client/profile                      → get current profile
@@ -133,14 +126,6 @@ try:
     logger.info("Due diligence module loaded OK")
 except ImportError as _dd_e:
     logger.warning(f"Due diligence module not loaded: {_dd_e}")
-
-# Oracle v3 — optional (used for all-rates / events / regulatory endpoints)
-_ORACLE_V3_API_OK = False
-try:
-    _ORACLE_V3_API_OK = True
-    logger.info("OracleV3 API access OK")
-except ImportError as _ov3_e:
-    logger.warning(f"OracleV3 not available for API: {_ov3_e}")
 
 from backend.routers.oracle_v2_router import router as oracle_v2_router
 
@@ -2215,144 +2200,6 @@ def api_entity_validate_document(entity_name: str, doc_id: str, data: dict) -> d
     }
 
 
-# ─── Oracle v3 endpoints ──────────────────────────────────────────────────────
-
-def api_oracle_all_rates() -> dict:
-    """
-    Return latest cached reading for all 9 rates in RateRegistry.
-    Uses `registry.latest()` (no live fetch) — safe for 10-second polling.
-    If a rate has never been fetched, returns its static fallback value.
-    """
-    if not _ORACLE_V3_API_OK:
-        return {"status": "UNAVAILABLE", "rates": {}, "message": "OracleV3 module not loaded"}
-
-    oracle = get_oracle_v3()
-    if oracle is None:
-        return {"status": "UNAVAILABLE", "rates": {}, "message": "OracleV3 singleton unavailable"}
-
-    rates_out: dict = {}
-    for rid in RateID:
-        cached = oracle.registry.latest(rid)
-        if cached:
-            rates_out[rid.value] = cached.as_dict()
-        else:
-            # Never fetched — return static fallback
-            fb = _STATIC_FALLBACKS.get(rid, None)
-            rates_out[rid.value] = {
-                "rate_id":         rid.value,
-                "rate":            str(fb) if fb is not None else "0",
-                "status":          "STATIC_FALLBACK",
-                "source":          "STATIC_FALLBACK",
-                "fetch_timestamp": None,
-                "publication_date": None,
-            }
-
-    return {
-        "status":    "ok",
-        "rates":     rates_out,
-        "rate_count": len(rates_out),
-        "as_of":     _utcnow_iso(),
-    }
-
-
-def api_oracle_fetch_rates() -> dict:
-    """
-    Force a live fetch for all 9 rates from ECB (slow — only call on explicit Refresh).
-    Returns fresh RateReading objects after network calls.
-    """
-    if not _ORACLE_V3_API_OK:
-        return {"status": "UNAVAILABLE", "rates": {}, "message": "OracleV3 module not loaded"}
-
-    oracle = get_oracle_v3()
-    if oracle is None:
-        return {"status": "UNAVAILABLE", "rates": {}, "message": "OracleV3 singleton unavailable"}
-
-    readings = oracle.registry.fetch_many(list(RateID))
-    rates_out = {rid.value: r.as_dict() for rid, r in readings.items()}
-
-    return {
-        "status":    "ok",
-        "rates":     rates_out,
-        "rate_count": len(rates_out),
-        "as_of":     _utcnow_iso(),
-    }
-
-
-def api_oracle_events(contract_id: Optional[str] = None, min_severity: str = "LOW") -> dict:
-    """
-    Return stored market events from EventMonitor.
-    Advisor-only endpoint.  Optionally filter by contract_id and min severity.
-    """
-    if not _ORACLE_V3_API_OK:
-        return {"status": "UNAVAILABLE", "events": [], "message": "OracleV3 module not loaded"}
-
-    oracle = get_oracle_v3()
-    if oracle is None:
-        return {"status": "UNAVAILABLE", "events": [], "message": "OracleV3 singleton unavailable"}
-
-    sev_map = {
-        "LOW":    EventSeverity.LOW,
-        "MEDIUM": EventSeverity.MEDIUM,
-        "HIGH":   EventSeverity.HIGH,
-    }
-    sev = sev_map.get(min_severity.upper(), EventSeverity.LOW)
-
-    has_api_key = oracle.event_monitor.api_key is not None
-    # Seed stub events on first call when no API key; no-op on subsequent calls
-    oracle.poll_events()
-    # Use 7-day window for stub mode (stubs are seeded once and persist in memory)
-    window_hours = 168 if not has_api_key else 48
-    events = oracle.get_events(contract_id=contract_id, min_severity=sev, since_hours=window_hours)
-    return {
-        "status":      "ok",
-        "event_count": len(events),
-        "events":      [e.as_dict() for e in events],
-        "has_api_key": has_api_key,
-        "stub_mode":   not has_api_key,
-        "as_of":       _utcnow_iso(),
-    }
-
-
-def api_oracle_regulatory(contract_type: str = "IRS", jurisdiction: str = "") -> dict:
-    """
-    Return pre-loaded regulatory alerts from RegulatoryWatch.
-    Filtered by contract_type ('IRS' default) and optional jurisdiction.
-    """
-    if not _ORACLE_V3_API_OK:
-        return {"status": "UNAVAILABLE", "alerts": [], "message": "OracleV3 module not loaded"}
-
-    oracle = get_oracle_v3()
-    if oracle is None:
-        return {"status": "UNAVAILABLE", "alerts": [], "message": "OracleV3 singleton unavailable"}
-
-    alerts = oracle.get_regulatory_alerts(
-        contract_type=contract_type,
-        jurisdiction=jurisdiction,
-    )
-
-    def _alert_dict(a) -> dict:
-        return {
-            "alert_id":               a.alert_id,
-            "regulation_name":        a.regulation_name,
-            "jurisdiction":           a.jurisdiction,
-            "impact_description":     a.impact_description,
-            "affected_contract_types": a.affected_contract_types,
-            "effective_date":         a.effective_date,
-            "source_url":             a.source_url,
-            "severity":               a.severity.value,
-            "urgency":                a.urgency.value,
-            "status":                 a.status,
-            "theme":                  a.theme,
-        }
-
-    return {
-        "status":      "ok",
-        "alert_count": len(alerts),
-        "alerts":      [_alert_dict(a) for a in alerts],
-        "as_of":       _utcnow_iso(),
-    }
-
-
 # ─── Client profile endpoints ─────────────────────────────────────────────────
 
 def api_get_client_profile() -> dict:
@@ -3433,38 +3280,6 @@ if HAS_FASTAPI:
         except Exception as e:
             logger.error(f"[{contract_id}] demo auto-validate error: {e}")
             raise HTTPException(500, detail={"code": "INTERNAL_ERROR", "message": str(e)})
-
-    # ── Oracle v3 routes ────────────────────────────────────────────────────
-
-    @app.get("/api/oracle/rates", tags=["Oracle"])
-    def oracle_all_rates():
-        """All 9 cached rate readings (no live fetch — safe for 10s polling)."""
-        return api_oracle_all_rates()
-
-    @app.post("/api/oracle/rates/refresh", tags=["Oracle"])
-    def oracle_refresh_rates():
-        """Force a live ECB fetch for all 9 rates (slow — call on Refresh button only)."""
-        try:
-            return api_oracle_fetch_rates()
-        except Exception as e:
-            logger.error(f"oracle refresh error: {e}\n{traceback.format_exc()}")
-            raise HTTPException(500, detail={"code": "INTERNAL_ERROR", "message": str(e)})
-
-    @app.get("/api/oracle/events", tags=["Oracle"])
-    def oracle_events(
-        contract_id: Optional[str] = None,
-        min_severity: str = "LOW",
-    ):
-        """Stored market events from EventMonitor. Advisor-only."""
-        return api_oracle_events(contract_id=contract_id, min_severity=min_severity)
-
-    @app.get("/api/oracle/regulatory", tags=["Oracle"])
-    def oracle_regulatory(
-        contract_type: str = "IRS",
-        jurisdiction:  str = "",
-    ):
-        """Pre-loaded regulatory alerts from RegulatoryWatch."""
-        return api_oracle_regulatory(contract_type=contract_type, jurisdiction=jurisdiction)
 
     # ── Client profile routes ───────────────────────────────────────────────
 
