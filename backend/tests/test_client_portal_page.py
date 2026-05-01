@@ -48,6 +48,14 @@ def test_client_portal_wires_design_system_and_four_views() -> None:
         assert needle in body, f"expected page to contain {needle!r}"
 
 
+def test_client_portal_exposes_oracle_as_sidebar_entry() -> None:
+    body = _client().get("/client").text
+    assert 'data-view="oracle"' in body, (
+        "client portal must expose Oracle as an internal sidebar entry"
+    )
+    assert "Oracle" in body, "client portal must surface the Oracle label"
+
+
 def test_client_portal_has_shed_legacy_palette_and_fonts() -> None:
     body = _client().get("/client").text
     forbidden = (
@@ -73,6 +81,7 @@ def test_client_portal_wires_v2_oracle_endpoints() -> None:
         "/api/v2/oracle/health",
         "/api/v2/oracle/attestations/latest",
         "/api/v2/oracle/triggers",
+        "/api/v2/oracle/chain/verify",
     ):
         assert needle in body, (
             f"client portal must reference new v2 endpoint {needle!r}"

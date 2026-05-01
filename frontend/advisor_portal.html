@@ -91,6 +91,7 @@
         <span class="badge" id="badge-contracts">—</span>
       </div>
       <div class="side-group" style="margin-top:18px;"><span class="label">Operations</span></div>
+      <div class="side-item" data-view="oracle">Oracle</div>
       <div class="side-item" data-view="audit">Audit</div>
       <div class="side-item" data-view="notices">Notices</div>
       <div class="side-group" style="margin-top:18px;"><span class="label">Reference</span></div>
@@ -138,6 +139,16 @@
       "warning":           { cls: "chip-ochre", label: "Warning" },
       "potential_trigger": { cls: "chip-blue",  label: "Potential trigger" },
       "trigger":           { cls: "chip-red",   label: "Trigger" },
+    };
+    const METRIC_LABELS = {
+      "ESTR":        "Euro short-term rate",
+      "EURIBOR_3M":  "3-month EURIBOR",
+      "EURIBOR_6M":  "6-month EURIBOR",
+      "EURIBOR_12M": "12-month EURIBOR",
+    };
+    const SOURCE_LABELS = {
+      "ecb_sdw_v1": { plain: "European Central Bank", jargon: "ECB SDW" },
+      "fake_v1":    { plain: "Synthetic source",      jargon: "FAKE" },
     };
     const NOTICE_TYPES = [
       { v: "FAILURE_TO_PAY",      l: "Failure to pay",       j: "§5(a)(i)" },
@@ -384,6 +395,7 @@
       const main = document.getElementById("page");
       if (view === "dashboard") return renderDashboard(main);
       if (view === "contracts") return exContract ? renderContractDetail(main) : renderContracts(main);
+      if (view === "oracle")    return renderOracle(main);
       if (view === "audit")     return renderAudit(main);
       if (view === "notices")   return renderNotices(main);
       if (view === "library")   return renderLibrary(main);
@@ -896,7 +908,7 @@
               <div style="font-size:12px;color:var(--ink-2);">European Central Bank <span class="jargon">ECB SDW</span></div>
               <div class="timestamp" style="margin-top:4px;">
                 ${seq != null ? "Attestation #" + String(seq).padStart(3, "0") : "Awaiting first attestation"}
-                · <a href="/oracle" style="color:var(--ochre);text-decoration:underline;text-underline-offset:2px;">Open oracle</a>
+                · <a href="/oracle" data-act="openOracle" style="color:var(--ochre);text-decoration:underline;text-underline-offset:2px;">Open oracle</a>
               </div>
             </div>
           </section>
@@ -1270,6 +1282,81 @@
     }
 
     /* ──────────────────────────────────────────────────────────────────
+       Oracle — internal view (mirrors /oracle inside the portal shell)
+       ────────────────────────────────────────────────────────────────── */
+    function renderOracle(main) {
+      const env = state.v2.latest, chain = state.v2.chain, h = state.v2.health;
+      const trigs = (state.v2.triggers || []).slice(0, 10);
+      let chainHtml;
+      if (chain?.ok) {
+        const n = chain.attestations_count || 0;
+        chainHtml = `<span class="chip chip-green"><span class="dot"></span><span>Chain integrity: OK · ${n} attestation${n === 1 ? "" : "s"}</span></span>`;
+      } else if (!chain || chain.fetchFailed) {
+        chainHtml = `<span class="chip chip-ochre"><span class="dot"></span><span>Chain integrity: unknown</span></span>`;
+      } else {
+        chainHtml = `<span class="chip chip-red"><span class="dot"></span><span>Chain integrity: ${esc(chain.error || "broken")}</span></span>`;
+      }
+      const dbVal = h?.db_reachable === false ? "Unreachable" : h?.db_reachable ? "Reachable" : "—";
+      const dbCls = h?.db_reachable === false ? "bad" : h?.db_reachable ? "ok" : "";
+      const fails = Number(h?.source_failures_24h || 0);
+      const trigsCnt = Number(h?.trigger_events_24h || 0);
+      const kpiHtml = `<section class="kpi-row fade-up" aria-label="Oracle health">
+        <div class="kpi"><div class="kpi-label">Database</div><div class="kpi-value ${dbCls}">${esc(dbVal)}</div><div class="kpi-foot">${esc(h?.db_path || "")}</div></div>
+        <div class="kpi"><div class="kpi-label">Last attestation</div><div class="kpi-value" title="${h?.last_attestation_at ? esc(formatTimestamp(h.last_attestation_at)) : ""}">${h?.last_attestation_at ? esc(formatRelative(h.last_attestation_at)) : "Never"}</div><div class="kpi-foot">${h?.last_attestation_at ? esc(formatTimestamp(h.last_attestation_at)) : "No attestation has been published yet"}</div></div>
+        <div class="kpi"><div class="kpi-label">Source failures (24h)</div><div class="kpi-value ${fails ? "warn" : "ok"}">${fails}</div><div class="kpi-foot">From upstream feeds</div></div>
+        <div class="kpi"><div class="kpi-label">Trigger events (24h)</div><div class="kpi-value ${trigsCnt ? "warn" : ""}">${trigsCnt}</div><div class="kpi-foot">Across monitored contracts</div></div>
+      </section>`;
+      let latestHtml;
+      if (!env?.attestation) {
+        latestHtml = `<div class="empty-state"><div class="empty-state-title">No attestations yet</div><div class="empty-state-body">The oracle has not yet published any verified market data.</div></div>`;
+      } else {
+        const att = env.attestation;
+        const dpsHtml = (env.datapoints || []).map(dp => {
+          const m = METRIC_LABELS[dp.metric] || dp.metric;
+          const s = SOURCE_LABELS[dp.source_id] || { plain: dp.source_id, jargon: dp.source_id };
+          const v = dp.unit === "decimal_fraction" ? formatDecimalRate(dp.value)
+            : dp.unit === "percent_per_annum" ? Number(dp.value).toFixed(3) + "%"
+            : dp.value + " " + (dp.unit || "");
+          return `<div class="dp-tile">
+            <div class="muted" style="font-size:12px;">${esc(m)} <span class="jargon">${esc(dp.metric)}</span></div>
+            <div class="dp-value">${esc(v)}</div>
+            <div style="font-size:12px;color:var(--ink-2);">${esc(s.plain)} <span class="jargon">${esc(s.jargon)}</span></div>
+            <div class="timestamp" style="margin-top:4px;">As of ${esc(formatRelative(dp.as_of + "T00:00:00Z"))} · ${esc(dp.as_of)}</div>
+          </div>`;
+        }).join("");
+        latestHtml = `<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">
+            <div class="section-h" style="border:0;padding:0;margin:0;"><span class="section-num">02</span><h2 class="section-title">Latest attestation</h2></div>
+            <div class="mono muted" style="font-size:12px;">#${String(att.sequence_number).padStart(3, "0")}</div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px;margin:14px 0 18px;">${dpsHtml}</div>
+          <details style="border-top:1px dashed var(--hair-2);padding-top:14px;">
+            <summary class="mono" style="cursor:pointer;color:var(--ink-3);font-size:11px;letter-spacing:.08em;text-transform:uppercase;list-style:none;">▸ Signature</summary>
+            <div style="margin-top:14px;display:grid;grid-template-columns:140px 1fr;gap:8px 14px;font-family:var(--mono);font-size:12px;">
+              <div class="muted">Current hash</div><div style="word-break:break-all;">${esc(att.current_hash)}</div>
+              <div class="muted">Previous hash</div><div style="word-break:break-all;">${esc(att.previous_hash || "Genesis")}</div>
+              <div class="muted">Payload hash</div><div style="word-break:break-all;">${esc(att.payload_hash)}</div>
+              <div class="muted">Signed at</div><div>${esc(formatTimestamp(att.signed_at))}</div>
+              <div class="muted">Versions</div><div>oracle ${esc(att.oracle_version)} · rules ${esc(att.rules_version)}</div>
+            </div>
+          </details>`;
+      }
+      main.innerHTML = `
+        <section class="page-h fade-up">
+          <div><div class="num">01 · Oracle</div><h1>Oracle</h1><p class="lede">Verified market data and contractual triggers, with full audit trail.</p></div>
+          <div class="aside">${chainHtml}</div>
+        </section>
+        <div class="stack">
+          ${kpiHtml}
+          <section class="card fade-up">${latestHtml}</section>
+          <section class="card fade-up">
+            <div class="section-h" style="margin-bottom:14px;"><span class="section-num">03</span><h2 class="section-title">Recent triggers</h2><span class="section-sub">Last 10 events</span></div>
+            ${renderTriggersTable(trigs)}
+          </section>
+        </div>`;
+      bindActionButtons(main);
+    }
+
+    /* ──────────────────────────────────────────────────────────────────
        Action handlers (wired via data-act attributes)
        ────────────────────────────────────────────────────────────────── */
     function bindActionButtons(root) {
@@ -1281,6 +1368,8 @@
         b.addEventListener("click", () => approveAdvisorB(b.dataset.cid, b)));
       root.querySelectorAll('[data-act="openContract"]').forEach(el =>
         el.addEventListener("click", (e) => { e.stopPropagation(); openContract(el.dataset.cid); }));
+      root.querySelectorAll('[data-act="openOracle"]').forEach(el =>
+        el.addEventListener("click", (e) => { e.preventDefault(); nav("oracle"); }));
     }
 
     async function approvePi(contractId, period, btn) {

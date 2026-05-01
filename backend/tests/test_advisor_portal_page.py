@@ -55,6 +55,14 @@ def test_advisor_portal_wires_design_system_and_five_views() -> None:
         assert needle in body, f"expected page to contain {needle!r}"
 
 
+def test_advisor_portal_exposes_oracle_as_sidebar_entry() -> None:
+    body = _client().get("/advisor").text
+    assert 'data-view="oracle"' in body, (
+        "advisor portal must expose Oracle as an internal sidebar entry"
+    )
+    assert "Oracle" in body, "advisor portal must surface the Oracle label"
+
+
 def test_advisor_portal_has_shed_legacy_palette_and_fonts() -> None:
     body = _client().get("/advisor").text
     forbidden = (
